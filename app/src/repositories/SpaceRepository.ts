@@ -9,8 +9,8 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import type { Space, SpaceRow, ServiceError } from '@/models/Space';
-import { getDatabase } from '@/db/client';
+import type { Space, SpaceRow, ServiceError } from '../models/Space';
+import { getDatabase } from '../db/client';
 
 /**
  * SpaceRepository handles all space-related database operations
@@ -62,41 +62,32 @@ export class SpaceRepository {
     }
   }
 
-  /**
+    /**
    * Get all spaces from the database
    *
-   * @returns Array of Space objects ordered by creation date (most recent first)
-   * @throws ServiceError if database operation fails
+   * @returns Array of Space objects ordered by newest first
    *
-   * SQL: SELECT id, name, created_at, updated_at FROM spaces ORDER BY created_at DESC
+   * SQL: SELECT * FROM spaces ORDER BY created_at DESC
    */
   static async getAllSpaces(): Promise<Space[]> {
     try {
       const db = getDatabase();
 
-      // Execute SELECT query
-      const result = await db.getAllAsync<SpaceRow>(
-        'SELECT id, name, created_at, updated_at FROM spaces ORDER BY created_at DESC'
+      const result = await db.getAllAsync(
+        'SELECT * FROM spaces ORDER BY created_at DESC'
       );
 
-      // Map database rows (snake_case) to Space objects (camelCase)
-      return result.map((row) => ({
+      return result.map((row: SpaceRow) => ({
         id: row.id,
         name: row.name,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
-      }));
+     }));
+     
     } catch (error) {
-      // Convert database error to ServiceError
-      const serviceError: ServiceError = {
-        code: 'DB_ERROR',
-        message: 'Failed to retrieve spaces. Try again.',
-      };
-
-      // Log error for debugging
       console.error('[SpaceRepository.getAllSpaces] Database error:', error);
-
-      throw serviceError;
+      throw new Error('Failed to retrieve spaces');
     }
   }
+  
 }

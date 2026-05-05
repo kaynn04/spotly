@@ -19,8 +19,8 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
-import type { Space } from '@/models/Space';
-import { SpaceService } from '@/services/SpaceService';
+import type { Space } from '../models/Space';
+import { SpaceService } from '../services/SpaceService';
 
 export function SpaceScreen() {
   const [name, setName] = useState('');

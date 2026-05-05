@@ -7,8 +7,8 @@
  * Implementation: T004 - Create app/src/services/SpaceService.ts
  */
 
-import type { Space, ServiceError } from '@/models/Space';
-import { SpaceRepository } from '@/repositories/SpaceRepository';
+import type { Space, ServiceError } from '../models/Space';
+import { SpaceRepository } from '../repositories/SpaceRepository';
 
 /**
  * SpaceService handles all space-related business logic
