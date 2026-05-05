@@ -5,6 +5,14 @@
 **Status**: Draft  
 **Input**: User description: "Allow users to create containers inside a space, and place items within those containers to better organize and locate belongings."
 
+## Clarifications
+
+### Session May 6, 2026
+
+- Q: "Add Item" button strategy? → A: Option C - Both FAB for global items + per-container buttons for containerized items
+- Q: Space-level items positioning? → A: Option C - "Uncategorized" section for explicit grouping
+- Q: Add Container button placement? → A: Option D - Section header ("Containers" with "+") above containers
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Create Container in Space (Priority: P1)
@@ -15,10 +23,12 @@ User wants to organize items into logical groups (e.g., "Kitchen Items", "Bedroo
 
 **Independent Test**: Can be fully tested by creating a container, verifying it appears in the space detail view with a distinct visual treatment, and confirming it persists in the database.
 
+**UI Pattern**: A "Containers" section header appears above the container list with a "+" button to add new containers (mirroring the "Items" section header pattern).
+
 **Acceptance Scenarios**:
 
-1. **Given** user is viewing a space detail screen, **When** user taps the "Add Container" button, **Then** a modal appears with a text input for container name
-2. **Given** the add container modal is open, **When** user enters "Kitchen Items" and taps "Create", **Then** the container is created, modal closes, and "Kitchen Items" appears in the container list
+1. **Given** user is viewing a space detail screen, **When** user taps the "+" button next to the "Containers" section header, **Then** a modal appears with a text input for container name
+2. **Given** the add container modal is open, **When** user enters "Kitchen Items" and taps "Create", **Then** the container is created, modal closes, and "Kitchen Items" appears in the container list below the "Containers" header
 3. **Given** a container has been created, **When** user navigates away and returns to the space, **Then** the container is still visible (data persisted)
 4. **Given** user taps "Create" without entering a name, **When** the form is submitted, **Then** an error alert appears saying "Container name cannot be empty"
 
@@ -32,12 +42,16 @@ User wants to place items into containers (e.g., put "Plates", "Cups", "Forks" i
 
 **Independent Test**: Can be fully tested by creating a container, adding items to that container, verifying items appear grouped under the container, and confirming data persistence.
 
+**Interaction Pattern**: Users can add items via:
+- **Per-container button**: "Add Item" button under each container header (adds directly to that container)
+- **FAB**: Global floating action button (opens modal with container selector or adds space-level item)
+
 **Acceptance Scenarios**:
 
-1. **Given** a container exists in the space, **When** user taps the "Add Item" button within/near the container, **Then** a modal appears for entering item name with a note indicating which container will contain it
-2. **Given** the add item modal is open and container is selected, **When** user enters "Plates" and taps "Add Item", **Then** the item appears in the container, is grouped visually under the container name, and modal closes
+1. **Given** a container exists in the space, **When** user taps the "Add Item" button under the container header, **Then** a modal appears for entering item name with the container pre-selected
+2. **Given** the add item modal is open with a container selected, **When** user enters "Plates" and taps "Add Item", **Then** the item appears in the container, is grouped visually under the container name, and modal closes
 3. **Given** items exist in multiple containers, **When** user views the space detail screen, **Then** items are displayed grouped by their container with a visual indicator (e.g., indentation, grouping header)
-4. **Given** user taps "Add Item" without selecting a container, **When** the item is created, **Then** it goes to the space root level (not in any container)
+4. **Given** user taps the FAB (global) without a container selected, **When** the item is created, **Then** it goes to the space root level (not in any container)
 
 ---
 
@@ -49,11 +63,17 @@ User wants to see items organized by container on the space detail screen so the
 
 **Independent Test**: Can be fully tested by creating multiple containers with multiple items each, then verifying the display shows proper grouping with visual hierarchy.
 
+**Display Structure**: 
+- "Containers" section header with "+" button
+- Container names as subsections, each with their grouped items
+- "Uncategorized" section header for space-level items
+- "Items" section header (existing, for backward compatibility if needed)
+
 **Acceptance Scenarios**:
 
-1. **Given** a space has 3 containers with 2 items each, **When** user views the space detail screen, **Then** containers appear as headers/sections with their items grouped underneath
-2. **Given** a container has items and there are also space-level items, **When** user views the space, **Then** space-level items appear separately (either at top or in "Uncategorized" section)
-3. **Given** a space has many containers, **When** user scrolls the list, **Then** all containers remain scrollable without performance degradation
+1. **Given** a space has 3 containers with 2 items each, **When** user views the space detail screen, **Then** a "Containers" section header appears, followed by containers as subsections with their items grouped underneath
+2. **Given** a container has items and there are also space-level items, **When** user views the space, **Then** space-level items appear in an "Uncategorized" section with visual distinction from containers
+3. **Given** a space has many containers, **When** user scrolls the list, **Then** all containers and the Uncategorized section remain scrollable without performance degradation
 4. **Given** a container has no items, **When** user views the space, **Then** the empty container still appears but may show "No items in this container" message
 
 ---
