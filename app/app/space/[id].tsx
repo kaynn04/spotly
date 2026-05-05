@@ -229,6 +229,49 @@ export default function SpaceDetailScreen() {
     }
   }
 
+  function handleAddContainerPress() {
+    if (!id) return;
+
+    // Use Alert.prompt for simple input (no modal)
+    Alert.prompt(
+      'Add Container',
+      'Enter container name',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Add',
+          onPress: (name?: string) => {
+            if (name) {
+              handleCreateContainer(name);
+            }
+          },
+        },
+      ],
+      'plain-text',
+      '',
+      'default'
+    );
+  }
+
+  async function handleCreateContainer(name: string | undefined) {
+    if (!id || !name) return;
+
+    try {
+      await ContainerService.createContainer(name, id);
+      await loadContainers();
+      await loadItems();
+    } catch (error) {
+      console.error('Failed to create container:', error);
+      // Check if it's a validation error
+      if (error && typeof error === 'object' && 'code' in error) {
+        const err = error as any;
+        Alert.alert('Error', err.message || 'Failed to create container.');
+      } else {
+        Alert.alert('Error', 'Failed to create container. Please try again.');
+      }
+    }
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -257,7 +300,29 @@ export default function SpaceDetailScreen() {
                 </Text>
               </View>
 
-              {/* Section Header */}
+              {/* Containers Section Header with Add Button */}
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionHeaderText}>Containers</Text>
+                <Pressable
+                  style={styles.addContainerButton}
+                  onPress={handleAddContainerPress}
+                >
+                  <Text style={styles.addContainerButtonText}>+</Text>
+                </Pressable>
+              </View>
+
+              {/* Container List */}
+              {containers.length > 0 && (
+                <View style={styles.containersList}>
+                  {containers.map((container) => (
+                    <View key={container.id} style={styles.containerTag}>
+                      <Text style={styles.containerTagText}>{container.name}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Items Section Header */}
               <Text style={styles.itemsHeader}>Items</Text>
             </View>
 
@@ -483,6 +548,51 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#222',
     marginTop: 8,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  sectionHeaderText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#222',
+  },
+  addContainerButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#4444ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addContainerButtonText: {
+    fontSize: 20,
+    color: '#fff',
+    fontWeight: '400',
+    lineHeight: 24,
+  },
+  containersList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  containerTag: {
+    backgroundColor: '#e8e8ff',
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#d0d0ff',
+  },
+  containerTagText: {
+    fontSize: 13,
+    color: '#4444ff',
+    fontWeight: '500',
   },
   sectionHeader: {
     fontSize: 16,
