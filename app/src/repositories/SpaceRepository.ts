@@ -61,4 +61,42 @@ export class SpaceRepository {
       throw serviceError;
     }
   }
+
+  /**
+   * Get all spaces from the database
+   *
+   * @returns Array of Space objects ordered by creation date (most recent first)
+   * @throws ServiceError if database operation fails
+   *
+   * SQL: SELECT id, name, created_at, updated_at FROM spaces ORDER BY created_at DESC
+   */
+  static async getAllSpaces(): Promise<Space[]> {
+    try {
+      const db = getDatabase();
+
+      // Execute SELECT query
+      const result = await db.getAllAsync<SpaceRow>(
+        'SELECT id, name, created_at, updated_at FROM spaces ORDER BY created_at DESC'
+      );
+
+      // Map database rows (snake_case) to Space objects (camelCase)
+      return result.map((row) => ({
+        id: row.id,
+        name: row.name,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+    } catch (error) {
+      // Convert database error to ServiceError
+      const serviceError: ServiceError = {
+        code: 'DB_ERROR',
+        message: 'Failed to retrieve spaces. Try again.',
+      };
+
+      // Log error for debugging
+      console.error('[SpaceRepository.getAllSpaces] Database error:', error);
+
+      throw serviceError;
+    }
+  }
 }
