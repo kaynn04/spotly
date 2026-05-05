@@ -70,4 +70,14 @@ export class SpaceService {
       throw serviceError;
     }
   }
+
+  /**
+   * Get all spaces
+   *
+   * @returns Array of Space objects ordered by creation date (most recent first)
+   * @throws ServiceError if database operation fails
+   */
+  static async getAllSpaces(): Promise<Space[]> {
+    return SpaceRepository.getAllSpaces();
+  }
 }

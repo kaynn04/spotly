@@ -4,4 +4,4 @@ Phase MVP (Create Space Only)
 [X] T2: Implement SpaceRepository.createSpace (INSERT)
 [X] T3: Implement SpaceRepository.getAllSpaces (SELECT)
 [X] T4: Implement SpaceService.createSpace (validation + UUID + timestamps)
-- [ ] T5: Implement SpaceService.getAllSpaces
+[X] T5: Implement SpaceService.getAllSpaces
