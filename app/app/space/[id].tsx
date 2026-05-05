@@ -12,14 +12,17 @@ import { View, Text, StyleSheet, Button, Alert, Pressable, FlatList, TextInput, 
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import type { Space } from '../../src/models/Space';
 import type { Item } from '../../src/models/Item';
+import type { Container } from '../../src/models/Container';
 import { SpaceService } from '../../src/services/SpaceService';
 import { ItemService } from '../../src/services/ItemService';
+import { ContainerService } from '../../src/services/ContainerService';
 
 export default function SpaceDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [space, setSpace] = useState<Space | null>(null);
   const [items, setItems] = useState<Item[]>([]);
+  const [containers, setContainers] = useState<Container[]>([]);
   const [itemName, setItemName] = useState<string>('');
   const [allSpaces, setAllSpaces] = useState<Space[]>([]);
   const [showMoveModal, setShowMoveModal] = useState<boolean>(false);
@@ -32,11 +35,12 @@ export default function SpaceDetailScreen() {
     loadSpace();
   }, [id]);
 
-  // Refresh items when screen comes into focus
+  // Refresh items and containers when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
       if (space?.id) {
         loadItems();
+        loadContainers();
       }
     }, [space?.id])
   );
@@ -79,9 +83,59 @@ export default function SpaceDetailScreen() {
     }
   }
 
+  async function loadContainers() {
+    if (!id) return;
+
+    try {
+      const result = await ContainerService.getContainersBySpaceId(id);
+      setContainers(result);
+    } catch (error) {
+      console.error('Failed to load containers:', error);
+      setContainers([]);
+    }
+  }
+
   function handleMovePress(itemId: string) {
     setSelectedMoveItemId(itemId);
     setShowMoveModal(true);
+  }
+
+  /**
+   * Build grouped items data structure
+   * Returns array of sections: [uncategorized, container1, container2, ...]
+   */
+  function getGroupedItems() {
+    const groups: {
+      title: string;
+      containerId: string | null;
+      items: Item[];
+    }[] = [];
+
+    // Add uncategorized items first
+    const uncategorizedItems = items.filter((item) => !item.containerId);
+    if (uncategorizedItems.length > 0) {
+      groups.push({
+        title: 'Uncategorized',
+        containerId: null,
+        items: uncategorizedItems,
+      });
+    }
+
+    // Add container sections
+    containers.forEach((container) => {
+      const containerItems = items.filter(
+        (item) => item.containerId === container.id
+      );
+      if (containerItems.length > 0) {
+        groups.push({
+          title: container.name,
+          containerId: container.id,
+          items: containerItems,
+        });
+      }
+    });
+
+    return groups;
   }
 
   async function handleSelectTargetSpace(targetSpaceId: string) {
@@ -211,30 +265,38 @@ export default function SpaceDetailScreen() {
             <FlatList
               style={styles.itemsList}
               contentContainerStyle={styles.itemsListContent}
-              data={items}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <View style={styles.itemCard}>
-                  <Text style={styles.itemName}>{item.name}</Text>
-                  <View style={styles.itemActions}>
-                    <Pressable
-                      style={[
-                        styles.button,
-                        styles.moveButton,
-                        allSpaces.length < 2 && styles.disabledButton,
-                      ]}
-                      onPress={() => handleMovePress(item.id)}
-                      disabled={allSpaces.length < 2}
-                    >
-                      <Text style={styles.moveButtonText}>Move</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.button, styles.deleteItemButton]}
-                      onPress={() => handleDeleteItemPress(item.id, item.name)}
-                    >
-                      <Text style={styles.deleteItemButtonText}>Delete</Text>
-                    </Pressable>
-                  </View>
+              data={getGroupedItems()}
+              keyExtractor={(section, index) => `section-${index}`}
+              renderItem={({ item: section }) => (
+                <View key={section.containerId}>
+                  {/* Section Header */}
+                  <Text style={styles.sectionHeader}>{section.title}</Text>
+                  
+                  {/* Items in Section */}
+                  {section.items.map((item) => (
+                    <View key={item.id} style={styles.itemCard}>
+                      <Text style={styles.itemName}>{item.name}</Text>
+                      <View style={styles.itemActions}>
+                        <Pressable
+                          style={[
+                            styles.button,
+                            styles.moveButton,
+                            allSpaces.length < 2 && styles.disabledButton,
+                          ]}
+                          onPress={() => handleMovePress(item.id)}
+                          disabled={allSpaces.length < 2}
+                        >
+                          <Text style={styles.moveButtonText}>Move</Text>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.button, styles.deleteItemButton]}
+                          onPress={() => handleDeleteItemPress(item.id, item.name)}
+                        >
+                          <Text style={styles.deleteItemButtonText}>Delete</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))}
                 </View>
               )}
               ListEmptyComponent={
@@ -421,6 +483,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#222',
     marginTop: 8,
+  },
+  sectionHeader: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#444',
+    marginTop: 16,
+    marginBottom: 8,
+    paddingHorizontal: 4,
   },
   itemsList: {
     flex: 1,
