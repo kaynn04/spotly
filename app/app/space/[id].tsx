@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Button } from 'react-native';
+import { View, Text, StyleSheet, Button, Alert, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Space } from '../../src/models/Space';
 import { SpaceService } from '../../src/services/SpaceService';
@@ -35,6 +35,37 @@ export default function SpaceDetailScreen() {
     }
   }
 
+  function handleDeletePress() {
+    if (!space) return;
+
+    // Show confirmation dialog
+    Alert.alert(
+      'Delete Space',
+      `Delete '${space.name}'? This cannot be undone.`,
+      [
+        { text: 'Cancel', onPress: () => {}, style: 'cancel' },
+        {
+          text: 'Delete',
+          onPress: () => deleteSpace(),
+          style: 'destructive',
+        },
+      ]
+    );
+  }
+
+  async function deleteSpace() {
+    if (!id) return;
+
+    try {
+      await SpaceService.deleteSpace(id);
+      // Navigate back to space list after successful deletion
+      router.back();
+    } catch (error) {
+      console.error('Failed to delete space:', error);
+      Alert.alert('Error', 'Failed to delete space. Please try again.');
+    }
+  }
+
   return (
     <View style={styles.container}>
       {/* Header with back button */}
@@ -53,6 +84,14 @@ export default function SpaceDetailScreen() {
             <Text style={styles.value}>
               {new Date(space.createdAt).toLocaleDateString()}
             </Text>
+
+            {/* Delete Button */}
+            <Pressable
+              style={[styles.button, styles.deleteButton]}
+              onPress={handleDeletePress}
+            >
+              <Text style={styles.deleteButtonText}>Delete Space</Text>
+            </Pressable>
           </>
         ) : (
           <Text style={styles.notFound}>Space not found</Text>
@@ -104,5 +143,20 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'center',
     marginTop: 24,
+  },
+  button: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  deleteButton: {
+    backgroundColor: '#ff4444',
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

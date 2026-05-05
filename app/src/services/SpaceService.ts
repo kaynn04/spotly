@@ -91,4 +91,15 @@ export class SpaceService {
   static async getSpaceById(id: string): Promise<Space | null> {
     return SpaceRepository.getSpaceById(id);
   }
+
+  /**
+   * Delete a space by id
+   *
+   * @param id - The space id to delete
+   * @returns void (no return value)
+   * @throws ServiceError if database operation fails
+   */
+  static async deleteSpace(id: string): Promise<void> {
+    return SpaceRepository.deleteSpace(id);
+  }
 }
