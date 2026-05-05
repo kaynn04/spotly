@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Button, Alert, Pressable, FlatList, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Button, Alert, Pressable, FlatList, TextInput, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import type { Space } from '../../src/models/Space';
 import type { Item } from '../../src/models/Item';
@@ -21,6 +21,9 @@ export default function SpaceDetailScreen() {
   const [space, setSpace] = useState<Space | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [itemName, setItemName] = useState<string>('');
+  const [allSpaces, setAllSpaces] = useState<Space[]>([]);
+  const [showMoveModal, setShowMoveModal] = useState<boolean>(false);
+  const [selectedMoveItemId, setSelectedMoveItemId] = useState<string | null>(null);
 
   // Fetch space details on mount
   useEffect(() => {
@@ -45,6 +48,7 @@ export default function SpaceDetailScreen() {
       if (result?.id) {
         loadItems();
       }
+      loadAllSpaces();
     } catch (error) {
       console.error('Failed to load space:', error);
       setSpace(null);
@@ -60,6 +64,36 @@ export default function SpaceDetailScreen() {
     } catch (error) {
       console.error('Failed to load items:', error);
       setItems([]);
+    }
+  }
+
+  async function loadAllSpaces() {
+    try {
+      const result = await SpaceService.getAllSpaces();
+      setAllSpaces(result);
+    } catch (error) {
+      console.error('Failed to load spaces:', error);
+      setAllSpaces([]);
+    }
+  }
+
+  function handleMovePress(itemId: string) {
+    setSelectedMoveItemId(itemId);
+    setShowMoveModal(true);
+  }
+
+  async function handleSelectTargetSpace(targetSpaceId: string) {
+    if (!selectedMoveItemId || !space) return;
+
+    try {
+      await ItemService.moveItem(selectedMoveItemId, space.id, targetSpaceId);
+      setShowMoveModal(false);
+      setSelectedMoveItemId(null);
+      // Refresh items from current space
+      await loadItems();
+    } catch (error) {
+      console.error('Failed to move item:', error);
+      Alert.alert('Error', 'Failed to move item. Please try again.');
     }
   }
 
@@ -145,7 +179,20 @@ export default function SpaceDetailScreen() {
               data={items}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
-                <Text style={styles.itemName}>{item.name}</Text>
+                <View style={styles.itemRow}>
+                  <Text style={styles.itemName}>{item.name}</Text>
+                  <Pressable
+                    style={[
+                      styles.button,
+                      styles.moveButton,
+                      allSpaces.length < 2 && styles.disabledButton,
+                    ]}
+                    onPress={() => handleMovePress(item.id)}
+                    disabled={allSpaces.length < 2}
+                  >
+                    <Text style={styles.moveButtonText}>Move</Text>
+                  </Pressable>
+                </View>
               )}
               scrollEnabled={false}
               ListEmptyComponent={
@@ -169,6 +216,41 @@ export default function SpaceDetailScreen() {
                 <Text style={styles.addButtonText}>Add Item</Text>
               </Pressable>
             </View>
+
+            {/* Move Item Modal */}
+            <Modal
+              visible={showMoveModal}
+              transparent={true}
+              animationType="fade"
+              onRequestClose={() => setShowMoveModal(false)}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                  <Text style={styles.modalTitle}>Move to space</Text>
+                  
+                  <FlatList
+                    data={allSpaces.filter((s) => s.id !== space?.id)}
+                    keyExtractor={(s) => s.id}
+                    renderItem={({ item: targetSpace }) => (
+                      <Pressable
+                        style={styles.spaceOption}
+                        onPress={() => handleSelectTargetSpace(targetSpace.id)}
+                      >
+                        <Text style={styles.spaceOptionText}>{targetSpace.name}</Text>
+                      </Pressable>
+                    )}
+                    scrollEnabled={true}
+                  />
+
+                  <Pressable
+                    style={[styles.button, styles.cancelButton]}
+                    onPress={() => setShowMoveModal(false)}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </Modal>
           </>
         ) : (
           <Text style={styles.notFound}>Space not found</Text>
@@ -256,6 +338,26 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     paddingVertical: 8,
   },
+  itemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  moveButton: {
+    backgroundColor: '#4444ff',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  moveButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  disabledButton: {
+    backgroundColor: '#cccccc',
+    opacity: 0.5,
+  },
   addItemContainer: {
     flexDirection: 'row',
     gap: 8,
@@ -277,6 +379,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   addButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 20,
+    width: '80%',
+    maxHeight: '60%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  spaceOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  spaceOptionText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  cancelButton: {
+    backgroundColor: '#999',
+    marginTop: 16,
+    paddingVertical: 10,
+  },
+  cancelButtonText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
