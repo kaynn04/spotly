@@ -9,7 +9,7 @@
  * Implementation: UI for Create Space feature
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   TextInput,
@@ -18,6 +18,7 @@ import {
   Text,
   StyleSheet,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import type { Space } from '../models/Space';
 import { SpaceService } from '../services/SpaceService';
@@ -25,11 +26,21 @@ import { SpaceService } from '../services/SpaceService';
 export function SpaceScreen() {
   const [name, setName] = useState('');
   const [spaces, setSpaces] = useState<Space[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const createTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load spaces on screen mount
   useEffect(() => {
     loadSpaces();
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (createTimeoutRef.current) {
+        clearTimeout(createTimeoutRef.current);
+      }
+    };
   }, []);
 
   /**
@@ -37,37 +48,60 @@ export function SpaceScreen() {
    */
   async function loadSpaces() {
     try {
-      setLoading(true);
+      setIsLoading(true);
       const result = await SpaceService.getAllSpaces();
       setSpaces(result);
     } catch (error) {
       Alert.alert('Error', 'Failed to load spaces');
       console.error('loadSpaces error:', error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   }
 
   /**
    * Create new space and reload list
+   * Includes debouncing to prevent rapid submissions
    */
   async function handleCreateSpace() {
+    // Prevent multiple rapid submissions
+    if (isCreating) {
+      return;
+    }
+
     if (!name.trim()) {
-      Alert.alert('Error', 'Please enter a space name');
+      Alert.alert('Validation Error', 'Please enter a space name');
       return;
     }
 
     try {
-      setLoading(true);
-      await SpaceService.createSpace(name);
+      setIsCreating(true);
+      const trimmedName = name.trim();
+
+      // Create space via service
+      await SpaceService.createSpace(trimmedName);
+
+      // Clear input immediately for better UX
       setName('');
+
+      // Show brief success message
+      setSuccessMessage('Space created!');
+      if (createTimeoutRef.current) {
+        clearTimeout(createTimeoutRef.current);
+      }
+      createTimeoutRef.current = setTimeout(() => {
+        setSuccessMessage('');
+      }, 2000);
+
+      // Reload spaces from database
       await loadSpaces();
     } catch (error: any) {
-      const message = error?.message || 'Failed to create space';
-      Alert.alert('Error', message);
+      // Extract error message from ServiceError
+      const message = error?.message || 'Failed to create space. Try again.';
+      Alert.alert('Creation Error', message);
       console.error('createSpace error:', error);
     } finally {
-      setLoading(false);
+      setIsCreating(false);
     }
   }
 
@@ -90,18 +124,34 @@ export function SpaceScreen() {
       {/* Input and Create Button */}
       <View style={styles.inputSection}>
         <TextInput
-          style={styles.textInput}
+          style={[styles.textInput, isCreating && styles.textInputDisabled]}
           placeholder="Enter space name"
+          placeholderTextColor="#999"
           value={name}
           onChangeText={setName}
-          editable={!loading}
+          editable={!isCreating}
           maxLength={100}
         />
-        <Button
-          title="Create"
-          onPress={handleCreateSpace}
-          disabled={loading}
-        />
+
+        <View style={styles.createButtonContainer}>
+          <Button
+            title={isCreating ? 'Creating...' : 'Create'}
+            onPress={handleCreateSpace}
+            disabled={isCreating || isLoading}
+          />
+          {isCreating && (
+            <ActivityIndicator
+              size="small"
+              color="#0000ff"
+              style={styles.spinner}
+            />
+          )}
+        </View>
+
+        {/* Success message */}
+        {successMessage ? (
+          <Text style={styles.successMessage}>{successMessage}</Text>
+        ) : null}
       </View>
 
       {/* Spaces List */}
@@ -111,7 +161,7 @@ export function SpaceScreen() {
         renderItem={renderSpaceItem}
         ListEmptyComponent={
           <Text style={styles.emptyText}>
-            {loading ? 'Loading...' : 'No spaces yet. Create one!'}
+            {isLoading ? 'Loading spaces...' : 'No spaces yet. Create one!'}
           </Text>
         }
         style={styles.list}
@@ -136,6 +186,24 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     padding: 8,
     fontSize: 16,
+  },
+  textInputDisabled: {
+    backgroundColor: '#f5f5f5',
+    color: '#999',
+  },
+  createButtonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  spinner: {
+    marginLeft: 8,
+  },
+  successMessage: {
+    color: '#28a745',
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 4,
   },
   list: {
     flex: 1,
