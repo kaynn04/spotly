@@ -22,13 +22,18 @@ export class ItemRepository {
    *
    * @param name - Item name
    * @param spaceId - The space id this item belongs to
+   * @param containerId - Optional container id (null for space-level items)
    * @returns The created Item object with generated id and timestamp
    * @throws ServiceError if database operation fails
    *
-   * SQL: INSERT INTO items (id, name, space_id, created_at) VALUES (?, ?, ?, ?)
+   * SQL: INSERT INTO items (id, name, space_id, container_id, created_at) VALUES (?, ?, ?, ?, ?)
    * Parameterized query prevents SQL injection
    */
-  static async createItem(name: string, spaceId: string): Promise<Item> {
+  static async createItem(
+    name: string,
+    spaceId: string,
+    containerId?: string | null
+  ): Promise<Item> {
     try {
       const db = getDatabase();
 
@@ -36,10 +41,10 @@ export class ItemRepository {
       const id = uuidv4();
       const now = new Date().toISOString();
 
-      // Execute parameterized INSERT query
+      // Execute parameterized INSERT query (handle optional containerId)
       await db.runAsync(
-        'INSERT INTO items (id, name, space_id, created_at) VALUES (?, ?, ?, ?)',
-        [id, name, spaceId, now]
+        'INSERT INTO items (id, name, space_id, container_id, created_at) VALUES (?, ?, ?, ?, ?)',
+        [id, name, spaceId, containerId ?? null, now]
       );
 
       // Return the created Item object
@@ -47,6 +52,7 @@ export class ItemRepository {
         id,
         name,
         spaceId,
+        containerId,
         createdAt: now,
       };
     } catch (error) {

@@ -28,6 +28,7 @@ export default function SpaceDetailScreen() {
   const [showMoveModal, setShowMoveModal] = useState<boolean>(false);
   const [selectedMoveItemId, setSelectedMoveItemId] = useState<string | null>(null);
   const [showAddItemModal, setShowAddItemModal] = useState<boolean>(false);
+  const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null);
   const [showHeaderMenu, setShowHeaderMenu] = useState<boolean>(false);
 
   // Fetch space details on mount
@@ -113,7 +114,7 @@ export default function SpaceDetailScreen() {
 
     // Add uncategorized items first
     const uncategorizedItems = items.filter((item) => !item.containerId);
-    if (uncategorizedItems.length > 0) {
+    if (uncategorizedItems.length > 0 || containers.length === 0) {
       groups.push({
         title: 'Uncategorized',
         containerId: null,
@@ -126,16 +127,23 @@ export default function SpaceDetailScreen() {
       const containerItems = items.filter(
         (item) => item.containerId === container.id
       );
-      if (containerItems.length > 0) {
-        groups.push({
-          title: container.name,
-          containerId: container.id,
-          items: containerItems,
-        });
-      }
+      groups.push({
+        title: container.name,
+        containerId: container.id,
+        items: containerItems,
+      });
     });
 
     return groups;
+  }
+
+  /**
+   * Get container name by id
+   */
+  function getContainerName(containerId: string | null): string {
+    if (!containerId) return 'Uncategorized';
+    const container = containers.find((c) => c.id === containerId);
+    return container ? container.name : 'Unknown';
   }
 
   async function handleSelectTargetSpace(targetSpaceId: string) {
@@ -219,14 +227,25 @@ export default function SpaceDetailScreen() {
     }
 
     try {
-      await ItemService.createItem(id, itemName);
+      await ItemService.createItem(id, itemName, selectedContainerId);
       setItemName('');
       setShowAddItemModal(false);
+      setSelectedContainerId(null);
       await loadItems();
     } catch (error) {
       console.error('Failed to add item:', error);
       Alert.alert('Error', 'Failed to add item. Please try again.');
     }
+  }
+
+  function handleAddItemToContainer(containerId: string) {
+    setSelectedContainerId(containerId);
+    setShowAddItemModal(true);
+  }
+
+  function handleAddSpaceItem() {
+    setSelectedContainerId(null);
+    setShowAddItemModal(true);
   }
 
   function handleAddContainerPress() {
@@ -334,34 +353,50 @@ export default function SpaceDetailScreen() {
               keyExtractor={(section, index) => `section-${index}`}
               renderItem={({ item: section }) => (
                 <View key={section.containerId}>
-                  {/* Section Header */}
-                  <Text style={styles.sectionHeader}>{section.title}</Text>
-                  
+                  {/* Section Header with Add Button */}
+                  <View style={styles.containerSectionHeader}>
+                    <Text style={styles.sectionHeader}>{section.title}</Text>
+                    <Pressable
+                      style={styles.sectionAddButton}
+                      onPress={() =>
+                        section.containerId
+                          ? handleAddItemToContainer(section.containerId)
+                          : handleAddSpaceItem()
+                      }
+                    >
+                      <Text style={styles.sectionAddButtonText}>+</Text>
+                    </Pressable>
+                  </View>
+
                   {/* Items in Section */}
-                  {section.items.map((item) => (
-                    <View key={item.id} style={styles.itemCard}>
-                      <Text style={styles.itemName}>{item.name}</Text>
-                      <View style={styles.itemActions}>
-                        <Pressable
-                          style={[
-                            styles.button,
-                            styles.moveButton,
-                            allSpaces.length < 2 && styles.disabledButton,
-                          ]}
-                          onPress={() => handleMovePress(item.id)}
-                          disabled={allSpaces.length < 2}
-                        >
-                          <Text style={styles.moveButtonText}>Move</Text>
-                        </Pressable>
-                        <Pressable
-                          style={[styles.button, styles.deleteItemButton]}
-                          onPress={() => handleDeleteItemPress(item.id, item.name)}
-                        >
-                          <Text style={styles.deleteItemButtonText}>Delete</Text>
-                        </Pressable>
+                  {section.items.length > 0 ? (
+                    section.items.map((item) => (
+                      <View key={item.id} style={styles.itemCard}>
+                        <Text style={styles.itemName}>{item.name}</Text>
+                        <View style={styles.itemActions}>
+                          <Pressable
+                            style={[
+                              styles.button,
+                              styles.moveButton,
+                              allSpaces.length < 2 && styles.disabledButton,
+                            ]}
+                            onPress={() => handleMovePress(item.id)}
+                            disabled={allSpaces.length < 2}
+                          >
+                            <Text style={styles.moveButtonText}>Move</Text>
+                          </Pressable>
+                          <Pressable
+                            style={[styles.button, styles.deleteItemButton]}
+                            onPress={() => handleDeleteItemPress(item.id, item.name)}
+                          >
+                            <Text style={styles.deleteItemButtonText}>Delete</Text>
+                          </Pressable>
+                        </View>
                       </View>
-                    </View>
-                  ))}
+                    ))
+                  ) : (
+                    <Text style={styles.emptySection}>No items</Text>
+                  )}
                 </View>
               )}
               ListEmptyComponent={
@@ -446,11 +481,22 @@ export default function SpaceDetailScreen() {
               onRequestClose={() => {
                 setShowAddItemModal(false);
                 setItemName('');
+                setSelectedContainerId(null);
               }}
             >
               <View style={styles.modalOverlay}>
                 <View style={styles.modalContent}>
-                  <Text style={styles.modalTitle}>Add Item</Text>
+                  <Text style={styles.modalTitle}>
+                    Add Item
+                    {selectedContainerId && (
+                      <>
+                        {'\n'}
+                        <Text style={styles.modalSubtitle}>
+                          to {getContainerName(selectedContainerId)}
+                        </Text>
+                      </>
+                    )}
+                  </Text>
                   <TextInput
                     style={styles.itemInput}
                     placeholder="Enter item name"
@@ -471,6 +517,7 @@ export default function SpaceDetailScreen() {
                       onPress={() => {
                         setShowAddItemModal(false);
                         setItemName('');
+                        setSelectedContainerId(null);
                       }}
                     >
                       <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -600,6 +647,34 @@ const styles = StyleSheet.create({
     color: '#444',
     marginTop: 16,
     marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  containerSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  sectionAddButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#4444ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sectionAddButtonText: {
+    fontSize: 18,
+    color: '#fff',
+    fontWeight: '400',
+    lineHeight: 22,
+  },
+  emptySection: {
+    fontSize: 14,
+    color: '#bbb',
+    fontStyle: 'italic',
+    paddingVertical: 12,
     paddingHorizontal: 4,
   },
   itemsList: {
@@ -763,6 +838,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 16,
     color: '#222',
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#4444ff',
   },
   spaceOption: {
     paddingVertical: 12,

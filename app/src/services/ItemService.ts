@@ -20,6 +20,7 @@ export class ItemService {
    *
    * @param spaceId - The space id this item belongs to
    * @param name - Item name from user input
+   * @param containerId - Optional container id (null for space-level items)
    * @returns The created Item object with id, name, spaceId, and timestamp
    * @throws ServiceError if validation fails or database operation fails
    *
@@ -27,7 +28,11 @@ export class ItemService {
    * - Trims input
    * - Requires non-empty name after trimming
    */
-  static async createItem(spaceId: string, name: string): Promise<Item> {
+  static async createItem(
+    spaceId: string,
+    name: string,
+    containerId?: string | null
+  ): Promise<Item> {
     try {
       // Trim input
       const trimmedName = name.trim();
@@ -42,7 +47,7 @@ export class ItemService {
       }
 
       // Create item in database via repository
-      const item = await ItemRepository.createItem(trimmedName, spaceId);
+      const item = await ItemRepository.createItem(trimmedName, spaceId, containerId);
 
       return item;
     } catch (error) {
