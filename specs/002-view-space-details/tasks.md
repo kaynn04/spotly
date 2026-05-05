@@ -16,7 +16,7 @@
 ## Phase 2: UI & Navigation
 
 - [ ] T003 Create SpaceDetailScreen at app/src/screens/space/[id].tsx with fetch, display, and error handling
-- [ ] T004 [P] Update SpaceScreen.tsx renderSpaceItem to wrap in Pressable and navigate to space detail
+- [X] T004 [P] Update SpaceScreen.tsx renderSpaceItem to wrap in Pressable and navigate to space detail
 
 ---
 

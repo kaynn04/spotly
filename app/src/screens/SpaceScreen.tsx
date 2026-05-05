@@ -19,11 +19,14 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Pressable,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import type { Space } from '../models/Space';
 import { SpaceService } from '../services/SpaceService';
 
 export function SpaceScreen() {
+  const router = useRouter();
   const [name, setName] = useState('');
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -110,12 +113,15 @@ export function SpaceScreen() {
    */
   function renderSpaceItem({ item }: { item: Space }) {
     return (
-      <View style={styles.spaceItem}>
+      <Pressable 
+        onPress={() => router.push(`/space/${item.id}`)}
+        style={styles.spaceItem}
+      >
         <Text style={styles.spaceName}>{item.name}</Text>
         <Text style={styles.spaceDate}>
           {new Date(item.createdAt).toLocaleDateString()}
         </Text>
-      </View>
+      </Pressable>
     );
   }
 
