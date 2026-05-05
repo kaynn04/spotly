@@ -5,6 +5,39 @@
 **Status**: Draft  
 **Input**: User description: "create_space"
 
+## Description
+
+Create a new space stored locally on the device using expo-sqlite. A space represents a physical location where users can organize and track their belongings (e.g., Home, Office, Dorm, Car).
+
+## Core User Story
+
+**As a** user  
+**I want to** create a space  
+**So that** I can organize my items by location
+
+## Inputs & Outputs
+
+**Input**:
+- `name`: string (required, max 100 characters)
+
+**Output**:
+- Space object: `{ id, name, createdAt, updatedAt }`
+
+## Acceptance Criteria (Core Feature)
+
+✅ Name must not be empty  
+✅ Name must be trimmed (leading/trailing whitespace removed)  
+✅ Name must not exceed 100 characters  
+✅ Space is saved to expo-sqlite  
+✅ Space is returned after creation  
+
+## Constraints
+
+- **Database**: expo-sqlite only (no ORM)
+- **Architecture**: Offline-first (all data persists locally)
+- **User Model**: Single-user only (no authentication)
+- **Data Format**: All queries use parameterized SQL
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Create a New Space (Priority: P1)
@@ -74,41 +107,45 @@ Users need to remove spaces they no longer use (e.g., moving to a new apartment,
 
 ### Edge Cases
 
-- What happens if user tries to create a space with an empty name? → Show validation error, don't create
-- What happens if user creates two spaces with the same name? → Allow it (duplicates allowed, user responsibility)
-- What happens if the database becomes corrupted? → Handle gracefully with error message, preserve existing data if possible
-- What if user deletes a space that contains items? → Allow deletion; decide separately in item management spec whether items are also deleted or orphaned
+- **Empty name**: Show validation error, don't create
+- **Whitespace-only name** (e.g., "   "): Trim first, then validate as empty
+- **Name with leading/trailing spaces**: Trim before saving (e.g., " Home " becomes "Home")
+- **Duplicate names**: Allow (same name in different spaces is allowed, user responsibility)
+- **Name exactly 100 characters**: Allowed
+- **Name exceeds 100 characters**: Validation error, don't create
+- **Database error on write**: Return error to user, don't persist
+- **Space deletion with items**: Handle per item management spec (separate decision)
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: System MUST allow users to create a new space with a name
+- **FR-001**: System MUST create a new space with a name input from user
 - **FR-002**: System MUST validate that space name is not empty before creating
-- **FR-003**: System MUST display all created spaces in a list view on the home screen
-- **FR-004**: System MUST persist spaces to local SQLite database
-- **FR-005**: System MUST allow users to tap a space to view its details
-- **FR-006**: System MUST display item count for each space in the space list
-- **FR-007**: System MUST display space name and item count on the space detail screen
-- **FR-008**: System MUST allow users to delete a space (with confirmation dialog)
-- **FR-009**: System MUST handle space names up to 100 characters
+- **FR-003**: System MUST trim whitespace from space name before validation
+- **FR-004**: System MUST validate that space name does not exceed 100 characters
+- **FR-005**: System MUST persist spaces to expo-sqlite database using parameterized queries
+- **FR-006**: System MUST return created space object with id, name, createdAt, updatedAt fields
+- **FR-007**: System MUST display all created spaces in a list view on the home screen
+- **FR-008**: System MUST allow users to tap a space to view its details
+- **FR-009**: System MUST display item count for each space in the space list
 - **FR-010**: System MUST show an empty state message when no spaces exist
 
 ### Key Entities
 
 **Space**:
 - `id` (UUID, primary key)
-- `name` (string, max 100 chars, required)
-- `created_at` (timestamp)
-- `updated_at` (timestamp)
+- `name` (string, max 100 chars, required, trimmed)
+- `createdAt` (ISO 8601 timestamp)
+- `updatedAt` (ISO 8601 timestamp)
 
 ## API/Data Model
 
-### Space Repository Interface
+### Space Service Interface
 
 ```typescript
-interface SpaceRepository {
-  create(name: string): Promise<Space>;
+interface ISpaceService {
+  create(name: string): Promise<Space>; // Validates, trims, persists
   getAll(): Promise<Space[]>;
   getById(id: string): Promise<Space | null>;
   delete(id: string): Promise<void>;
@@ -118,27 +155,32 @@ interface SpaceRepository {
 interface Space {
   id: string;
   name: string;
-  created_at: string;
-  updated_at: string;
+  createdAt: string; // ISO 8601 format
+  updatedAt: string; // ISO 8601 format
 }
 
 interface SpaceWithCount extends Space {
-  item_count: number;
+  itemCount: number;
+}
+
+// Input validation happens in Service layer
+interface CreateSpaceInput {
+  name: string; // Must be provided, will be trimmed, max 100 chars
 }
 ```
 
-### SQLite Schema
+### SQLite Schema (expo-sqlite)
 
 ```sql
-CREATE TABLE spaces (
+CREATE TABLE IF NOT EXISTS spaces (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CHECK (length(name) > 0 AND length(name) <= 100)
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  CHECK (length(trim(name)) > 0 AND length(name) <= 100)
 );
 
-CREATE INDEX idx_spaces_created_at ON spaces(created_at);
+CREATE INDEX IF NOT EXISTS idx_spaces_created_at ON spaces(created_at);
 ```
 
 ## UI Requirements
@@ -185,10 +227,33 @@ CREATE INDEX idx_spaces_created_at ON spaces(created_at);
 - Deleting a space should prompt the user; exact behavior of items when space is deleted will be defined in item management spec
 - "Home", "Office", "Dorm", "Car" are suggested examples but users can create any space name
 
-## Notes for Implementation
+## Technical Implementation Notes
 
-- Service layer should validate space name before calling repository
-- Repository should use parameterized SQL to prevent injection
-- Use UUID for space IDs (not auto-increment)
-- Timestamps should use ISO 8601 format
-- Keep space creation simple for MVP; no additional metadata beyond name and timestamps
+### Layer Responsibilities
+
+**Service Layer**:
+- Validate name is not empty
+- Trim whitespace from name
+- Validate name does not exceed 100 characters
+- Generate UUID for id
+- Call repository to persist
+- Return Space object
+
+**Repository Layer**:
+- Execute parameterized SQL queries only (no string interpolation)
+- Use expo-sqlite database connection
+- Map database results to Space objects
+- Handle database errors
+
+**Database (expo-sqlite)**:
+- Use ISO 8601 format for timestamps
+- Enforce schema constraints
+- Support offline-first operations
+
+### Key Implementation Details
+
+- Use `import { openDatabaseSync } from 'expo-sqlite'` for expo-sqlite
+- Trim name before any validation: `name.trim()`
+- Generate IDs using library like `uuid` package
+- All SQL queries must use parameterized placeholders (?, NOT string concat)
+- Keep MVP simple: no metadata beyond name and timestamps
