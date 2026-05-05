@@ -9,6 +9,16 @@
 
 Enable users to view detailed information about a space they have created or accessed. This feature allows users to inspect the space's metadata (name, creation date) and provides a foundation for viewing associated items within that space. The detail view serves as the entry point for viewing and managing items stored in a specific location.
 
+## Clarifications
+
+### Session 2026-05-05
+
+- Q: Navigation Integration → A: **Option B** - Tab with Nested Stack. Add SpaceDetailScreen to nested stack within existing tabs (standard React Native pattern)
+- Q: Timestamp Display → A: **Option B** - Human-readable date only ("May 5, 2026" using `.toLocaleDateString()`)
+- Q: Error Handling → A: **Option A** - Show error alert if space not found, then navigate back to list
+- Q: Loading State → A: **Option B** - No loading indicator needed (SQLite queries are instant, keep UI simple)
+- Q: List State on Back → A: **Option A** - Just ensure spaces exist; React Navigation handles basic state
+
 ## Core User Story
 
 **As a** user  
@@ -78,8 +88,8 @@ Enable users to view detailed information about a space they have created or acc
 ### Functional Requirements
 
 - **FR-001**: System MUST retrieve space details from expo-sqlite by space ID using parameterized queries
-- **FR-002**: System MUST display space object fields (id, name, createdAt, updatedAt) on the detail view
-- **FR-003**: System MUST validate that the requested space ID exists; if not found, show error or redirect to list
+- **FR-002**: System MUST display space object fields (id, name, createdAt, updatedAt) on the detail view with human-readable date formatting
+- **FR-003**: System MUST validate that the requested space ID exists; if not found, show error alert ("Space not found") then navigate back to space list
 - **FR-004**: System MUST provide a navigation button to return from detail view to space list
 - **FR-005**: System MUST persist ability to view spaces across app restarts (data from SQLite)
 
@@ -113,9 +123,12 @@ Display the space information clearly:
 
 1. **Header**: Back button + space name
 2. **Content**: Show id, name, createdAt, updatedAt in simple text format
+   - Timestamps formatted as human-readable dates (e.g., "May 5, 2026")
+   - Use `.toLocaleDateString()` for date formatting
 3. **No editing** - display only
-4. **Navigation**: Back button returns to space list
-5. **Minimal styling** - clean and simple layout
+4. **No loading indicator** - assume instant data loading from local SQLite
+5. **Navigation**: Back button returns to space list
+6. **Minimal styling** - clean and simple layout
 
 ---
 
@@ -146,16 +159,18 @@ No new fields or schema changes required.
 ## Assumptions
 
 - Users have created at least one space using 001-create-space before accessing this feature
-- React Navigation is available for stack-based navigation
-- Space data is stored and retrievable from expo-sqlite
+- React Navigation is configured with tab-based structure supporting nested stack navigators
+- Space data is stored and retrievable from expo-sqlite (instant queries, no loading indicator needed)
 - No items functionality yet (V1 does not include item management)
+- `.toLocaleDateString()` provides sufficient date formatting for the target audience
+- Navigation state is managed by React Navigation (basic navigation preservation handled automatically)
 
 ---
 
 ## Dependencies
 
 ### External
-- React Navigation (stack navigation)
+- React Navigation with stack navigator (for nested stack within tab)
 - expo-sqlite (existing)
 
 ### Feature Dependencies
@@ -166,7 +181,7 @@ No new fields or schema changes required.
 - `src/repositories/SpaceRepository.ts` - needs getSpaceById(id) method
 - `src/services/SpaceService.ts` - needs getSpaceDetails(id) method
 - `src/screens/`: New file `SpaceDetailScreen.tsx` for the detail view
-- Navigation structure: Likely `(tabs)/_layout.tsx` or new stack navigator configuration
+- Navigation structure: Add SpaceDetailScreen to existing tab's stack navigator (nested stack pattern)
 
 ---
 
