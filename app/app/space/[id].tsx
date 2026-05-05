@@ -24,12 +24,15 @@ export default function SpaceDetailScreen() {
   const [items, setItems] = useState<Item[]>([]);
   const [containers, setContainers] = useState<Container[]>([]);
   const [itemName, setItemName] = useState<string>('');
+  const [containerName, setContainerName] = useState<string>('');
   const [allSpaces, setAllSpaces] = useState<Space[]>([]);
   const [showMoveModal, setShowMoveModal] = useState<boolean>(false);
   const [selectedMoveItemId, setSelectedMoveItemId] = useState<string | null>(null);
   const [showAddItemModal, setShowAddItemModal] = useState<boolean>(false);
+  const [showAddContainerModal, setShowAddContainerModal] = useState<boolean>(false);
   const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null);
   const [showHeaderMenu, setShowHeaderMenu] = useState<boolean>(false);
+  const [showFabMenu, setShowFabMenu] = useState<boolean>(false);
 
   // Fetch space details on mount
   useEffect(() => {
@@ -102,39 +105,15 @@ export default function SpaceDetailScreen() {
   }
 
   /**
-   * Build grouped items data structure
-   * Returns array of sections: [uncategorized, container1, container2, ...]
+   * Get flat list of items with container context
    */
-  function getGroupedItems() {
-    const groups: {
-      title: string;
-      containerId: string | null;
-      items: Item[];
-    }[] = [];
-
-    // Add uncategorized items first
-    const uncategorizedItems = items.filter((item) => !item.containerId);
-    if (uncategorizedItems.length > 0 || containers.length === 0) {
-      groups.push({
-        title: 'Uncategorized',
-        containerId: null,
-        items: uncategorizedItems,
-      });
-    }
-
-    // Add container sections
-    containers.forEach((container) => {
-      const containerItems = items.filter(
-        (item) => item.containerId === container.id
-      );
-      groups.push({
-        title: container.name,
-        containerId: container.id,
-        items: containerItems,
-      });
-    });
-
-    return groups;
+  function getItemsWithContainer() {
+    return items.map((item) => ({
+      ...item,
+      containerName: item.containerId
+        ? containers.find((c) => c.id === item.containerId)?.name || 'Unknown'
+        : null,
+    }));
   }
 
   /**
@@ -238,50 +217,31 @@ export default function SpaceDetailScreen() {
     }
   }
 
-  function handleAddItemToContainer(containerId: string) {
-    setSelectedContainerId(containerId);
-    setShowAddItemModal(true);
-  }
-
-  function handleAddSpaceItem() {
+  function handleFabMenuItemPress() {
+    setShowFabMenu(false);
     setSelectedContainerId(null);
     setShowAddItemModal(true);
   }
 
-  function handleAddContainerPress() {
-    if (!id) return;
-
-    // Use Alert.prompt for simple input (no modal)
-    Alert.prompt(
-      'Add Container',
-      'Enter container name',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Add',
-          onPress: (name?: string) => {
-            if (name) {
-              handleCreateContainer(name);
-            }
-          },
-        },
-      ],
-      'plain-text',
-      '',
-      'default'
-    );
+  function handleFabMenuContainerPress() {
+    setShowFabMenu(false);
+    setShowAddContainerModal(true);
   }
 
-  async function handleCreateContainer(name: string | undefined) {
-    if (!id || !name) return;
+  async function handleCreateContainer() {
+    if (!id || !containerName.trim()) {
+      Alert.alert('Error', 'Container name cannot be empty.');
+      return;
+    }
 
     try {
-      await ContainerService.createContainer(name, id);
+      await ContainerService.createContainer(containerName, id);
+      setContainerName('');
+      setShowAddContainerModal(false);
       await loadContainers();
       await loadItems();
     } catch (error) {
       console.error('Failed to create container:', error);
-      // Check if it's a validation error
       if (error && typeof error === 'object' && 'code' in error) {
         const err = error as any;
         Alert.alert('Error', err.message || 'Failed to create container.');
@@ -319,20 +279,9 @@ export default function SpaceDetailScreen() {
                 </Text>
               </View>
 
-              {/* Containers Section Header with Add Button */}
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionHeaderText}>Containers</Text>
-                <Pressable
-                  style={styles.addContainerButton}
-                  onPress={handleAddContainerPress}
-                >
-                  <Text style={styles.addContainerButtonText}>+</Text>
-                </Pressable>
-              </View>
-
-              {/* Container List */}
+              {/* Containers Tags */}
               {containers.length > 0 && (
-                <View style={styles.containersList}>
+                <View style={styles.containersBar}>
                   {containers.map((container) => (
                     <View key={container.id} style={styles.containerTag}>
                       <Text style={styles.containerTagText}>{container.name}</Text>
@@ -340,63 +289,43 @@ export default function SpaceDetailScreen() {
                   ))}
                 </View>
               )}
-
-              {/* Items Section Header */}
-              <Text style={styles.itemsHeader}>Items</Text>
             </View>
 
             {/* Scrollable Items List */}
             <FlatList
               style={styles.itemsList}
               contentContainerStyle={styles.itemsListContent}
-              data={getGroupedItems()}
-              keyExtractor={(section, index) => `section-${index}`}
-              renderItem={({ item: section }) => (
-                <View key={section.containerId}>
-                  {/* Section Header with Add Button */}
-                  <View style={styles.containerSectionHeader}>
-                    <Text style={styles.sectionHeader}>{section.title}</Text>
+              data={getItemsWithContainer()}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View style={styles.itemCard}>
+                  <View style={styles.itemHeader}>
+                    <Text style={styles.itemName}>{item.name}</Text>
+                    {item.containerName && (
+                      <View style={styles.itemBadge}>
+                        <Text style={styles.itemBadgeText}>{item.containerName}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.itemActions}>
                     <Pressable
-                      style={styles.sectionAddButton}
-                      onPress={() =>
-                        section.containerId
-                          ? handleAddItemToContainer(section.containerId)
-                          : handleAddSpaceItem()
-                      }
+                      style={[
+                        styles.button,
+                        styles.moveButton,
+                        allSpaces.length < 2 && styles.disabledButton,
+                      ]}
+                      onPress={() => handleMovePress(item.id)}
+                      disabled={allSpaces.length < 2}
                     >
-                      <Text style={styles.sectionAddButtonText}>+</Text>
+                      <Text style={styles.moveButtonText}>Move</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.button, styles.deleteItemButton]}
+                      onPress={() => handleDeleteItemPress(item.id, item.name)}
+                    >
+                      <Text style={styles.deleteItemButtonText}>Delete</Text>
                     </Pressable>
                   </View>
-
-                  {/* Items in Section */}
-                  {section.items.length > 0 ? (
-                    section.items.map((item) => (
-                      <View key={item.id} style={styles.itemCard}>
-                        <Text style={styles.itemName}>{item.name}</Text>
-                        <View style={styles.itemActions}>
-                          <Pressable
-                            style={[
-                              styles.button,
-                              styles.moveButton,
-                              allSpaces.length < 2 && styles.disabledButton,
-                            ]}
-                            onPress={() => handleMovePress(item.id)}
-                            disabled={allSpaces.length < 2}
-                          >
-                            <Text style={styles.moveButtonText}>Move</Text>
-                          </Pressable>
-                          <Pressable
-                            style={[styles.button, styles.deleteItemButton]}
-                            onPress={() => handleDeleteItemPress(item.id, item.name)}
-                          >
-                            <Text style={styles.deleteItemButtonText}>Delete</Text>
-                          </Pressable>
-                        </View>
-                      </View>
-                    ))
-                  ) : (
-                    <Text style={styles.emptySection}>No items</Text>
-                  )}
                 </View>
               )}
               ListEmptyComponent={
@@ -405,13 +334,31 @@ export default function SpaceDetailScreen() {
               scrollEnabled={true}
             />
 
-            {/* Floating Action Button (FAB) */}
+            {/* Floating Action Button (FAB) with Menu */}
             <Pressable
               style={styles.fab}
-              onPress={() => setShowAddItemModal(true)}
+              onPress={() => setShowFabMenu(!showFabMenu)}
             >
               <Text style={styles.fabText}>+</Text>
             </Pressable>
+
+            {/* FAB Menu */}
+            {showFabMenu && (
+              <View style={styles.fabMenu}>
+                <Pressable
+                  style={styles.fabMenuItem}
+                  onPress={handleFabMenuItemPress}
+                >
+                  <Text style={styles.fabMenuItemText}>Add Item</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.fabMenuItem}
+                  onPress={handleFabMenuContainerPress}
+                >
+                  <Text style={styles.fabMenuItemText}>Add Container</Text>
+                </Pressable>
+              </View>
+            )}
 
             {/* Modal for Moving Items */}
             <Modal
@@ -473,7 +420,7 @@ export default function SpaceDetailScreen() {
               </Pressable>
             </Modal>
 
-            {/* Modal for Adding Item with Input */}
+            {/* Modal for Adding Item */}
             <Modal
               visible={showAddItemModal}
               transparent={true}
@@ -518,6 +465,48 @@ export default function SpaceDetailScreen() {
                         setShowAddItemModal(false);
                         setItemName('');
                         setSelectedContainerId(null);
+                      }}
+                    >
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            </Modal>
+
+            {/* Modal for Adding Container */}
+            <Modal
+              visible={showAddContainerModal}
+              transparent={true}
+              animationType="slide"
+              onRequestClose={() => {
+                setShowAddContainerModal(false);
+                setContainerName('');
+              }}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                  <Text style={styles.modalTitle}>Add Container</Text>
+                  <TextInput
+                    style={styles.itemInput}
+                    placeholder="Enter container name"
+                    value={containerName}
+                    onChangeText={setContainerName}
+                    placeholderTextColor="#999"
+                    autoFocus={true}
+                  />
+                  <View style={styles.modalButtonContainer}>
+                    <Pressable
+                      style={[styles.button, styles.addButton]}
+                      onPress={handleCreateContainer}
+                    >
+                      <Text style={styles.addButtonText}>Add Container</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.button, styles.cancelButton]}
+                      onPress={() => {
+                        setShowAddContainerModal(false);
+                        setContainerName('');
                       }}
                     >
                       <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -595,6 +584,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#222',
     marginTop: 8,
+  },
+  itemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  itemBadge: {
+    backgroundColor: '#e8e8ff',
+    borderRadius: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  itemBadgeText: {
+    fontSize: 11,
+    color: '#4444ff',
+    fontWeight: '600',
+  },
+  containersBar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+    marginBottom: 16,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -764,6 +777,30 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '300',
     lineHeight: 40,
+  },
+  fabMenu: {
+    position: 'absolute',
+    bottom: 90,
+    right: 24,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  fabMenuItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  fabMenuItemText: {
+    fontSize: 14,
+    color: '#4444ff',
+    fontWeight: '600',
   },
   itemInput: {
     borderWidth: 1,
