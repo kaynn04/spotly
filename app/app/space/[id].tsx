@@ -105,15 +105,39 @@ export default function SpaceDetailScreen() {
   }
 
   /**
-   * Get flat list of items with container context
+   * Get mixed list of items and containers for display
    */
-  function getItemsWithContainer() {
-    return items.map((item) => ({
-      ...item,
-      containerName: item.containerId
-        ? containers.find((c) => c.id === item.containerId)?.name || 'Unknown'
-        : null,
-    }));
+  function getDisplayList() {
+    const displayItems: {
+      type: 'container' | 'item';
+      id: string;
+      name: string;
+      containerId?: string;
+      itemCount?: number;
+    }[] = [];
+
+    // Add all containers first
+    containers.forEach((container) => {
+      const itemCount = items.filter((i) => i.containerId === container.id).length;
+      displayItems.push({
+        type: 'container',
+        id: container.id,
+        name: container.name,
+        itemCount,
+      });
+    });
+
+    // Add all items
+    items.forEach((item) => {
+      displayItems.push({
+        type: 'item',
+        id: item.id,
+        name: item.name,
+        containerId: item.containerId || undefined,
+      });
+    });
+
+    return displayItems;
   }
 
   /**
@@ -278,58 +302,70 @@ export default function SpaceDetailScreen() {
                   Created {new Date(space.createdAt).toLocaleDateString()}
                 </Text>
               </View>
-
-              {/* Containers Tags */}
-              {containers.length > 0 && (
-                <View style={styles.containersBar}>
-                  {containers.map((container) => (
-                    <View key={container.id} style={styles.containerTag}>
-                      <Text style={styles.containerTagText}>{container.name}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
             </View>
 
-            {/* Scrollable Items List */}
+            {/* Scrollable Items and Containers List */}
             <FlatList
               style={styles.itemsList}
               contentContainerStyle={styles.itemsListContent}
-              data={getItemsWithContainer()}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <View style={styles.itemCard}>
-                  <View style={styles.itemHeader}>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                    {item.containerName && (
-                      <View style={styles.itemBadge}>
-                        <Text style={styles.itemBadgeText}>{item.containerName}</Text>
+              data={getDisplayList()}
+              keyExtractor={(item) => `${item.type}-${item.id}`}
+              renderItem={({ item: displayItem }) =>
+                displayItem.type === 'container' ? (
+                  <Pressable
+                    style={styles.containerCard}
+                    onPress={() => {
+                      // Container clicked - could expand or open details
+                      console.log('Container clicked:', displayItem.name);
+                    }}
+                  >
+                    <View style={styles.containerHeader}>
+                      <Text style={styles.containerName}>{displayItem.name}</Text>
+                      <View style={styles.containerCount}>
+                        <Text style={styles.containerCountText}>
+                          {displayItem.itemCount} {displayItem.itemCount === 1 ? 'item' : 'items'}
+                        </Text>
                       </View>
-                    )}
+                    </View>
+                  </Pressable>
+                ) : (
+                  <View style={styles.itemCard}>
+                    <View style={styles.itemHeader}>
+                      <Text style={styles.itemName}>{displayItem.name}</Text>
+                      {displayItem.containerId && (
+                        <View style={styles.itemBadge}>
+                          <Text style={styles.itemBadgeText}>
+                            {containers.find((c) => c.id === displayItem.containerId)?.name || 'Unknown'}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.itemActions}>
+                      <Pressable
+                        style={[
+                          styles.button,
+                          styles.moveButton,
+                          allSpaces.length < 2 && styles.disabledButton,
+                        ]}
+                        onPress={() => handleMovePress(displayItem.id)}
+                        disabled={allSpaces.length < 2}
+                      >
+                        <Text style={styles.moveButtonText}>Move</Text>
+                      </Pressable>
+                      <Pressable
+                        style={[styles.button, styles.deleteItemButton]}
+                        onPress={() =>
+                          handleDeleteItemPress(displayItem.id, displayItem.name)
+                        }
+                      >
+                        <Text style={styles.deleteItemButtonText}>Delete</Text>
+                      </Pressable>
+                    </View>
                   </View>
-                  <View style={styles.itemActions}>
-                    <Pressable
-                      style={[
-                        styles.button,
-                        styles.moveButton,
-                        allSpaces.length < 2 && styles.disabledButton,
-                      ]}
-                      onPress={() => handleMovePress(item.id)}
-                      disabled={allSpaces.length < 2}
-                    >
-                      <Text style={styles.moveButtonText}>Move</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.button, styles.deleteItemButton]}
-                      onPress={() => handleDeleteItemPress(item.id, item.name)}
-                    >
-                      <Text style={styles.deleteItemButtonText}>Delete</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              )}
+                )
+              }
               ListEmptyComponent={
-                <Text style={styles.emptyState}>No items yet</Text>
+                <Text style={styles.emptyState}>No items or containers yet</Text>
               }
               scrollEnabled={true}
             />
@@ -715,6 +751,36 @@ const styles = StyleSheet.create({
   itemActions: {
     flexDirection: 'row',
     gap: 8,
+  },
+  containerCard: {
+    backgroundColor: '#f0f0ff',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#4444ff',
+  },
+  containerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  containerName: {
+    fontSize: 15,
+    color: '#4444ff',
+    fontWeight: '600',
+    flex: 1,
+  },
+  containerCount: {
+    backgroundColor: '#4444ff',
+    borderRadius: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  containerCountText: {
+    fontSize: 11,
+    color: '#fff',
+    fontWeight: '600',
   },
   emptyState: {
     fontSize: 16,
