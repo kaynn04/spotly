@@ -24,6 +24,8 @@ export default function SpaceDetailScreen() {
   const [allSpaces, setAllSpaces] = useState<Space[]>([]);
   const [showMoveModal, setShowMoveModal] = useState<boolean>(false);
   const [selectedMoveItemId, setSelectedMoveItemId] = useState<string | null>(null);
+  const [showAddItemModal, setShowAddItemModal] = useState<boolean>(false);
+  const [showHeaderMenu, setShowHeaderMenu] = useState<boolean>(false);
 
   // Fetch space details on mount
   useEffect(() => {
@@ -165,6 +167,7 @@ export default function SpaceDetailScreen() {
     try {
       await ItemService.createItem(id, itemName);
       setItemName('');
+      setShowAddItemModal(false);
       await loadItems();
     } catch (error) {
       console.error('Failed to add item:', error);
@@ -174,82 +177,81 @@ export default function SpaceDetailScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header with back button */}
+      {/* Header */}
       <View style={styles.header}>
         <Button title="Back" onPress={() => router.back()} />
         <Text style={styles.title}>Space Detail</Text>
-        <View style={{ width: 50 }} />
+        <Pressable 
+          style={styles.headerMenuButton}
+          onPress={() => setShowHeaderMenu(true)}
+        >
+          <Text style={styles.headerMenuText}>⋮</Text>
+        </Pressable>
       </View>
 
-      {/* Content */}
-      <View style={styles.content}>
+      {/* Main Content - Full Height */}
+      <View style={styles.contentWrapper}>
         {space ? (
           <>
-            <Text style={styles.name}>{space.name}</Text>
-            <Text style={styles.label}>Created:</Text>
-            <Text style={styles.value}>
-              {new Date(space.createdAt).toLocaleDateString()}
-            </Text>
+            {/* Fixed Top Section */}
+            <View style={styles.fixedSection}>
+              {/* Space Title */}
+              <View style={styles.titleSection}>
+                <Text style={styles.spaceName}>{space.name}</Text>
+                <Text style={styles.createdDate}>
+                  Created {new Date(space.createdAt).toLocaleDateString()}
+                </Text>
+              </View>
 
-            {/* Delete Button */}
-            <Pressable
-              style={[styles.button, styles.deleteButton]}
-              onPress={handleDeletePress}
-            >
-              <Text style={styles.deleteButtonText}>Delete Space</Text>
-            </Pressable>
+              {/* Section Header */}
+              <Text style={styles.itemsHeader}>Items</Text>
+            </View>
 
-            {/* Items List */}
-            <Text style={styles.itemsHeader}>Items:</Text>
+            {/* Scrollable Items List */}
             <FlatList
+              style={styles.itemsList}
+              contentContainerStyle={styles.itemsListContent}
               data={items}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
-                <View style={styles.itemRow}>
+                <View style={styles.itemCard}>
                   <Text style={styles.itemName}>{item.name}</Text>
-                  <Pressable
-                    style={[
-                      styles.button,
-                      styles.moveButton,
-                      allSpaces.length < 2 && styles.disabledButton,
-                    ]}
-                    onPress={() => handleMovePress(item.id)}
-                    disabled={allSpaces.length < 2}
-                  >
-                    <Text style={styles.moveButtonText}>Move</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.button, styles.deleteItemButton]}
-                    onPress={() => handleDeleteItemPress(item.id, item.name)}
-                  >
-                    <Text style={styles.deleteItemButtonText}>Delete</Text>
-                  </Pressable>
+                  <View style={styles.itemActions}>
+                    <Pressable
+                      style={[
+                        styles.button,
+                        styles.moveButton,
+                        allSpaces.length < 2 && styles.disabledButton,
+                      ]}
+                      onPress={() => handleMovePress(item.id)}
+                      disabled={allSpaces.length < 2}
+                    >
+                      <Text style={styles.moveButtonText}>Move</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.button, styles.deleteItemButton]}
+                      onPress={() => handleDeleteItemPress(item.id, item.name)}
+                    >
+                      <Text style={styles.deleteItemButtonText}>Delete</Text>
+                    </Pressable>
+                  </View>
                 </View>
               )}
-              scrollEnabled={false}
               ListEmptyComponent={
-                <Text style={styles.noItems}>No items yet</Text>
+                <Text style={styles.emptyState}>No items yet</Text>
               }
+              scrollEnabled={true}
             />
 
-            {/* Add Item Input */}
-            <View style={styles.addItemContainer}>
-              <TextInput
-                style={styles.itemInput}
-                placeholder="Enter item name"
-                value={itemName}
-                onChangeText={setItemName}
-                placeholderTextColor="#999"
-              />
-              <Pressable
-                style={[styles.button, styles.addButton]}
-                onPress={handleAddItem}
-              >
-                <Text style={styles.addButtonText}>Add Item</Text>
-              </Pressable>
-            </View>
+            {/* Floating Action Button (FAB) */}
+            <Pressable
+              style={styles.fab}
+              onPress={() => setShowAddItemModal(true)}
+            >
+              <Text style={styles.fabText}>+</Text>
+            </Pressable>
 
-            {/* Move Item Modal */}
+            {/* Modal for Moving Items */}
             <Modal
               visible={showMoveModal}
               transparent={true}
@@ -283,6 +285,73 @@ export default function SpaceDetailScreen() {
                 </View>
               </View>
             </Modal>
+
+            {/* Header Menu Modal */}
+            <Modal
+              visible={showHeaderMenu}
+              transparent={true}
+              animationType="fade"
+              onRequestClose={() => setShowHeaderMenu(false)}
+            >
+              <Pressable 
+                style={styles.modalOverlay}
+                onPress={() => setShowHeaderMenu(false)}
+              >
+                <View style={styles.headerMenuContent}>
+                  <Pressable
+                    style={styles.headerMenuOption}
+                    onPress={() => {
+                      setShowHeaderMenu(false);
+                      handleDeletePress();
+                    }}
+                  >
+                    <Text style={styles.headerMenuOptionText}>Delete Space</Text>
+                  </Pressable>
+                </View>
+              </Pressable>
+            </Modal>
+
+            {/* Modal for Adding Item with Input */}
+            <Modal
+              visible={showAddItemModal}
+              transparent={true}
+              animationType="slide"
+              onRequestClose={() => {
+                setShowAddItemModal(false);
+                setItemName('');
+              }}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                  <Text style={styles.modalTitle}>Add Item</Text>
+                  <TextInput
+                    style={styles.itemInput}
+                    placeholder="Enter item name"
+                    value={itemName}
+                    onChangeText={setItemName}
+                    placeholderTextColor="#999"
+                    autoFocus={true}
+                  />
+                  <View style={styles.modalButtonContainer}>
+                    <Pressable
+                      style={[styles.button, styles.addButton]}
+                      onPress={handleAddItem}
+                    >
+                      <Text style={styles.addButtonText}>Add Item</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.button, styles.cancelButton]}
+                      onPress={() => {
+                        setShowAddItemModal(false);
+                        setItemName('');
+                      }}
+                    >
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            </Modal>
           </>
         ) : (
           <Text style={styles.notFound}>Space not found</Text>
@@ -311,75 +380,93 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  content: {
-    padding: 16,
+  headerMenuButton: {
+    width: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
   },
-  name: {
-    fontSize: 20,
+  headerMenuText: {
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 16,
+    color: '#333',
   },
-  label: {
+  contentWrapper: {
+    flex: 1,
+    flexDirection: 'column',
+    position: 'relative',
+  },
+  fixedSection: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+    backgroundColor: '#fff',
+  },
+  titleSection: {
+    marginBottom: 20,
+  },
+  spaceName: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#222',
+    marginBottom: 8,
+  },
+  createdDate: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
+    color: '#888',
+    fontWeight: '400',
   },
-  value: {
-    fontSize: 16,
+  itemsHeader: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#222',
+    marginTop: 8,
+  },
+  itemsList: {
+    flex: 1,
+  },
+  itemsListContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingBottom: 100,
+  },
+  itemCard: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  itemName: {
+    fontSize: 15,
+    color: '#333',
+    marginBottom: 10,
     fontWeight: '500',
-    marginBottom: 16,
   },
-  notFound: {
+  itemActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  emptyState: {
     fontSize: 16,
     color: '#999',
+    fontStyle: 'italic',
     textAlign: 'center',
-    marginTop: 24,
+    paddingVertical: 48,
   },
   button: {
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 24,
-  },
-  deleteButton: {
-    backgroundColor: '#ff4444',
-  },
-  deleteButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  itemsHeader: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 24,
-    marginBottom: 12,
-  },
-  itemName: {
-    fontSize: 14,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  noItems: {
-    fontSize: 14,
-    color: '#999',
-    fontStyle: 'italic',
-    paddingVertical: 8,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    justifyContent: 'center',
   },
   moveButton: {
     backgroundColor: '#4444ff',
     paddingVertical: 6,
     paddingHorizontal: 12,
+    flex: 0,
   },
   moveButtonText: {
     color: '#fff',
@@ -390,30 +477,68 @@ const styles = StyleSheet.create({
     backgroundColor: '#cccccc',
     opacity: 0.5,
   },
-  addItemContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 16,
+  deleteItemButton: {
+    backgroundColor: '#ff3333',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    flex: 0,
+  },
+  deleteItemButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#4444ff',
+    justifyContent: 'center',
     alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  fabText: {
+    fontSize: 32,
+    color: '#fff',
+    fontWeight: '300',
+    lineHeight: 40,
   },
   itemInput: {
-    flex: 1,
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 4,
+    borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
+    backgroundColor: '#fff',
+    marginBottom: 12,
   },
   addButton: {
     backgroundColor: '#4444ff',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
   },
   addButtonText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  notFound: {
+    fontSize: 16,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 24,
   },
   modalOverlay: {
     flex: 1,
@@ -424,26 +549,52 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 20,
-    width: '80%',
-    maxHeight: '60%',
+    width: '85%',
+    maxHeight: '65%',
+  },
+  headerMenuContent: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    marginTop: 60,
+    marginRight: 16,
+    width: 150,
+    overflow: 'hidden',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  headerMenuOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  headerMenuOptionText: {
+    fontSize: 14,
+    color: '#ff3333',
+    fontWeight: '500',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 16,
+    color: '#222',
   },
   spaceOption: {
     paddingVertical: 12,
     paddingHorizontal: 16,
     backgroundColor: '#f5f5f5',
-    borderRadius: 4,
-    marginBottom: 8,
+    borderRadius: 8,
+    marginBottom: 10,
   },
   spaceOptionText: {
     fontSize: 14,
     color: '#333',
+    fontWeight: '500',
   },
   cancelButton: {
     backgroundColor: '#999',
@@ -453,16 +604,6 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: '#fff',
     fontSize: 14,
-    fontWeight: '600',
-  },
-  deleteItemButton: {
-    backgroundColor: '#ff3333',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  deleteItemButtonText: {
-    color: '#fff',
-    fontSize: 12,
     fontWeight: '600',
   },
 });
