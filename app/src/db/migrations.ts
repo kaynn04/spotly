@@ -35,14 +35,34 @@ export async function initializeDatabase() {
       ON spaces(created_at);
     `);
 
+    // Create containers table
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS containers (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        space_id TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (space_id) REFERENCES spaces(id) ON DELETE CASCADE,
+        CHECK (length(trim(name)) > 0 AND length(name) <= 50)
+      );
+    `);
+
+    // Create index for efficient container queries by space_id
+    await db.execAsync(`
+      CREATE INDEX IF NOT EXISTS idx_containers_space_id 
+      ON containers(space_id);
+    `);
+
     // Create items table
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS items (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         space_id TEXT NOT NULL,
+        container_id TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        FOREIGN KEY (space_id) REFERENCES spaces(id) ON DELETE CASCADE
+        FOREIGN KEY (space_id) REFERENCES spaces(id) ON DELETE CASCADE,
+        FOREIGN KEY (container_id) REFERENCES containers(id) ON DELETE CASCADE
       );
     `);
 
@@ -50,6 +70,12 @@ export async function initializeDatabase() {
     await db.execAsync(`
       CREATE INDEX IF NOT EXISTS idx_items_space_id 
       ON items(space_id);
+    `);
+
+    // Create index for efficient queries by container_id
+    await db.execAsync(`
+      CREATE INDEX IF NOT EXISTS idx_items_container_id 
+      ON items(container_id);
     `);
 
     console.log('✓ Database initialized successfully');
@@ -69,6 +95,7 @@ export async function resetDatabase() {
   try {
     await db.execAsync(`
       DROP TABLE IF EXISTS items;
+      DROP TABLE IF EXISTS containers;
       DROP TABLE IF EXISTS spaces;
     `);
     await initializeDatabase();
