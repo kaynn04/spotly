@@ -118,4 +118,34 @@ export class ItemService {
       throw serviceError;
     }
   }
+
+  /**
+   * Delete an item (permanent deletion)
+   *
+   * @param itemId - The item id to delete
+   * @returns void (no return value)
+   * @throws ServiceError if database operation fails
+   *
+   * Note: Deletion is permanent and cannot be undone.
+   */
+  static async deleteItem(itemId: string): Promise<void> {
+    try {
+      // Delete item from database via repository
+      await ItemRepository.deleteItem(itemId);
+    } catch (error) {
+      // If already a ServiceError, re-throw it
+      if (error && typeof error === 'object' && 'code' in error) {
+        throw error;
+      }
+
+      // Convert unexpected errors to ServiceError
+      const serviceError: ServiceError = {
+        code: 'DB_ERROR',
+        message: 'Failed to delete item. Try again.',
+      };
+
+      console.error('[ItemService.deleteItem] Unexpected error:', error);
+      throw serviceError;
+    }
+  }
 }

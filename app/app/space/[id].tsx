@@ -97,6 +97,32 @@ export default function SpaceDetailScreen() {
     }
   }
 
+  function handleDeleteItemPress(itemId: string, itemName: string) {
+    // Show confirmation dialog
+    Alert.alert(
+      'Delete Item',
+      `Delete '${itemName}'? This cannot be undone.`,
+      [
+        { text: 'Cancel', onPress: () => {}, style: 'cancel' },
+        {
+          text: 'Delete',
+          onPress: async () => await deleteItem(itemId),
+          style: 'destructive',
+        },
+      ]
+    );
+  }
+
+  async function deleteItem(itemId: string) {
+    try {
+      await ItemService.deleteItem(itemId);
+      await loadItems(); // Refresh list
+    } catch (error) {
+      console.error('Failed to delete item:', error);
+      Alert.alert('Error', 'Failed to delete item. Please try again.');
+    }
+  }
+
   function handleDeletePress() {
     if (!space) return;
 
@@ -191,6 +217,12 @@ export default function SpaceDetailScreen() {
                     disabled={allSpaces.length < 2}
                   >
                     <Text style={styles.moveButtonText}>Move</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.button, styles.deleteItemButton]}
+                    onPress={() => handleDeleteItemPress(item.id, item.name)}
+                  >
+                    <Text style={styles.deleteItemButtonText}>Delete</Text>
                   </Pressable>
                 </View>
               )}
@@ -421,6 +453,16 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: '#fff',
     fontSize: 14,
+    fontWeight: '600',
+  },
+  deleteItemButton: {
+    backgroundColor: '#ff3333',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  deleteItemButtonText: {
+    color: '#fff',
+    fontSize: 12,
     fontWeight: '600',
   },
 });
