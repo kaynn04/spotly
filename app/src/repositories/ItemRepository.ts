@@ -100,4 +100,38 @@ export class ItemRepository {
       throw serviceError;
     }
   }
+
+  /**
+   * Update an item's space_id to move it to a different space
+   *
+   * @param itemId - The item id to move
+   * @param newSpaceId - The new space id to move the item to
+   * @returns void (no return value)
+   * @throws ServiceError if database operation fails
+   *
+   * SQL: UPDATE items SET space_id = ? WHERE id = ?
+   * Parameterized query prevents SQL injection
+   */
+  static async updateSpaceId(itemId: string, newSpaceId: string): Promise<void> {
+    try {
+      const db = getDatabase();
+
+      // Execute parameterized UPDATE query
+      await db.runAsync(
+        'UPDATE items SET space_id = ? WHERE id = ?',
+        [newSpaceId, itemId]
+      );
+    } catch (error) {
+      // Convert database error to ServiceError
+      const serviceError: ServiceError = {
+        code: 'DB_ERROR',
+        message: 'Failed to move item. Try again.',
+      };
+
+      // Log error for debugging
+      console.error('[ItemRepository.updateSpaceId] Database error:', error);
+
+      throw serviceError;
+    }
+  }
 }

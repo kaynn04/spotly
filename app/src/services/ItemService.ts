@@ -72,4 +72,50 @@ export class ItemService {
   static async getItemsBySpaceId(spaceId: string): Promise<Item[]> {
     return ItemRepository.getItemsBySpaceId(spaceId);
   }
+
+  /**
+   * Move an item to a different space
+   *
+   * @param itemId - The item id to move
+   * @param currentSpaceId - The current space id (for validation)
+   * @param newSpaceId - The new space id to move the item to
+   * @returns void (no return value)
+   * @throws ServiceError if validation fails or database operation fails
+   *
+   * Validation:
+   * - Prevents moving item to its current space (no-op)
+   */
+  static async moveItem(
+    itemId: string,
+    currentSpaceId: string,
+    newSpaceId: string
+  ): Promise<void> {
+    try {
+      // Validate: prevent moving to same space
+      if (newSpaceId === currentSpaceId) {
+        const error: ServiceError = {
+          code: 'VALIDATION_ERROR',
+          message: 'Cannot move item to same space.',
+        };
+        throw error;
+      }
+
+      // Move item in database via repository
+      await ItemRepository.updateSpaceId(itemId, newSpaceId);
+    } catch (error) {
+      // If already a ServiceError, re-throw it
+      if (error && typeof error === 'object' && 'code' in error) {
+        throw error;
+      }
+
+      // Convert unexpected errors to ServiceError
+      const serviceError: ServiceError = {
+        code: 'DB_ERROR',
+        message: 'Failed to move item. Try again.',
+      };
+
+      console.error('[ItemService.moveItem] Unexpected error:', error);
+      throw serviceError;
+    }
+  }
 }
