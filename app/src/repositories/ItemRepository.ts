@@ -134,4 +134,38 @@ export class ItemRepository {
       throw serviceError;
     }
   }
+
+  /**
+   * Delete an item from the database (permanent deletion)
+   *
+   * @param itemId - The item id to delete
+   * @returns void (no return value)
+   * @throws ServiceError if database operation fails
+   *
+   * SQL: DELETE FROM items WHERE id = ?
+   * Parameterized query prevents SQL injection
+   * Deletion is permanent - no recovery possible
+   */
+  static async deleteItem(itemId: string): Promise<void> {
+    try {
+      const db = getDatabase();
+
+      // Execute parameterized DELETE query
+      await db.runAsync(
+        'DELETE FROM items WHERE id = ?',
+        [itemId]
+      );
+    } catch (error) {
+      // Convert database error to ServiceError
+      const serviceError: ServiceError = {
+        code: 'DB_ERROR',
+        message: 'Failed to delete item. Try again.',
+      };
+
+      // Log error for debugging
+      console.error('[ItemRepository.deleteItem] Database error:', error);
+
+      throw serviceError;
+    }
+  }
 }
