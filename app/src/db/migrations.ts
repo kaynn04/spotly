@@ -35,6 +35,23 @@ export async function initializeDatabase() {
       ON spaces(created_at);
     `);
 
+    // Create items table
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS items (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        space_id TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (space_id) REFERENCES spaces(id) ON DELETE CASCADE
+      );
+    `);
+
+    // Create index for efficient queries by space_id
+    await db.execAsync(`
+      CREATE INDEX IF NOT EXISTS idx_items_space_id 
+      ON items(space_id);
+    `);
+
     console.log('✓ Database initialized successfully');
   } catch (error) {
     console.error('✗ Database initialization error:', error);
@@ -51,6 +68,7 @@ export async function resetDatabase() {
 
   try {
     await db.execAsync(`
+      DROP TABLE IF EXISTS items;
       DROP TABLE IF EXISTS spaces;
     `);
     await initializeDatabase();

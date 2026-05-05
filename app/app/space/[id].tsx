@@ -8,20 +8,33 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Button, Alert, Pressable } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { View, Text, StyleSheet, Button, Alert, Pressable, FlatList, TextInput } from 'react-native';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import type { Space } from '../../src/models/Space';
+import type { Item } from '../../src/models/Item';
 import { SpaceService } from '../../src/services/SpaceService';
+import { ItemService } from '../../src/services/ItemService';
 
 export default function SpaceDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [space, setSpace] = useState<Space | null>(null);
+  const [items, setItems] = useState<Item[]>([]);
+  const [itemName, setItemName] = useState<string>('');
 
   // Fetch space details on mount
   useEffect(() => {
     loadSpace();
   }, [id]);
+
+  // Refresh items when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (space?.id) {
+        loadItems();
+      }
+    }, [space?.id])
+  );
 
   async function loadSpace() {
     if (!id) return;
@@ -29,9 +42,24 @@ export default function SpaceDetailScreen() {
     try {
       const result = await SpaceService.getSpaceById(id);
       setSpace(result);
+      if (result?.id) {
+        loadItems();
+      }
     } catch (error) {
       console.error('Failed to load space:', error);
       setSpace(null);
+    }
+  }
+
+  async function loadItems() {
+    if (!id) return;
+
+    try {
+      const result = await ItemService.getItemsBySpaceId(id);
+      setItems(result);
+    } catch (error) {
+      console.error('Failed to load items:', error);
+      setItems([]);
     }
   }
 
@@ -66,6 +94,24 @@ export default function SpaceDetailScreen() {
     }
   }
 
+  async function handleAddItem() {
+    if (!id) return;
+
+    if (!itemName.trim()) {
+      Alert.alert('Error', 'Item name cannot be empty.');
+      return;
+    }
+
+    try {
+      await ItemService.createItem(id, itemName);
+      setItemName('');
+      await loadItems();
+    } catch (error) {
+      console.error('Failed to add item:', error);
+      Alert.alert('Error', 'Failed to add item. Please try again.');
+    }
+  }
+
   return (
     <View style={styles.container}>
       {/* Header with back button */}
@@ -92,6 +138,37 @@ export default function SpaceDetailScreen() {
             >
               <Text style={styles.deleteButtonText}>Delete Space</Text>
             </Pressable>
+
+            {/* Items List */}
+            <Text style={styles.itemsHeader}>Items:</Text>
+            <FlatList
+              data={items}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <Text style={styles.itemName}>{item.name}</Text>
+              )}
+              scrollEnabled={false}
+              ListEmptyComponent={
+                <Text style={styles.noItems}>No items yet</Text>
+              }
+            />
+
+            {/* Add Item Input */}
+            <View style={styles.addItemContainer}>
+              <TextInput
+                style={styles.itemInput}
+                placeholder="Enter item name"
+                value={itemName}
+                onChangeText={setItemName}
+                placeholderTextColor="#999"
+              />
+              <Pressable
+                style={[styles.button, styles.addButton]}
+                onPress={handleAddItem}
+              >
+                <Text style={styles.addButtonText}>Add Item</Text>
+              </Pressable>
+            </View>
           </>
         ) : (
           <Text style={styles.notFound}>Space not found</Text>
@@ -157,6 +234,51 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  itemsHeader: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  itemName: {
+    fontSize: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  noItems: {
+    fontSize: 14,
+    color: '#999',
+    fontStyle: 'italic',
+    paddingVertical: 8,
+  },
+  addItemContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  itemInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
+  addButton: {
+    backgroundColor: '#4444ff',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: '600',
   },
 });
