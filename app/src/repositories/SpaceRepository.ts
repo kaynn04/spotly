@@ -131,5 +131,37 @@ export class SpaceRepository {
       throw serviceError;
     }
   }
+
+  /**
+   * Delete a space from the database
+   *
+   * @param id - The space id to delete
+   * @returns void (no return value)
+   * @throws ServiceError if database operation fails
+   *
+   * SQL: DELETE FROM spaces WHERE id = ?
+   * Parameterized query prevents SQL injection
+   */
+  static async deleteSpace(id: string): Promise<void> {
+    try {
+      const db = getDatabase();
+
+      // Execute parameterized DELETE query
+      await db.runAsync(
+        'DELETE FROM spaces WHERE id = ?',
+        [id]
+      );
+    } catch (error) {
+      // Convert database error to ServiceError
+      const serviceError: ServiceError = {
+        code: 'DB_ERROR',
+        message: 'Failed to delete space. Try again.',
+      };
+
+      console.error('[SpaceRepository.deleteSpace] Database error:', error);
+
+      throw serviceError;
+    }
+  }
   
 }
