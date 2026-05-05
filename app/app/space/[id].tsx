@@ -4,16 +4,36 @@
  * View details for a single space
  * Accessed via /space/[id] dynamic route
  *
- * Implementation: T003 - Create SpaceDetailScreen
+ * Implementation: T005 - Display space details in SpaceDetailScreen
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Button } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import type { Space } from '../../src/models/Space';
+import { SpaceService } from '../../src/services/SpaceService';
 
 export default function SpaceDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [space, setSpace] = useState<Space | null>(null);
+
+  // Fetch space details on mount
+  useEffect(() => {
+    loadSpace();
+  }, [id]);
+
+  async function loadSpace() {
+    if (!id) return;
+
+    try {
+      const result = await SpaceService.getSpaceById(id);
+      setSpace(result);
+    } catch (error) {
+      console.error('Failed to load space:', error);
+      setSpace(null);
+    }
+  }
 
   return (
     <View style={styles.container}>
@@ -26,8 +46,17 @@ export default function SpaceDetailScreen() {
 
       {/* Content */}
       <View style={styles.content}>
-        <Text style={styles.label}>Space ID:</Text>
-        <Text style={styles.value}>{id}</Text>
+        {space ? (
+          <>
+            <Text style={styles.name}>{space.name}</Text>
+            <Text style={styles.label}>Created:</Text>
+            <Text style={styles.value}>
+              {new Date(space.createdAt).toLocaleDateString()}
+            </Text>
+          </>
+        ) : (
+          <Text style={styles.notFound}>Space not found</Text>
+        )}
       </View>
     </View>
   );
@@ -55,6 +84,11 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
   },
+  name: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
   label: {
     fontSize: 14,
     color: '#666',
@@ -64,5 +98,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginBottom: 16,
+  },
+  notFound: {
+    fontSize: 16,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 24,
   },
 });

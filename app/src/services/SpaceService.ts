@@ -80,4 +80,15 @@ export class SpaceService {
   static async getAllSpaces(): Promise<Space[]> {
     return SpaceRepository.getAllSpaces();
   }
+
+  /**
+   * Get a single space by id
+   *
+   * @param id - The space id to retrieve
+   * @returns Space object if found, null if not found
+   * @throws ServiceError if database operation fails
+   */
+  static async getSpaceById(id: string): Promise<Space | null> {
+    return SpaceRepository.getSpaceById(id);
+  }
 }

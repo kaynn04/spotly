@@ -9,7 +9,7 @@
  * Implementation: UI for Create Space feature
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback} from 'react';
 import {
   View,
   TextInput,
@@ -21,7 +21,7 @@ import {
   ActivityIndicator,
   Pressable,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import type { Space } from '../models/Space';
 import { SpaceService } from '../services/SpaceService';
 
@@ -32,19 +32,24 @@ export function SpaceScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const createTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const createTimeoutRef = useRef<number | null>(null);
 
-  // Load spaces on screen mount
-  useEffect(() => {
-    loadSpaces();
+  // Load spaces on screen mount and whenever screen comes into focus (including from navigation back)
+  useFocusEffect(
+    React.useCallback(() => {
+      // Reset creation state when screen comes back into focus
+      setIsCreating(false);
+      setIsLoading(false);
+      loadSpaces();
 
-    // Cleanup timeout on unmount
-    return () => {
-      if (createTimeoutRef.current) {
-        clearTimeout(createTimeoutRef.current);
-      }
-    };
-  }, []);
+      // Cleanup timeout on unmount
+      return () => {
+        if (createTimeoutRef.current) {
+          clearTimeout(createTimeoutRef.current);
+        }
+      };
+    }, [])
+  );
 
   /**
    * Fetch all spaces from service
@@ -114,13 +119,17 @@ export function SpaceScreen() {
   function renderSpaceItem({ item }: { item: Space }) {
     return (
       <Pressable 
-        onPress={() => router.push(`/space/${item.id}`)}
-        style={styles.spaceItem}
+        onPress={() => router.push({
+          pathname: '/space/[id]' as any,
+          params: { id: item.id }
+        })}
       >
-        <Text style={styles.spaceName}>{item.name}</Text>
-        <Text style={styles.spaceDate}>
-          {new Date(item.createdAt).toLocaleDateString()}
-        </Text>
+        <View style={styles.spaceItem}>
+          <Text style={styles.spaceName}>{item.name}</Text>
+          <Text style={styles.spaceDate}>
+            {new Date(item.createdAt).toLocaleDateString()}
+          </Text>
+        </View>
       </Pressable>
     );
   }
@@ -143,7 +152,7 @@ export function SpaceScreen() {
           <Button
             title={isCreating ? 'Creating...' : 'Create'}
             onPress={handleCreateSpace}
-            disabled={isCreating || isLoading}
+            disabled={isCreating}
           />
           {isCreating && (
             <ActivityIndicator

@@ -89,5 +89,47 @@ export class SpaceRepository {
       throw new Error('Failed to retrieve spaces');
     }
   }
+
+  /**
+   * Get a single space by id
+   *
+   * @param id - The space id to retrieve
+   * @returns Space object if found, null if not found
+   * @throws ServiceError if database operation fails
+   *
+   * SQL: SELECT * FROM spaces WHERE id = ?
+   * Parameterized query prevents SQL injection
+   */
+  static async getSpaceById(id: string): Promise<Space | null> {
+    try {
+      const db = getDatabase();
+
+      const row = await db.getFirstAsync(
+        'SELECT * FROM spaces WHERE id = ?',
+        [id]
+      ) as SpaceRow | null;
+
+      if (!row) {
+        return null;
+      }
+
+      return {
+        id: row.id,
+        name: row.name,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
+    } catch (error) {
+      // Convert database error to ServiceError
+      const serviceError: ServiceError = {
+        code: 'DB_ERROR',
+        message: 'Failed to retrieve space. Try again.',
+      };
+
+      console.error('[SpaceRepository.getSpaceById] Database error:', error);
+
+      throw serviceError;
+    }
+  }
   
 }
