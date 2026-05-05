@@ -5,6 +5,17 @@
 **Status**: Draft  
 **Input**: User description: "create_space"
 
+## Clarifications
+
+### Session 2026-05-05
+
+- Q: What is the acceptable response time for creating a space? → A: Fast (< 500ms) with brief loading state permitted
+- Q: What is the maximum reasonable number of spaces a user might create in V1? → A: Small scale (< 20 spaces; no optimization needed for MVP)
+- Q: When space creation fails, what should happen? → A: Show generic error message ("Failed to create space. Try again.") with no auto-retry
+- Q: Are there any restrictions on special characters in space names? → A: Allow any character without restriction (parameterized SQL ensures safety)
+
+---
+
 ## Description
 
 Create a new space stored locally on the device using expo-sqlite. A space represents a physical location where users can organize and track their belongings (e.g., Home, Office, Dorm, Car).
@@ -131,6 +142,12 @@ Users need to remove spaces they no longer use (e.g., moving to a new apartment,
 - **FR-009**: System MUST display item count for each space in the space list
 - **FR-010**: System MUST show an empty state message when no spaces exist
 
+### Error Handling
+
+- **ERR-001**: If space creation fails, return generic error message: "Failed to create space. Try again."
+- **ERR-002**: Service layer MUST throw error on database write failure; UI layer catches and displays message
+- **ERR-003**: No automatic retry on database errors; user must manually retry via UI
+
 ### Key Entities
 
 **Space**:
@@ -187,6 +204,7 @@ CREATE INDEX IF NOT EXISTS idx_spaces_created_at ON spaces(created_at);
 
 - **Home Screen**: Shows list of all spaces with item count badge
 - **Create Space Dialog**: Simple text input with Save/Cancel buttons
+- **Loading State**: During space creation (< 500ms), show brief loading indicator or disabled Save button
 - **Space Detail Screen**: Shows space name as header, displays items related to this space (when item feature exists)
 - **Empty State**: When no spaces exist, show message "No spaces yet. Create one to get started."
 - **Delete Confirmation**: Modal asking "Are you sure you want to delete [space name]?"
@@ -203,6 +221,13 @@ CREATE INDEX IF NOT EXISTS idx_spaces_created_at ON spaces(created_at);
 - ✅ No critical errors or crashes during space operations
 - ✅ Database schema matches specification
 - ✅ All acceptance scenarios pass manual testing
+- ✅ Space creation completes within 500ms (brief loading state permitted)
+
+## Non-Functional Requirements
+
+- **NFR-001**: Space creation response time must be < 500ms (user sees brief loading state)
+- **NFR-002**: All database operations must complete offline without network connectivity
+- **NFR-003**: Space data must persist across app restarts and device reboots
 
 ## Dependencies
 
@@ -226,6 +251,9 @@ CREATE INDEX IF NOT EXISTS idx_spaces_created_at ON spaces(created_at);
 - Duplicate space names are allowed
 - Deleting a space should prompt the user; exact behavior of items when space is deleted will be defined in item management spec
 - "Home", "Office", "Dorm", "Car" are suggested examples but users can create any space name
+- **Data scale**: Small scale assumption (typical user will have < 20 spaces; no pagination needed for MVP)
+- **Response time**: Space creation must complete within 500ms; brief loading state is acceptable
+- **Special characters**: No restrictions on special characters, emoji, or unicode (parameterized SQL ensures safety)
 
 ## Technical Implementation Notes
 
