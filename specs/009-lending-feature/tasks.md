@@ -194,77 +194,86 @@
 
 ### Tasks
 
-- [ ] T017 Create LendingPage component (active list view)
+- [X] T017 Create LendingPage component (active list view)
   - **Objective**: Main lending tab showing active lendings
   - **Scope**: Component structure, state (lendings, loading, error), useFocusEffect for data loading
   - **Files**: `src/features/lending/screens/LendingPage.tsx` (update existing placeholder)
   - **Expected Output**: Component renders empty state initially; loads data on focus
   - **Dependencies**: T014 (getActiveLendings), existing Expo Router setup
   - **Validation**: Component mounts; useFocusEffect triggers on focus; loading state displays
+  - ✅ **COMPLETED**: Full implementation with service integration, state management, error handling
 
-- [ ] T018 Add "Lend Item" button to LendingPage
+- [X] T018 Add "Lend Item" button to LendingPage
   - **Objective**: User action to initiate lending creation (US1 entry point)
   - **Scope**: Button component with handler to show item selection
   - **Files**: `src/features/lending/screens/LendingPage.tsx` (modify T017)
   - **Expected Output**: Button visible on page; press handler implemented (not yet showing selection UI)
   - **Dependencies**: T017
   - **Validation**: Button rendered and pressable
+  - ✅ **COMPLETED**: Styled action button with modal trigger
 
-- [ ] T019 Create item selection modal/component
+- [X] T019 Create item selection modal/component
   - **Objective**: Allow user to pick an item to lend (US1 step 1)
   - **Scope**: Modal/screen showing all items with item name, space, container context
-  - **Files**: `src/features/lending/screens/LendingPage.tsx` or separate component
+  - **Files**: `src/features/lending/screens/components/ItemSelectionModal.tsx` (new)
   - **Expected Output**: Modal displays items; tap selects item; item passed to form
   - **Dependencies**: T017, existing ItemRepository/queries
   - **Validation**: Items displayed with correct context; selection works
+  - ✅ **COMPLETED**: Modal component with FlatList, loading/error states, item context display
 
-- [ ] T020 Create lending form component (borrower + note)
+- [X] T020 Create lending form component (borrower + note)
   - **Objective**: User enters borrower name and optional note (US1 step 2-3)
   - **Scope**: Form with required borrower field, optional note field, validation
-  - **Files**: `src/features/lending/screens/LendingPage.tsx` or component file
+  - **Files**: `src/features/lending/screens/components/LendingFormModal.tsx` (new)
   - **Expected Output**: Form fields validated; submission disabled until valid
   - **Dependencies**: T019
   - **Validation**: Borrower field required; note optional; form prevents submit when invalid
+  - ✅ **COMPLETED**: Form modal with validation, character counter, keyboard handling
 
-- [ ] T021 Implement form submission (create lending)
+- [X] T021 Implement form submission (create lending)
   - **Objective**: Call LendingService.createLending() from form (US1 step 4)
   - **Scope**: Handle submission, show loading/spinner, success/error feedback
   - **Files**: `src/features/lending/screens/LendingPage.tsx` (modify T020)
   - **Expected Output**: Form submission calls service; shows success toast or error alert
   - **Dependencies**: T012 (createLending), T020 (form)
   - **Validation**: Lending created in DB; list refreshes; user sees new lending
+  - ✅ **COMPLETED**: Service integration with error codes, alerts, list refresh
 
-- [ ] T022 Add "See History" button to LendingPage
+- [X] T022 Add "See History" button to LendingPage
   - **Objective**: Link to history view (US4 entry point)
   - **Scope**: Button or link that navigates to history screen
   - **Files**: `src/features/lending/screens/LendingPage.tsx` (modify T017)
   - **Expected Output**: Button present; tap navigates to history
   - **Dependencies**: T017, navigation setup
   - **Validation**: Navigation works; history screen loads
+  - ✅ **COMPLETED**: Header button with router.push navigation
 
-- [ ] T023 Implement active lendings list display
+- [X] T023 Implement active lendings list display
   - **Objective**: Show ACTIVE lendings in list format (US2 requirement)
   - **Scope**: FlatList rendering lending cards with item name, borrower, date, note
   - **Files**: `src/features/lending/screens/LendingPage.tsx` (modify T017)
   - **Expected Output**: List displays all active lendings; card shows required info
   - **Dependencies**: T014 (getActiveLendings), T017
   - **Validation**: Lendings display correctly; list updates when lendings change
+  - ✅ **COMPLETED**: Styled lending card list with all required information
 
-- [ ] T024 Add empty state to LendingPage
+- [X] T024 Add empty state to LendingPage
   - **Objective**: Show message when no active lendings exist (US2 edge case)
   - **Scope**: Display "No active lendings" when list is empty
   - **Files**: `src/features/lending/screens/LendingPage.tsx` (modify T023)
   - **Expected Output**: Empty state shows when lendings array empty
   - **Dependencies**: T023
   - **Validation**: Empty state displays correctly; disappears when lendings added
+  - ✅ **COMPLETED**: ListEmptyComponent with helpful empty state message
 
-- [ ] T025 Add tap handler to lending card (navigate to detail)
+- [X] T025 Add tap handler to lending card (navigate to detail)
   - **Objective**: User taps lending to see details (entry point for US3)
   - **Scope**: Tap handler navigates to detail screen with lending ID
   - **Files**: `src/features/lending/screens/LendingPage.tsx` (modify T023)
   - **Expected Output**: Tap on card navigates to `/lending/[id]` with params
   - **Dependencies**: T023, Expo Router setup
   - **Validation**: Navigation works; detail screen receives correct lending ID
+  - ✅ **COMPLETED**: Card Pressable with handleLendingTap navigation
 
 **✅ Checkpoint 3**: Users can lend items (US1 complete); active lendings display (US2 in progress); create workflow end-to-end functional.
 
