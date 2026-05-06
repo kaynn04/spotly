@@ -20,6 +20,7 @@ import {
   ActivityIndicator,
   SafeAreaView,
 } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { DashboardService } from '@/src/services/DashboardService';
 import { ItemRepository } from '@/src/repositories/ItemRepository';
 import { SpaceRepository } from '@/src/repositories/SpaceRepository';
@@ -50,35 +51,39 @@ export default function HomeScreen() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Initialize DashboardService once on mount
   useEffect(() => {
-    // Initialize DashboardService with repositories
     DashboardService.initialize(
       ItemRepository,
       SpaceRepository,
       ContainerRepository
     );
-
-    // Fetch dashboard data
-    const loadDashboard = async () => {
-      try {
-        setLoading(true);
-        const data = await DashboardService.getFullDashboard();
-        setDashboard(data);
-      } catch (error) {
-        console.error('[HomeScreen] Error loading dashboard:', error);
-        // Set empty state on error
-        setDashboard({
-          recentItems: [],
-          stats: { totalItems: 0, totalSpaces: 0, totalContainers: 0 },
-          isEmpty: true,
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadDashboard();
   }, []);
+
+  // Fetch dashboard data whenever screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadDashboard = async () => {
+        try {
+          setLoading(true);
+          const data = await DashboardService.getFullDashboard();
+          setDashboard(data);
+        } catch (error) {
+          console.error('[HomeScreen] Error loading dashboard:', error);
+          // Set empty state on error
+          setDashboard({
+            recentItems: [],
+            stats: { totalItems: 0, totalSpaces: 0, totalContainers: 0 },
+            isEmpty: true,
+          });
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      loadDashboard();
+    }, [])
+  );
 
   if (loading) {
     return (

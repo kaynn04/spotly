@@ -266,22 +266,20 @@ export default function SpaceDetailScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <Button title="Back" onPress={() => router.back()} />
-        <Text style={styles.title}>Space Details</Text>
-        <Pressable 
-          style={styles.headerMenuButton}
-          onPress={() => setShowHeaderMenu(true)}
-        >
-          <Text style={styles.headerMenuText}>⋮</Text>
-        </Pressable>
-      </View>
-
-
-
       {/* Main Content - Full Height */}
       <View style={styles.contentWrapper}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Button title="Back" onPress={() => router.back()} />
+          <Text style={styles.title}>Space Details</Text>
+          <Pressable 
+            style={styles.headerMenuButton}
+            onPress={() => setShowHeaderMenu(true)}
+          >
+            <Text style={styles.headerMenuText}>⋮</Text>
+          </Pressable>
+        </View>
+
         {space ? (
           <>
             {/* Fixed Top Section with Space Info */}
