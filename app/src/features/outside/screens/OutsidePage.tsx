@@ -191,7 +191,7 @@ export default function OutsidePage() {
                           borderBottomColor: colors.icon,
                         }
                       ]}
-                      onPress={() => handleToggleItem(item.id)}
+                      onPress={() => handleToggleItem(item.item_id)}
                     >
                       <View style={styles.itemCheckbox}>
                         <Text style={{ fontSize: 20, color: Boolean(item.is_checked) ? '#0a84ff' : colors.icon }}>
