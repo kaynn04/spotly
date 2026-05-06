@@ -28,7 +28,8 @@ export function getDatabase(): SQLiteDatabase {
  */
 export function closeDatabase() {
   if (db) {
-    db.close();
+    // SQLiteDatabase doesn't expose a close method in expo-sqlite
+    // Setting to null ensures a fresh connection is created on next getDatabase() call
     db = null;
   }
 }

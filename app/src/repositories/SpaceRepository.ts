@@ -77,7 +77,7 @@ export class SpaceRepository {
         'SELECT * FROM spaces ORDER BY created_at DESC'
       );
 
-      return result.map((row: SpaceRow) => ({
+return (result as any[]).map((row: SpaceRow) => ({
         id: row.id,
         name: row.name,
         createdAt: row.created_at,

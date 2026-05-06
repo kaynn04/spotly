@@ -82,7 +82,7 @@ export class ContainerRepository {
       );
 
       // Map database rows (snake_case) to Container objects (camelCase)
-      return result.map((row: ContainerRow) => ({
+      return (result as any[]).map((row: ContainerRow) => ({
         id: row.id,
         name: row.name,
         spaceId: row.space_id,

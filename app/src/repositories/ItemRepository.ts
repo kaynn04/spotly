@@ -92,7 +92,7 @@ export class ItemRepository {
         [spaceId]
       );
 
-      return result.map((row: ItemRow) => ({
+      return (result as any[]).map((row: ItemRow) => ({
         id: row.id,
         name: row.name,
         spaceId: row.space_id,
@@ -131,7 +131,7 @@ export class ItemRepository {
         [containerId]
       );
 
-      return result.map((row: ItemRow) => ({
+      return (result as any[]).map((row: ItemRow) => ({
         id: row.id,
         name: row.name,
         spaceId: row.space_id,
@@ -350,7 +350,7 @@ export class ItemRepository {
         ORDER BY i.name ASC
       `);
 
-      return (result || []).map((row: any) => ({
+      return (result as any[]).map((row: any) => ({
         id: row.id,
         name: row.name,
         spaceId: row.space_id,
@@ -379,7 +379,7 @@ export class ItemRepository {
     console.log('[ItemRepository.getById] Looking up item:', id);
     try {
       const db = getDatabase();
-      const result = await db.getFirstAsync(`
+      const result = await db.getFirstAsync<any>(`
         SELECT 
           i.id,
           i.name,
@@ -399,7 +399,7 @@ export class ItemRepository {
         return null;
       }
 
-      const item = {
+      const item: Item = {
         id: result.id,
         name: result.name,
         spaceId: result.space_id,

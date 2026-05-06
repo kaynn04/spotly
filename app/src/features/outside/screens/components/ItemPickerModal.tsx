@@ -33,8 +33,8 @@ interface ItemPickerModalProps {
 interface PickerItem {
   id: string;
   name: string;
-  space?: { name: string };
-  container?: { name: string };
+  space?: { name: string } | null;
+  container?: { name: string } | null;
   selected: boolean;
 }
 
