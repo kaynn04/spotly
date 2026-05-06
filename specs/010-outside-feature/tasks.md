@@ -134,8 +134,89 @@ description: "Phase 1 Implementation tasks for Outside Checklist feature"
 
 ---
 
+## Phase 4: History & Polish (Phase 2 - Enhancement)
+
+**Purpose**: Add history management, delete functionality, UX improvements
+
+**Independent Test**: Complete session → View in history → Delete completed session → Verify removed
+
+### History & Delete
+
+- [ ] T018 Implement SessionHistoryScreen in `app/src/features/outside/screens/SessionHistoryScreen.tsx`
+  - Load all COMPLETED sessions
+  - Display in reverse chronological order (newest first)
+  - Show: title, completed_at date, item count
+  - Add "Delete" button/swipe option for each session
+  - Add confirmation dialog before delete
+  - Wrap with SafeAreaView
+
+- [ ] T019 Add delete session functionality to OutsideService
+  - Implement deleteSession(id) with validation
+  - Update existing error codes or add CANNOT_DELETE_ACTIVE if needed
+
+- [ ] T020 Add confirmation dialogs
+  - Before completing session: "Mark this session as completed?"
+  - Before deleting session: "Delete this session? This cannot be undone"
+  - Use Alert.alert() or custom modal
+
+### Modals & Forms Enhancements
+
+- [ ] T021 Add search/filter to ItemPickerModal
+  - Add text input field for item name search
+  - Real-time filtering as user types
+  - Show "No items found" if search returns empty
+
+- [ ] T022 Add item removal from active session
+  - Implement swipe-to-delete on session detail item list
+  - Or context menu option "Remove from session"
+  - Update OutsideSessionItemRepository.removeItem() if needed
+
+### User Feedback
+
+- [ ] T023 Add toast notifications
+  - Session created: "Session created"
+  - Session completed: "Session completed"
+  - Item added: "Items added to session"
+  - Session deleted: "Session deleted"
+
+- [ ] T024 Improve error handling & messages
+  - Show user-friendly error messages for validation errors
+  - Add retry buttons for network/database errors
+  - Log errors for debugging
+
+### Navigation & UX
+
+- [ ] T025 Update OutsidePage navigation
+  - When completing a session, navigate to history and show toast
+  - Add back navigation from history to main page
+
+- [ ] T026 Session title immutability enforcement
+  - Ensure title cannot be edited after creation (verify in service)
+  - Do not show edit option in UI for existing sessions
+
+### Integration Testing (Phase 2)
+
+- [ ] T027 Manual test complete flow with history:
+  1. Create session "Grocery run"
+  2. Add items and check some
+  3. Complete session
+  4. Verify navigated to history
+  5. Verify session shows in history with date
+  6. Delete completed session
+  7. Verify removed from history
+
+- [ ] T028 Manual test UX improvements:
+  1. Search for item in item picker (partial match)
+  2. Try to remove item from active session (swipe/menu)
+  3. Verify toast notifications appear
+  4. Test error scenarios (e.g., create session with empty title)
+  5. Verify all error messages are user-friendly
+
+---
+
 ## Completion Checklist
 
+### Phase 1 (if not completed)
 - [ ] All 5 database/service tasks complete (T001-T006)
 - [ ] All screens render without errors (T007-T009)
 - [ ] All modals work (T010-T011)
@@ -143,4 +224,15 @@ description: "Phase 1 Implementation tasks for Outside Checklist feature"
 - [ ] Full flow manually tested (T016-T017)
 - [ ] No TypeScript errors
 - [ ] App compiles and runs
-- [ ] Ready for Phase 2
+
+### Phase 2
+- [ ] History screen complete (T018)
+- [ ] Delete functionality working (T019-T020)
+- [ ] Search/filter in item picker (T021)
+- [ ] Item removal from session (T022)
+- [ ] Toast notifications showing (T023)
+- [ ] Error messages user-friendly (T024)
+- [ ] Navigation flows fixed (T025-T026)
+- [ ] All manual tests passing (T027-T028)
+- [ ] No TypeScript errors
+- [ ] App compiles and runs
