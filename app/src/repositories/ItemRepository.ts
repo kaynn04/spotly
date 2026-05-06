@@ -356,8 +356,8 @@ export class ItemRepository {
         space_id: row.space_id,
         container_id: row.container_id,
         created_at: row.created_at,
-        space: row.space,
-        container: row.container,
+        space: row.space ? { name: row.space } : null,
+        container: row.container ? { name: row.container } : null,
       }));
     } catch (error) {
       console.error('[ItemRepository.getAll] Database error:', error);
@@ -405,8 +405,8 @@ export class ItemRepository {
         space_id: result.space_id,
         container_id: result.container_id,
         created_at: result.created_at,
-        space: result.space,
-        container: result.container,
+        space: result.space ? { name: result.space } : null,
+        container: result.container ? { name: result.container } : null,
       };
       console.log('[ItemRepository.getById] Item found:', item);
       return item;
