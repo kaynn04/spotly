@@ -79,6 +79,17 @@ export class ItemService {
   }
 
   /**
+   * Get all items in a specific container
+   *
+   * @param containerId - The container id to retrieve items for
+   * @returns Array of Item objects ordered by creation date (most recent first)
+   * @throws ServiceError if database operation fails
+   */
+  static async getItemsByContainerId(containerId: string): Promise<Item[]> {
+    return ItemRepository.getItemsByContainerId(containerId);
+  }
+
+  /**
    * Move an item to a different space
    *
    * @param itemId - The item id to move

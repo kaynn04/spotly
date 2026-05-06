@@ -82,4 +82,15 @@ export class ContainerService {
   static async getContainersBySpaceId(spaceId: string): Promise<Container[]> {
     return ContainerRepository.getContainersBySpaceId(spaceId);
   }
+
+  /**
+   * Get a specific container by id
+   *
+   * @param containerId - The container id to retrieve
+   * @returns Container object, or null if not found
+   * @throws ServiceError if database operation fails
+   */
+  static async getContainerById(containerId: string): Promise<Container | null> {
+    return ContainerRepository.getContainerById(containerId);
+  }
 }

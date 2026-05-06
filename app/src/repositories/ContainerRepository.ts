@@ -101,4 +101,48 @@ export class ContainerRepository {
       throw serviceError;
     }
   }
+
+  /**
+   * Get a specific container by id
+   *
+   * @param containerId - The container id to retrieve
+   * @returns Container object, or null if not found
+   * @throws ServiceError if database operation fails
+   *
+   * SQL: SELECT * FROM containers WHERE id = ? LIMIT 1
+   */
+  static async getContainerById(containerId: string): Promise<Container | null> {
+    try {
+      const db = getDatabase();
+
+      const result = await db.getFirstAsync(
+        'SELECT * FROM containers WHERE id = ? LIMIT 1',
+        [containerId]
+      );
+
+      if (!result) {
+        return null;
+      }
+
+      // Map database row (snake_case) to Container object (camelCase)
+      const row = result as ContainerRow;
+      return {
+        id: row.id,
+        name: row.name,
+        spaceId: row.space_id,
+        createdAt: row.created_at,
+      };
+    } catch (error) {
+      // Convert database error to ServiceError
+      const serviceError: ServiceError = {
+        code: 'DB_ERROR',
+        message: 'Failed to retrieve container. Try again.',
+      };
+
+      // Log error for debugging
+      console.error('[ContainerRepository.getContainerById] Database error:', error);
+
+      throw serviceError;
+    }
+  }
 }

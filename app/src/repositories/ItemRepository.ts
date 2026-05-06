@@ -108,6 +108,45 @@ export class ItemRepository {
   }
 
   /**
+   * Get all items in a specific container
+   *
+   * @param containerId - The container id to retrieve items for
+   * @returns Array of Item objects ordered by newest first
+   * @throws ServiceError if database operation fails
+   *
+   * SQL: SELECT * FROM items WHERE container_id = ? ORDER BY created_at DESC
+   */
+  static async getItemsByContainerId(containerId: string): Promise<Item[]> {
+    try {
+      const db = getDatabase();
+
+      const result = await db.getAllAsync(
+        'SELECT * FROM items WHERE container_id = ? ORDER BY created_at DESC',
+        [containerId]
+      );
+
+      return result.map((row: ItemRow) => ({
+        id: row.id,
+        name: row.name,
+        spaceId: row.space_id,
+        createdAt: row.created_at,
+        containerId: row.container_id,
+      }));
+    } catch (error) {
+      // Convert database error to ServiceError
+      const serviceError: ServiceError = {
+        code: 'DB_ERROR',
+        message: 'Failed to retrieve container items. Try again.',
+      };
+
+      // Log error for debugging
+      console.error('[ItemRepository.getItemsByContainerId] Database error:', error);
+
+      throw serviceError;
+    }
+  }
+
+  /**
    * Update an item's space_id to move it to a different space
    *
    * @param itemId - The item id to move
