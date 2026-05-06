@@ -13,7 +13,7 @@
 
 import { getDatabase } from '../../../db/client';
 import { Lending, LendingCreateInput, LendingStatus } from '../models/Lending';
-import { v4 as uuidv4 } from 'uuid';
+import { generateUUID } from '../../../utils/uuid';
 
 /**
  * LendingRepository
@@ -161,7 +161,7 @@ export class LendingRepository {
    * @throws SQLite error (likely unique constraint violation if item already lent)
    */
   async create(input: LendingCreateInput): Promise<Lending> {
-    const id = uuidv4();
+    const id = generateUUID();
     const now = new Date().toISOString();
 
     console.log('[LendingRepository.create] Starting with:', {
