@@ -1,10 +1,7 @@
 /**
  * Lending Form Modal
  *
- * Modal dialog for entering lending details.
- * User enters:
- * - Borrower name (required)
- * - Note (optional)
+ * Bottom sheet redesign — uniform with Outside SessionFormModal
  *
  * Feature: 009 - Lending Tracker
  */
@@ -16,11 +13,17 @@ import {
   StyleSheet,
   Modal,
   TextInput,
-  Pressable,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+
+const PRIMARY = '#6b7f99';
 
 interface LendingFormModalProps {
   visible: boolean;
@@ -34,23 +37,6 @@ interface LendingFormModalProps {
   loading: boolean;
 }
 
-/**
- * LendingFormModal Component
- *
- * Form for entering lending details (borrower name and optional note).
- * Item is pre-selected from previous screen.
- *
- * Props:
- * - visible: Show/hide modal
- * - item: Selected item (displayed as context)
- * - borrowerName: Current borrower name value
- * - onBorrowerNameChange: Callback for borrower name changes
- * - note: Current note value
- * - onNoteChange: Callback for note changes
- * - onSubmit: Submit handler
- * - onCancel: Cancel handler
- * - loading: Loading state during submission
- */
 export default function LendingFormModal({
   visible,
   item,
@@ -62,119 +48,112 @@ export default function LendingFormModal({
   onCancel,
   loading,
 }: LendingFormModalProps) {
+  const colorScheme = useColorScheme();
+  const insets = useSafeAreaInsets();
+  const isDark = colorScheme === 'dark';
+
+  const cardBg = isDark ? '#1c1c1e' : '#ffffff';
+  const inputBg = isDark ? '#2c2c2e' : '#f8f9fa';
+  const textColor = isDark ? '#ffffff' : '#2c3e50';
+  const subtleText = isDark ? '#8e8e93' : '#a0aec0';
+  const borderColor = isDark ? '#3a3a3c' : '#e2e6ea';
+
   const isValid = borrowerName.trim().length > 0;
+
+  const handleCancel = () => {
+    Keyboard.dismiss();
+    onCancel();
+  };
 
   return (
     <Modal
       visible={visible}
       transparent
       animationType="slide"
-      onRequestClose={onCancel}
+      statusBarTranslucent
+      onRequestClose={handleCancel}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.overlay}
-      >
-        <View style={styles.overlay}>
-          {/* Background tap to close */}
-          <Pressable
-            style={styles.backdrop}
-            onPress={onCancel}
-          />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+        <TouchableWithoutFeedback onPress={handleCancel}>
+          <View style={styles.overlay}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+                {/* Handle */}
+                <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
-          {/* Modal card */}
-          <View style={styles.modal}>
-            {/* Header */}
-            <View style={styles.header}>
-              <Text style={styles.headerTitle}>Lend Item</Text>
-              <Pressable
-                style={styles.closeButton}
-                onPress={onCancel}
-                disabled={loading}
-              >
-                <Text style={styles.closeText}>✕</Text>
-              </Pressable>
-            </View>
-
-            {/* Content */}
-            <View style={styles.content}>
-              {/* Item display */}
-              {item && (
-                <View style={styles.itemSection}>
-                  <Text style={styles.itemLabel}>Item</Text>
-                  <View style={styles.itemBox}>
-                    <Text style={styles.itemName} numberOfLines={2}>
-                      {item.name}
-                    </Text>
+                {/* Title */}
+                <Text style={[styles.sheetTitle, { color: textColor }]}>Lend Item</Text>
+                {item && (
+                  <View style={[styles.itemPill, { backgroundColor: inputBg, borderColor }]}>
+                    <Text style={[styles.itemPillText, { color: subtleText }]}>Item: </Text>
+                    <Text style={[styles.itemPillName, { color: textColor }]} numberOfLines={1}>{item.name}</Text>
                   </View>
-                </View>
-              )}
-
-              {/* Borrower name field */}
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Borrower Name *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter borrower name"
-                  placeholderTextColor="#ccc"
-                  value={borrowerName}
-                  onChangeText={onBorrowerNameChange}
-                  editable={!loading}
-                  maxLength={100}
-                />
-              </View>
-
-              {/* Note field */}
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Note (optional)</Text>
-                <TextInput
-                  style={[styles.input, styles.noteInput]}
-                  placeholder="Add any notes about this lending"
-                  placeholderTextColor="#ccc"
-                  value={note}
-                  onChangeText={onNoteChange}
-                  multiline
-                  numberOfLines={3}
-                  editable={!loading}
-                  maxLength={500}
-                  textAlignVertical="top"
-                />
-              </View>
-
-              {/* Character count for note */}
-              <Text style={styles.charCount}>
-                {note.length}/500
-              </Text>
-            </View>
-
-            {/* Actions */}
-            <View style={styles.actions}>
-              <Pressable
-                style={[styles.button, styles.cancelButton]}
-                onPress={onCancel}
-                disabled={loading}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </Pressable>
-
-              <Pressable
-                style={[
-                  styles.button,
-                  styles.submitButton,
-                  !isValid && styles.submitButtonDisabled,
-                ]}
-                onPress={onSubmit}
-                disabled={!isValid || loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.submitButtonText}>Lend Item</Text>
                 )}
-              </Pressable>
-            </View>
+
+                {/* Borrower Name */}
+                <Text style={[styles.fieldLabel, { color: subtleText }]}>Borrower Name *</Text>
+                <View style={[styles.inputWrapper, { backgroundColor: inputBg, borderColor }]}>
+                  <TextInput
+                    style={[styles.input, { color: textColor }]}
+                    placeholder="Who are you lending to?"
+                    placeholderTextColor={subtleText}
+                    value={borrowerName}
+                    onChangeText={onBorrowerNameChange}
+                    maxLength={100}
+                    editable={!loading}
+                    autoFocus
+                    returnKeyType="next"
+                  />
+                </View>
+
+                {/* Note */}
+                <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 12 }]}>Note (optional)</Text>
+                <View style={[styles.inputWrapper, styles.noteWrapper, { backgroundColor: inputBg, borderColor }]}>
+                  <TextInput
+                    style={[styles.input, styles.noteInput, { color: textColor }]}
+                    placeholder="Add any notes about this lending"
+                    placeholderTextColor={subtleText}
+                    value={note}
+                    onChangeText={onNoteChange}
+                    multiline
+                    numberOfLines={3}
+                    editable={!loading}
+                    maxLength={500}
+                    textAlignVertical="top"
+                  />
+                </View>
+                <Text style={[styles.charCount, { color: subtleText }]}>{note.length}/500</Text>
+
+                {/* Buttons */}
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity
+                    style={[styles.cancelBtn, { borderColor }]}
+                    onPress={handleCancel}
+                    disabled={loading}
+                  >
+                    <Text style={[styles.cancelBtnText, { color: subtleText }]}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.submitBtn,
+                      { backgroundColor: isValid ? PRIMARY : (isDark ? '#3a3a3c' : '#e2e6ea') },
+                    ]}
+                    onPress={onSubmit}
+                    disabled={!isValid || loading}
+                  >
+                    {loading ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={[styles.submitBtnText, { color: isValid ? '#fff' : subtleText }]}>
+                        Lend Item
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -183,127 +162,59 @@ export default function LendingFormModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
   },
-  backdrop: {
-    flex: 1,
+  sheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
   },
-  modal: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingBottom: 20,
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
   },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    marginBottom: 12,
+  },
+  itemPill: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-  },
-  closeButton: {
-    padding: 8,
-  },
-  closeText: {
-    fontSize: 24,
-    color: '#999',
-  },
-  content: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  itemSection: {
-    marginBottom: 16,
-  },
-  itemLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#999',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-  },
-  itemBox: {
-    backgroundColor: '#f5f5f5',
     paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 6,
+    paddingVertical: 8,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  itemName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#000',
-  },
-  formGroup: {
     marginBottom: 16,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#000',
-    marginBottom: 6,
+  itemPillText: { fontSize: 13 },
+  itemPillName: { fontSize: 13, fontWeight: '600', flex: 1 },
+
+  fieldLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3, marginBottom: 6 },
+  inputWrapper: {
+    borderRadius: 12,
+    borderWidth: 1.5,
+    paddingHorizontal: 14,
+    paddingVertical: 2,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: '#000',
-    backgroundColor: '#fafafa',
+  noteWrapper: { paddingVertical: 8 },
+  input: { fontSize: 15, paddingVertical: 10 },
+  noteInput: { minHeight: 72, paddingTop: 2 },
+  charCount: { fontSize: 12, textAlign: 'right', marginTop: 4, marginBottom: 20 },
+
+  buttonRow: { flexDirection: 'row', gap: 10 },
+  cancelBtn: {
+    flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, alignItems: 'center',
   },
-  noteInput: {
-    minHeight: 80,
-    paddingTop: 10,
+  cancelBtnText: { fontSize: 15, fontWeight: '600' },
+  submitBtn: {
+    flex: 2, paddingVertical: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
   },
-  charCount: {
-    fontSize: 11,
-    color: '#ccc',
-    textAlign: 'right',
-    marginBottom: 16,
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 16,
-    marginTop: 12,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#f0f0f0',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  cancelButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#000',
-  },
-  submitButton: {
-    backgroundColor: '#0a7ea4',
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  submitButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
-  },
+  submitBtnText: { fontSize: 15, fontWeight: '600' },
 });

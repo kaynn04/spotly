@@ -1,13 +1,7 @@
-/**
+﻿/**
  * Lending Page
  *
- * Main lending tab screen where users can:
- * - View active lendings (items they've lent out)
- * - Lend a new item
- * - Navigate to lending details
- *
- * Architecture: UI → Service → Repository → SQLite
- * State: Local (lendings, modals, loading/error)
+ * Main lending tab â€” minimalist redesign, uniform with Outside feature
  *
  * Feature: 009 - Lending Tracker
  */
@@ -17,326 +11,238 @@ import {
   View,
   Text,
   StyleSheet,
+  TouchableOpacity,
+  ScrollView,
   FlatList,
-  Pressable,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
 import { LendingService } from '../services/LendingService';
 import { LendingRepository } from '../repositories/LendingRepository';
 import { ItemRepository } from '../../../repositories/ItemRepository';
 import { Lending } from '../models/Lending';
 
-/**
- * LendingPage Component
- *
- * Main lending tab showing:
- * - List of active lendings (items currently lent)
- * - Link to view lending history
- * - Lending creation is handled from item options (move/delete)
- *
- * State Management:
- * - lendings: Array of Lending records with item names
- * - loading: Loading state for data fetch
- * - error: Error message if fetch fails
- *
- * Flow:
- * 1. On screen focus, load active lendings with item names
- * 2. User taps on a lending to see details
- * 3. User accesses "Lend Item" from item options in spaces
- */
+const PRIMARY = '#6b7f99';
+
 export default function LendingPage() {
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
+  const isDark = colorScheme === 'dark';
 
-  // Service instances - memoized to prevent re-creation on every render
-  const repositories = useMemo(() => {
-    const lendingRepository = new LendingRepository();
-    const itemRepository = new ItemRepository();
-    return { lendingRepository, itemRepository };
-  }, []);
+  const repositories = useMemo(() => ({
+    lendingRepository: new LendingRepository(),
+    itemRepository: new ItemRepository(),
+  }), []);
 
-  const lendingService = useMemo(() => {
-    return new LendingService(repositories.lendingRepository, repositories.itemRepository);
-  }, [repositories]);
+  const lendingService = useMemo(() =>
+    new LendingService(repositories.lendingRepository, repositories.itemRepository),
+    [repositories]
+  );
 
-  // Data state - store lendings with item names
   const [lendings, setLendings] = useState<(Lending & { itemName?: string })[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /**
-   * Load Active Lendings with Item Names
-   *
-   * Fetches active lendings from service, then loads item names
-   * Called on mount and after screen focus
-   */
+  const cardBg = isDark ? '#1c1c1e' : '#ffffff';
+  const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
+  const subtleText = isDark ? '#8e8e93' : '#a0aec0';
+
   const loadLendings = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const activeLendings = await lendingService.getActiveLendings();
-      
-      // Load item names for each lending
       const lendingsWithItems = await Promise.all(
         activeLendings.map(async (lending) => {
           try {
             const item = await repositories.itemRepository.getById(lending.item_id);
-            return {
-              ...lending,
-              itemName: item?.name || 'Unknown Item',
-            };
-          } catch (err) {
-            console.error(`Failed to load item for lending ${lending.id}:`, err);
-            return {
-              ...lending,
-              itemName: 'Unknown Item',
-            };
+            return { ...lending, itemName: item?.name || 'Unknown Item' };
+          } catch {
+            return { ...lending, itemName: 'Unknown Item' };
           }
         })
       );
-      
       setLendings(lendingsWithItems);
     } catch (err: any) {
       setError(err.message || 'Failed to load lendings');
-      console.error('Error loading lendings:', err);
     } finally {
       setLoading(false);
     }
   }, [lendingService, repositories.itemRepository]);
 
-  // Load lendings on screen focus
-  useFocusEffect(
-    useCallback(() => {
-      loadLendings();
-    }, [loadLendings])
-  );
+  useFocusEffect(useCallback(() => { loadLendings(); }, [loadLendings]));
 
-  /**
-   * Handle Lending Tap
-   *
-   * User tapped on a lending in the list.
-   * Navigate to detail screen with lending ID.
-   */
-  const handleLendingTap = (lending: Lending) => {
-    router.push(`/lending/${lending.id}`);
+  const formatDate = (date: Date | null): string => {
+    if (!date) return '';
+    return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  /**
-   * Handle See History Button
-   *
-   * Navigate to lending history screen.
-   */
-  const handleSeeHistory = () => {
-    router.push('/lending/history');
-  };
-
-  /**
-   * Render Lending Item
-   *
-   * List item component showing lending details with item name.
-   */
-  const renderLendingItem = ({ item }: { item: Lending & { itemName?: string } }) => (
-    <Pressable
-      style={styles.lendingCard}
-      onPress={() => handleLendingTap(item)}
+  const renderLendingItem = ({ item, index }: { item: Lending & { itemName?: string }, index: number }) => (
+    <TouchableOpacity
+      style={[
+        styles.lendingRow,
+        index < lendings.length - 1 && { borderBottomWidth: 1, borderBottomColor: borderColor },
+      ]}
+      onPress={() => router.push(`/lending/${item.id}`)}
+      activeOpacity={0.6}
     >
-      <View style={styles.cardContent}>
-        <Text style={styles.cardTitle} numberOfLines={1}>
+      <View style={[styles.activeDot, { backgroundColor: PRIMARY }]} />
+      <View style={styles.lendingRowContent}>
+        <Text style={[styles.lendingItemName, { color: colors.text }]} numberOfLines={1}>
           {item.itemName || 'Unknown Item'}
         </Text>
-        <Text style={styles.cardSubtitle}>
-          Borrowed by: {item.borrower_name}
+        <Text style={[styles.lendingBorrower, { color: subtleText }]} numberOfLines={1}>
+          Lent to {item.borrower_name}
         </Text>
-        <Text style={styles.cardMeta}>
-          Lent on {new Date(item.lent_at).toLocaleDateString()}
+        <Text style={[styles.lendingDate, { color: subtleText }]}>
+          {formatDate(item.lent_at)}
         </Text>
-        {item.note && (
-          <Text style={styles.cardNote} numberOfLines={2}>
-            Note: {item.note}
-          </Text>
-        )}
       </View>
-      <Text style={styles.cardArrow}>›</Text>
-    </Pressable>
-  );
-
-  /**
-   * Render Empty State
-   *
-   * Message when no active lendings exist.
-   */
-  const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyTitle}>No active lendings</Text>
-      <Text style={styles.emptyMessage}>
-        Select an item and tap &quot;Lend&quot; to lend something to a friend
-      </Text>
-    </View>
+      <Text style={[styles.chevron, { color: subtleText }]}>â€º</Text>
+    </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header with actions */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Lendings</Text>
-        <View style={styles.headerActions}>
-          <Pressable
-            style={styles.historyButton}
-            onPress={handleSeeHistory}
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={[styles.title, { color: colors.text }]}>Lending</Text>
+            <Text style={[styles.subtitle, { color: subtleText }]}>Track items you&apos;ve lent out</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.historyPill, { borderColor, backgroundColor: cardBg }]}
+            onPress={() => router.push('/lending/history')}
           >
-            <Text style={styles.historyButtonText}>History</Text>
-          </Pressable>
+            <Text style={[styles.historyPillText, { color: PRIMARY }]}>History</Text>
+          </TouchableOpacity>
         </View>
-      </View>
 
-      {/* Error message */}
-      {error && (
-        <View style={styles.errorBanner}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      )}
-
-      {/* Loading indicator */}
-      {loading && !lendings.length ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0a7ea4" />
-        </View>
-      ) : (
-        <>
-          {/* Lendings list */}
-          <FlatList
-            data={lendings}
-            renderItem={renderLendingItem}
-            keyExtractor={(item) => item.id}
-            ListEmptyComponent={renderEmptyState}
-            contentContainerStyle={styles.listContent}
-            scrollEnabled={lendings.length > 0}
-          />
-        </>
-      )}
-    </SafeAreaView>
+        {/* Content */}
+        {loading ? (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color={PRIMARY} />
+          </View>
+        ) : error ? (
+          <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+            <Text style={[styles.errorText, { color: '#d32f2f' }]}>{error}</Text>
+            <TouchableOpacity
+              style={[styles.primaryButton, { backgroundColor: PRIMARY }]}
+              onPress={loadLendings}
+            >
+              <Text style={styles.primaryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : lendings.length > 0 ? (
+          <View style={[styles.card, { backgroundColor: cardBg, borderColor, padding: 0, overflow: 'hidden' }]}>
+            <View style={[styles.cardHeaderRow, { borderBottomColor: borderColor }]}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Active</Text>
+              <View style={[styles.countBadge, { backgroundColor: `${PRIMARY}18` }]}>
+                <Text style={[styles.countBadgeText, { color: PRIMARY }]}>{lendings.length}</Text>
+              </View>
+            </View>
+            <FlatList
+              data={lendings}
+              renderItem={renderLendingItem}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+              contentContainerStyle={{ paddingHorizontal: 16 }}
+            />
+          </View>
+        ) : (
+          <View style={[styles.card, styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
+            <View style={[styles.emptyIconContainer, { backgroundColor: `${PRIMARY}12` }]}>
+              <Text style={styles.emptyIcon}>ðŸ¤</Text>
+            </View>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>No Active Lendings</Text>
+            <Text style={[styles.emptySubtitle, { color: subtleText }]}>
+              Lend an item from any space to start tracking
+            </Text>
+          </View>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
+  container: { flex: 1 },
+  scrollContent: { padding: 16, paddingBottom: 40 },
+
   header: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    marginBottom: 20,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#000',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  historyButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: '#f0f0f0',
-  },
-  historyButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#0a7ea4',
-  },
-  errorBanner: {
-    backgroundColor: '#ffebee',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ef5350',
-  },
-  errorText: {
-    fontSize: 14,
-    color: '#c62828',
-    fontWeight: '500',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listContent: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    gap: 8,
-  },
-  lendingCard: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 8,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  title: { fontSize: 30, fontWeight: '700', letterSpacing: -0.5 },
+  subtitle: { fontSize: 13, marginTop: 2 },
+  historyPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
   },
-  cardContent: {
-    flex: 1,
+  historyPillText: { fontSize: 14, fontWeight: '600' },
+
+  centerContainer: { justifyContent: 'center', alignItems: 'center', minHeight: 200 },
+
+  card: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 12,
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 4,
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 2,
-  },
-  cardMeta: {
-    fontSize: 12,
-    color: '#999',
-    marginBottom: 4,
-  },
-  cardNote: {
-    fontSize: 12,
-    color: '#555',
-    fontStyle: 'italic',
-    marginTop: 4,
-  },
-  cardArrow: {
-    fontSize: 24,
-    color: '#ccc',
-    marginLeft: 12,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  cardHeaderRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 32,
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
   },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 8,
-    textAlign: 'center',
+  cardTitle: { fontSize: 16, fontWeight: '600' },
+  countBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
   },
-  emptyMessage: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 20,
+  countBadgeText: { fontSize: 12, fontWeight: '700' },
+
+  lendingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    gap: 12,
   },
+  activeDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  lendingRowContent: { flex: 1 },
+  lendingItemName: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
+  lendingBorrower: { fontSize: 13, marginBottom: 2 },
+  lendingDate: { fontSize: 12 },
+  chevron: { fontSize: 22 },
+
+  errorText: { fontSize: 15, marginBottom: 16, textAlign: 'center' },
+  primaryButton: {
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  primaryButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+
+  emptyCard: { alignItems: 'center', paddingVertical: 36, gap: 12, marginTop: 24 },
+  emptyIconContainer: { width: 72, height: 72, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  emptyIcon: { fontSize: 36 },
+  emptyTitle: { fontSize: 20, fontWeight: '700' },
+  emptySubtitle: { fontSize: 14, textAlign: 'center', lineHeight: 20, paddingHorizontal: 16 },
 });
+

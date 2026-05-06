@@ -1,11 +1,7 @@
-/**
+﻿/**
  * Lending History Screen
  *
- * Display history of all lendings (ACTIVE and RETURNED).
- * Allow filtering by status and view individual lending details.
- *
- * Architecture: UI → Service → Repository → SQLite
- * State: Local (allLendings, loading, error, selectedFilter)
+ * Minimalist redesign â€” uniform with Outside feature
  *
  * Feature: 009 - Lending Tracker
  */
@@ -16,480 +12,258 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  Pressable,
+  TouchableOpacity,
   ActivityIndicator,
-  useColorScheme,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
 import { LendingService } from '../services/LendingService';
 import { LendingRepository } from '../repositories/LendingRepository';
 import { ItemRepository } from '../../../repositories/ItemRepository';
 import { Lending } from '../models/Lending';
-import { Colors } from '@/constants/theme';
+
+const PRIMARY = '#6b7f99';
+const SUCCESS = '#6b9e7a';
 
 type FilterType = 'ALL' | 'ACTIVE' | 'RETURNED';
 
-/**
- * LendingHistoryScreen Component
- *
- * Shows:
- * - All lendings (ACTIVE + RETURNED)
- * - Filter tabs for status
- * - List with lending details and status badges
- * - Navigation to detail screen
- * - Loading/error states
- * - Empty state per filter
- *
- * State Management:
- * - allLendings: All lending records
- * - loading: Loading state for data fetch
- * - error: Error message if fetch fails
- * - selectedFilter: Current filter (ALL/ACTIVE/RETURNED)
- */
 export default function LendingHistoryScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
+  const isDark = colorScheme === 'dark';
 
-  // Services - memoized to prevent re-creation on every render
-  const repositories = useMemo(() => {
-    const lendingRepository = new LendingRepository();
-    const itemRepository = new ItemRepository();
-    return { lendingRepository, itemRepository };
-  }, []);
+  const repositories = useMemo(() => ({
+    lendingRepository: new LendingRepository(),
+    itemRepository: new ItemRepository(),
+  }), []);
 
-  const lendingService = useMemo(() => {
-    return new LendingService(repositories.lendingRepository, repositories.itemRepository);
-  }, [repositories]);
+  const lendingService = useMemo(() =>
+    new LendingService(repositories.lendingRepository, repositories.itemRepository),
+    [repositories]
+  );
 
-  // State - store lendings with item names
   const [allLendings, setAllLendings] = useState<(Lending & { itemName?: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('ALL');
 
-  /**
-   * Load All Lendings with Item Names
-   *
-   * Fetch all lendings from service, load item names, and sort appropriately.
-   * Sorting: ACTIVE first, then by date descending (most recent first)
-   */
+  const cardBg = isDark ? '#1c1c1e' : '#ffffff';
+  const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
+  const subtleText = isDark ? '#8e8e93' : '#a0aec0';
+
   const loadAllLendings = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-
-      // Fetch all lendings
       const lendings = await lendingService.getAllLendings();
-
-      // Load item names for each lending
       const lendingsWithItems = await Promise.all(
         lendings.map(async (lending) => {
           try {
             const item = await repositories.itemRepository.getById(lending.item_id);
-            return {
-              ...lending,
-              itemName: item?.name || 'Unknown Item',
-            };
-          } catch (err) {
-            console.error(`Failed to load item for lending ${lending.id}:`, err);
-            return {
-              ...lending,
-              itemName: 'Unknown Item',
-            };
+            return { ...lending, itemName: item?.name || 'Unknown Item' };
+          } catch {
+            return { ...lending, itemName: 'Unknown Item' };
           }
         })
       );
-
-      // Sort: ACTIVE before RETURNED, then by date descending
       const sorted = [...lendingsWithItems].sort((a, b) => {
-        // First: ACTIVE before RETURNED
-        if (a.status !== b.status) {
-          return a.status === 'ACTIVE' ? -1 : 1;
-        }
-        // Second: Most recent first
-        const dateA = new Date(a.lent_at).getTime();
-        const dateB = new Date(b.lent_at).getTime();
-        return dateB - dateA;
+        if (a.status !== b.status) return a.status === 'ACTIVE' ? -1 : 1;
+        return new Date(b.lent_at).getTime() - new Date(a.lent_at).getTime();
       });
-
       setAllLendings(sorted);
     } catch (err: any) {
-      console.error('Error loading lendings:', err);
       setError(err?.message || 'Failed to load lending history');
     } finally {
       setLoading(false);
     }
   }, [lendingService, repositories.itemRepository]);
 
-  // Load on mount and on screen focus
-  useFocusEffect(
-    useCallback(() => {
-      loadAllLendings();
-    }, [loadAllLendings])
-  );
+  useFocusEffect(useCallback(() => { loadAllLendings(); }, [loadAllLendings]));
 
-  /**
-   * Get Filtered Lendings
-   *
-   * Filter lendings based on selected filter.
-   */
-  const getFilteredLendings = (): Lending[] => {
-    if (selectedFilter === 'ALL') {
-      return allLendings;
-    }
-    return allLendings.filter((lending) => lending.status === selectedFilter);
-  };
+  const filteredLendings = selectedFilter === 'ALL'
+    ? allLendings
+    : allLendings.filter((l) => l.status === selectedFilter);
 
-  /**
-   * Handle Lending Tap
-   *
-   * Navigate to detail screen with lending ID.
-   */
-  const handleLendingTap = (lending: Lending) => {
-    router.push(`/lending/${lending.id}`);
-  };
-
-  /**
-   * Format Date
-   *
-   * Display date in readable format.
-   */
   const formatDate = (date: Date | null): string => {
-    if (!date) return 'N/A';
-    return date instanceof Date
-      ? date.toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-        })
-      : new Date(date).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-        });
+    if (!date) return '';
+    return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  /**
-   * Render Filter Tab
-   *
-   * Tab button for status filter.
-   */
-  const renderFilterTab = (filter: FilterType, label: string) => {
-    const isSelected = selectedFilter === filter;
-    return (
-      <Pressable
-        key={filter}
-        style={[
-          styles.filterTab,
-          isSelected && { borderBottomColor: colors.tint, borderBottomWidth: 2 },
-        ]}
-        onPress={() => setSelectedFilter(filter)}
-      >
-        <Text
-          style={[
-            styles.filterTabText,
-            { color: isSelected ? colors.tint : colors.tabIconDefault },
-            isSelected && { fontWeight: '700' },
-          ]}
-        >
-          {label}
-        </Text>
-      </Pressable>
-    );
-  };
-
-  /**
-   * Render Lending Item
-   *
-   * List item component showing lending details with item name.
-   */
-  const renderLendingItem = ({ item }: { item: Lending & { itemName?: string } }) => {
+  const renderLendingItem = ({ item, index }: { item: Lending & { itemName?: string }, index: number }) => {
     const isActive = item.status === 'ACTIVE';
-    const statusColor = isActive ? '#4caf50' : '#9e9e9e';
+    const dotColor = isActive ? PRIMARY : SUCCESS;
 
     return (
-      <Pressable
-        style={styles.lendingCard}
-        onPress={() => handleLendingTap(item)}
+      <TouchableOpacity
+        style={[
+          styles.lendingRow,
+          index < filteredLendings.length - 1 && { borderBottomWidth: 1, borderBottomColor: borderColor },
+        ]}
+        onPress={() => router.push(`/lending/${item.id}`)}
+        activeOpacity={0.6}
       >
-        <View style={styles.lendingCardContent}>
-          {/* Item Name */}
+        <View style={[styles.statusDot, { backgroundColor: dotColor }]} />
+        <View style={styles.lendingRowContent}>
           <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={1}>
             {item.itemName || 'Unknown Item'}
           </Text>
-
-          {/* Borrower Name */}
-          <Text style={[styles.borrowerName, { color: colors.text }]} numberOfLines={1}>
-            Lent to: {item.borrower_name}
+          <Text style={[styles.borrowerName, { color: subtleText }]} numberOfLines={1}>
+            Lent to {item.borrower_name}
           </Text>
-
-          {/* Status Badge and Date Info */}
           <View style={styles.metaRow}>
-            <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
-              <Text style={styles.statusBadgeText}>{isActive ? 'ACTIVE' : 'RETURNED'}</Text>
+            <View style={[styles.statusPill, { backgroundColor: isActive ? `${PRIMARY}18` : `${SUCCESS}18` }]}>
+              <Text style={[styles.statusPillText, { color: isActive ? PRIMARY : SUCCESS }]}>
+                {isActive ? 'Active' : 'Returned'}
+              </Text>
             </View>
-            <Text style={[styles.dateText, { color: colors.tabIconDefault }]}>
-              {formatDate(item.lent_at)}
-            </Text>
+            <Text style={[styles.dateText, { color: subtleText }]}>{formatDate(item.lent_at)}</Text>
           </View>
-
-          {/* Note Preview (if exists) */}
-          {item.note && (
-            <Text style={[styles.notePreview, { color: colors.tabIconDefault }]} numberOfLines={1}>
-              Note: {item.note}
-            </Text>
-          )}
-
-          {/* Returned Date (if returned) */}
-          {!isActive && item.returned_at && (
-            <Text style={[styles.returnedDateText, { color: colors.tabIconDefault }]}>
-              Returned: {formatDate(item.returned_at)}
-            </Text>
-          )}
         </View>
-
-        {/* Chevron */}
-        <Text style={[styles.chevron, { color: colors.tabIconDefault }]}>›</Text>
-      </Pressable>
+        <Text style={[styles.chevron, { color: subtleText }]}>â€º</Text>
+      </TouchableOpacity>
     );
   };
 
-  /**
-   * Render Empty State
-   *
-   * Show message when no lendings match filter.
-   */
-  const renderEmptyState = () => {
-    const filteredCount = getFilteredLendings().length;
-    if (filteredCount > 0) return null;
+  const headerBar = (
+    <View style={[styles.headerBar, { borderBottomColor: borderColor, paddingTop: insets.top }]}>
+      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <Text style={[styles.backBtnText, { color: PRIMARY }]}>â€¹ Back</Text>
+      </TouchableOpacity>
+      <Text style={[styles.headerTitle, { color: colors.text }]}>History</Text>
+      <View style={styles.headerSpacer} />
+    </View>
+  );
 
-    let message = 'No lending history';
-    if (selectedFilter === 'ACTIVE') {
-      message = 'No active lendings';
-    } else if (selectedFilter === 'RETURNED') {
-      message = 'No returned items';
-    }
-
-    return (
-      <View style={styles.emptyStateContainer}>
-        <Text style={[styles.emptyStateText, { color: colors.tabIconDefault }]}>
-          {message}
-        </Text>
-      </View>
-    );
-  };
-
-  const filteredLendings = getFilteredLendings();
-
-  // Render Loading
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()}>
-            <Text style={[styles.backButton, { color: colors.tint }]}>← Back</Text>
-          </Pressable>
-          <Text style={[styles.title, { color: colors.text }]}>History</Text>
-          <View style={styles.headerSpacer} />
+      <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+        {headerBar}
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={PRIMARY} />
         </View>
-        <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={colors.tint} />
-          <Text style={[styles.loadingText, { color: colors.text }]}>Loading history...</Text>
-        </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
-  // Render Error
   if (error) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()}>
-            <Text style={[styles.backButton, { color: colors.tint }]}>← Back</Text>
-          </Pressable>
-          <Text style={[styles.title, { color: colors.text }]}>History</Text>
-          <View style={styles.headerSpacer} />
-        </View>
-        <View style={styles.centerContent}>
+      <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+        {headerBar}
+        <View style={styles.centerContainer}>
           <Text style={[styles.errorText, { color: '#d32f2f' }]}>{error}</Text>
-          <Pressable
-            style={[styles.retryButton, { backgroundColor: colors.tint }]}
-            onPress={loadAllLendings}
-          >
-            <Text style={styles.retryButtonText}>Try Again</Text>
-          </Pressable>
+          <TouchableOpacity style={[styles.primaryButton, { backgroundColor: PRIMARY }]} onPress={loadAllLendings}>
+            <Text style={styles.primaryButtonText}>Retry</Text>
+          </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header with Back Button */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Text style={[styles.backButton, { color: colors.tint }]}>← Back</Text>
-        </Pressable>
-        <Text style={[styles.title, { color: colors.text }]}>History</Text>
-        <View style={styles.headerSpacer} />
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+      {headerBar}
+
+      {/* Filter Pills */}
+      <View style={[styles.filterRow, { borderBottomColor: borderColor }]}>
+        {(['ALL', 'ACTIVE', 'RETURNED'] as FilterType[]).map((f) => (
+          <TouchableOpacity
+            key={f}
+            style={[
+              styles.filterPill,
+              selectedFilter === f && { backgroundColor: PRIMARY },
+              selectedFilter !== f && { backgroundColor: isDark ? '#2c2c2e' : '#e2e6ea' },
+            ]}
+            onPress={() => setSelectedFilter(f)}
+          >
+            <Text style={[
+              styles.filterPillText,
+              { color: selectedFilter === f ? '#fff' : subtleText },
+            ]}>
+              {f === 'ALL' ? 'All' : f === 'ACTIVE' ? 'Active' : 'Returned'}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      {/* Filter Tabs */}
-      <View style={styles.filterContainer}>
-        {renderFilterTab('ALL', 'All')}
-        {renderFilterTab('ACTIVE', 'Active')}
-        {renderFilterTab('RETURNED', 'Returned')}
-      </View>
-
-      {/* Lendings List */}
-      <FlatList
-        data={filteredLendings}
-        renderItem={renderLendingItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={renderEmptyState}
-        scrollEnabled={true}
-      />
-    </SafeAreaView>
+      {/* List */}
+      {filteredLendings.length === 0 ? (
+        <View style={styles.centerContainer}>
+          <Text style={styles.emptyIcon}>ðŸ•“</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>No records</Text>
+          <Text style={[styles.emptySubtitle, { color: subtleText }]}>
+            {selectedFilter === 'ACTIVE' ? 'No active lendings' : selectedFilter === 'RETURNED' ? 'No returned items yet' : 'No lending history yet'}
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredLendings}
+          renderItem={renderLendingItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+        />
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  container: { flex: 1 },
+
+  headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  backButton: {
-    fontSize: 16,
-    fontWeight: '600',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    flex: 1,
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 60,
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
     paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
   },
-  filterTab: {
+  backBtn: { paddingVertical: 8, paddingRight: 8 },
+  backBtnText: { fontSize: 17, fontWeight: '600' },
+  headerTitle: { fontSize: 17, fontWeight: '700' },
+  headerSpacer: { width: 60 },
+
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingHorizontal: 12,
-    marginRight: 8,
+    borderBottomWidth: 1,
   },
-  filterTabText: {
-    fontSize: 14,
-    fontWeight: '500',
+  filterPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
-  listContent: {
-    padding: 16,
-  },
-  lendingCard: {
+  filterPillText: { fontSize: 13, fontWeight: '600' },
+
+  listContent: { paddingHorizontal: 16, paddingVertical: 8 },
+
+  lendingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    marginBottom: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    backgroundColor: '#f9f9f9',
-  },
-  lendingCardContent: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  borrowerName: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    paddingVertical: 14,
     gap: 12,
-    marginBottom: 6,
   },
-  statusBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 4,
-  },
-  statusBadgeText: {
-    color: 'white',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  dateText: {
-    fontSize: 12,
-  },
-  notePreview: {
-    fontSize: 12,
-    marginBottom: 4,
-  },
-  returnedDateText: {
-    fontSize: 12,
-  },
-  chevron: {
-    fontSize: 24,
-    marginLeft: 8,
-  },
-  centerContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-  },
-  errorText: {
-    fontSize: 16,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  retryButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  emptyStateContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyStateText: {
-    fontSize: 16,
-  },
+  statusDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  lendingRowContent: { flex: 1 },
+  itemName: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
+  borrowerName: { fontSize: 13, marginBottom: 6 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  statusPillText: { fontSize: 11, fontWeight: '600' },
+  dateText: { fontSize: 12 },
+  chevron: { fontSize: 22 },
+
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  emptyIcon: { fontSize: 40, marginBottom: 12 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 6 },
+  emptySubtitle: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+
+  errorText: { fontSize: 15, marginBottom: 16, textAlign: 'center' },
+  primaryButton: { paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, alignItems: 'center' },
+  primaryButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
 });
