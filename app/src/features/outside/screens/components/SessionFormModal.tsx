@@ -154,14 +154,10 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
   );
 
   return (
-    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={() => { Keyboard.dismiss(); handleCancel(); }}>
-      {Platform.OS === 'ios' ? (
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-          {content}
-        </KeyboardAvoidingView>
-      ) : (
-        content
-      )}
+    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={handleCancel}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+        {content}
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
