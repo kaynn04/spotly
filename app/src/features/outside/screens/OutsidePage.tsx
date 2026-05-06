@@ -7,8 +7,9 @@
  * Implementation: T007
  */
 
-import React, { useCallback, useFocusEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
@@ -288,35 +289,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
-  },
-});
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-
-  icon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 8,
-  },
-
-  message: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#666',
-    marginBottom: 12,
-  },
-
-  subtitle: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    lineHeight: 20,
   },
 });

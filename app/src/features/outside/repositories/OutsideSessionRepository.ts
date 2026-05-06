@@ -7,9 +7,9 @@
  * Implementation: T004
  */
 
-import { getDatabase } from '../../db/client';
+import { getDatabase } from '../../../db/client';
 import { OutsideSession, OutsideSessionStatus, OutsideSessionError, OutsideSessionErrorCode } from '../models/OutsideSession';
-import { generateUUID } from '../../utils/uuid';
+import { generateUUID } from '../../../utils/uuid';
 
 export class OutsideSessionRepository {
   /**
