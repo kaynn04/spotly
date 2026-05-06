@@ -24,7 +24,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LendingService } from '../services/LendingService';
 import { LendingRepository } from '../repositories/LendingRepository';
-import { ItemRepository } from '../../repositories/ItemRepository';
+import { ItemRepository } from '../../../repositories/ItemRepository';
 import { Lending } from '../models/Lending';
 import { Colors } from '@/constants/theme';
 

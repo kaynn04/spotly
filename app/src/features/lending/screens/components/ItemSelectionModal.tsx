@@ -19,7 +19,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { ItemRepository } from '../../repositories/ItemRepository';
+import { ItemRepository } from '../../../../repositories/ItemRepository';
 
 interface ItemSelectionModalProps {
   visible: boolean;

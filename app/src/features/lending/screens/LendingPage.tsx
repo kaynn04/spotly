@@ -26,7 +26,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { LendingService } from '../services/LendingService';
 import { LendingRepository } from '../repositories/LendingRepository';
-import { ItemRepository } from '../../repositories/ItemRepository';
+import { ItemRepository } from '../../../repositories/ItemRepository';
 import { Lending } from '../models/Lending';
 import ItemSelectionModal from './components/ItemSelectionModal';
 import LendingFormModal from './components/LendingFormModal';
