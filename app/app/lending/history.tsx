@@ -8,14 +8,8 @@
  */
 
 import React from 'react';
-import { Stack } from 'expo-router';
 import LendingHistoryScreen from '@/src/features/lending/screens/LendingHistoryScreen';
 
 export default function LendingHistoryRoute() {
-  return (
-    <>
-      <Stack.Screen options={{ headerShown: false }} />
-      <LendingHistoryScreen />
-    </>
-  );
+  return <LendingHistoryScreen />;
 }
