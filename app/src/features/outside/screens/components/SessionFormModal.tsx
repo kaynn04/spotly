@@ -74,6 +74,7 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
   };
 
   const handleCancel = () => {
+    Keyboard.dismiss();
     setTitle('');
     setError(null);
     onClose();
@@ -81,13 +82,15 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
 
   const isValid = title.trim().length > 0;
 
-  const content = (
-    <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); handleCancel(); }}>
-      <View style={styles.overlay}>
-        <TouchableWithoutFeedback>
-          <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
-            {/* Handle */}
-            <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+  return (
+    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={() => { Keyboard.dismiss(); handleCancel(); }}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+        <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); handleCancel(); }}>
+          <View style={styles.overlay}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+                {/* Handle */}
+                <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
                 {/* Title */}
                 <Text style={[styles.sheetTitle, { color: textColor }]}>New Session</Text>
@@ -151,12 +154,6 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
-  );
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={handleCancel}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-        {content}
       </KeyboardAvoidingView>
     </Modal>
   );
