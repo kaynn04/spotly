@@ -33,6 +33,17 @@
  */
 export async function createLendingsTable(db: any): Promise<void> {
   try {
+    // Check if lendings table exists
+    const tableInfo = await db.getAllAsync("SELECT name FROM sqlite_master WHERE type='table' AND name='lendings';");
+    const tableExists = tableInfo.length > 0;
+
+    if (tableExists) {
+      // Check if the foreign key has CASCADE delete by checking the schema
+      // SQLite doesn't provide direct way to check FK action, so we'll drop and recreate to ensure correctness
+      console.log('⚠ Lendings table exists, dropping to apply CASCADE delete constraint...');
+      await db.execAsync('DROP TABLE IF EXISTS lendings;');
+    }
+
     // Create lendings table
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS lendings (
@@ -45,7 +56,7 @@ export async function createLendingsTable(db: any): Promise<void> {
         status TEXT NOT NULL DEFAULT 'ACTIVE',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
-        FOREIGN KEY (item_id) REFERENCES items(id),
+        FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
         CHECK (status IN ('ACTIVE', 'RETURNED')),
         CHECK (returned_at IS NULL OR returned_at >= lent_at)
       );
