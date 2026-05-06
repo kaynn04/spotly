@@ -51,61 +51,68 @@
   - **Validation**: Migration runs without errors on app startup
   - ✅ **COMPLETED**: Import added, createLendingsTable() called in initializeDatabase(), lendings added to resetDatabase()
 
-- [ ] T004 [P] Create LendingRepository interface and skeleton in `src/features/lending/repositories/`
+- [X] T004 [P] Create LendingRepository interface and skeleton in `src/features/lending/repositories/`
   - **Objective**: Define repository contract and method signatures
   - **Scope**: Method signatures only (getByStatus, getAll, getById, getByItemId, hasActiveLending, create, markAsReturned)
   - **Files**: `src/features/lending/repositories/LendingRepository.ts` (new)
   - **Expected Output**: Repository class with all methods defined (skeleton implementations that throw "not implemented" errors)
   - **Dependencies**: T001 (Lending type)
   - **Validation**: All methods present and callable; TypeScript compiles
+  - ✅ **COMPLETED**: 7 methods with full JSDoc, dependency injection via constructor
 
-- [ ] T005 [P] Create LendingRepository.getByStatus() implementation
+- [X] T005 [P] Create LendingRepository.getByStatus() implementation
   - **Objective**: Implement query to fetch lendings by status (ACTIVE/RETURNED)
   - **Scope**: Single query method for fetching lendings by status, sorted by lent_at DESC
   - **Files**: `src/features/lending/repositories/LendingRepository.ts` (modify T004)
   - **Expected Output**: Parameterized SQL query that returns Lending[] sorted descending by date
   - **Dependencies**: T002 (schema), T004 (skeleton)
   - **Validation**: Query returns correct results with proper sorting
+  - ✅ **COMPLETED**: Implemented with index-optimized query
 
-- [ ] T006 [P] Create LendingRepository.getAll() implementation
+- [X] T006 [P] Create LendingRepository.getAll() implementation
   - **Objective**: Implement query to fetch all lendings (ACTIVE + RETURNED)
   - **Scope**: Query all lendings regardless of status, sorted by lent_at DESC
   - **Files**: `src/features/lending/repositories/LendingRepository.ts` (modify T004)
   - **Expected Output**: SQL query returns all Lending[] sorted descending by date
   - **Dependencies**: T002 (schema), T004 (skeleton)
   - **Validation**: Returns both ACTIVE and RETURNED lendings in correct order
+  - ✅ **COMPLETED**: Implemented with proper sorting
 
-- [ ] T007 [P] Create LendingRepository.getById() implementation
+- [X] T007 [P] Create LendingRepository.getById() implementation
   - **Objective**: Implement query to fetch single lending by ID
   - **Scope**: Fetch one lending record with null handling for not-found
   - **Files**: `src/features/lending/repositories/LendingRepository.ts` (modify T004)
   - **Expected Output**: Parameterized query returns Lending | null
   - **Dependencies**: T002 (schema), T004 (skeleton)
   - **Validation**: Returns correct record; returns null for non-existent ID
+  - ✅ **COMPLETED**: Implemented with null-safe return
 
-- [ ] T008 [P] Create LendingRepository.hasActiveLending() implementation
+- [X] T008 [P] Create LendingRepository.hasActiveLending() implementation
   - **Objective**: Check if item has active lending (for enforcing business rule BR-001)
   - **Scope**: Quick existence check query with (item_id, status) filter
   - **Files**: `src/features/lending/repositories/LendingRepository.ts` (modify T004)
   - **Expected Output**: Returns boolean; uses index for performance
   - **Dependencies**: T002 (schema), T004 (skeleton)
   - **Validation**: Returns true only if ACTIVE lending exists for item; false otherwise
+  - ✅ **COMPLETED**: Implemented with efficient index-based lookup
 
-- [ ] T009 [P] Create LendingRepository.create() implementation
+- [X] T009 [P] Create LendingRepository.create() implementation
   - **Objective**: Insert new lending record with ACTIVE status
   - **Scope**: Create lending with all required fields, auto-generate timestamps
   - **Files**: `src/features/lending/repositories/LendingRepository.ts` (modify T004)
   - **Expected Output**: Parameterized INSERT returns created Lending with all fields populated
   - **Dependencies**: T001 (Lending type), T002 (schema), T004 (skeleton)
   - **Validation**: Inserted record matches input data; timestamps set correctly
+  - ✅ **COMPLETED**: Implemented with UUID generation and timestamp management
 
-- [ ] T010 [P] Create LendingRepository.markAsReturned() implementation
+- [X] T010 [P] Create LendingRepository.markAsReturned() implementation
   - **Objective**: Update lending to RETURNED status with timestamp
   - **Scope**: Atomic UPDATE of status and returned_at (single statement)
   - **Files**: `src/features/lending/repositories/LendingRepository.ts` (modify T004)
   - **Expected Output**: Parameterized UPDATE returns updated Lending with status='RETURNED' and returned_at set
   - **Dependencies**: T001 (Lending type), T002 (schema), T004 (skeleton)
   - **Validation**: Status changed to RETURNED; returned_at is valid timestamp; updated_at refreshed
+  - ✅ **COMPLETED**: Implemented with atomic update and timestamp refresh
 
 **✅ Checkpoint 1**: Database schema created; all repository methods implemented and callable. Data layer ready for service layer.
 
