@@ -159,6 +159,33 @@ export default function SessionDetailScreen() {
 
   const renderItemComponent = ({ item, index }: { item: OutsideSessionItemWithContext; index: number }) => {
     try {
+      // Log item structure for debugging
+      console.log('[renderItemComponent] Item data:', {
+        id: item.id,
+        item_name: item.item_name,
+        space_name: item.space_name,
+        container_name: item.container_name,
+        is_checked: item.is_checked,
+      });
+
+      // Validate required fields
+      if (!item.item_name) {
+        console.warn('[renderItemComponent] Missing item_name:', item);
+        return (
+          <View style={styles.itemRow}>
+            <Text style={{ color: '#d32f2f' }}>Error: Missing item name</Text>
+          </View>
+        );
+      }
+
+      // Safe boolean conversion from SQLite 0/1
+      const isChecked = Boolean(item.is_checked);
+
+      // Safe string conversion
+      const spaceName = String(item.space_name || 'Unknown');
+      const containerName = item.container_name ? String(item.container_name) : null;
+      const locationText = containerName ? `${spaceName} / ${containerName}` : spaceName;
+
       return (
         <View style={[styles.itemRow, { borderBottomColor: '#e0e0e0', borderBottomWidth: index < items.length - 1 ? 1 : 0 }]}>
           <TouchableOpacity
@@ -168,23 +195,23 @@ export default function SessionDetailScreen() {
             <View
               style={[
                 styles.checkbox,
-                { backgroundColor: item.is_checked ? colors.tint : 'transparent', borderColor: colors.tint },
+                { backgroundColor: isChecked ? colors.tint : 'transparent', borderColor: colors.tint },
               ]}
             >
-              {item.is_checked && <Text style={styles.checkmark}>✓</Text>}
+              {isChecked && <Text style={styles.checkmark}>✓</Text>}
             </View>
           </TouchableOpacity>
           <View style={styles.itemInfo}>
             <Text
               style={[
                 styles.itemName,
-                { color: colors.text, textDecorationLine: item.is_checked ? 'line-through' : 'none', opacity: item.is_checked ? 0.5 : 1 },
+                { color: colors.text, textDecorationLine: isChecked ? 'line-through' : 'none', opacity: isChecked ? 0.5 : 1 },
               ]}
             >
-              {item.item_name}
+              {String(item.item_name)}
             </Text>
             <Text style={[styles.itemLocation, { color: colors.icon }]}>
-              {`${item.space_name || 'Unknown'}${item.container_name ? ` / ${item.container_name}` : ''}`}
+              {locationText}
             </Text>
           </View>
           <TouchableOpacity
@@ -196,10 +223,10 @@ export default function SessionDetailScreen() {
         </View>
       );
     } catch (err) {
-      console.error('[SessionDetailScreen] Error rendering item:', item, err);
+      console.error('[renderItemComponent] Error rendering item:', { item, error: err });
       return (
         <View style={styles.itemRow}>
-          <Text style={{ color: 'red' }}>Error rendering item: {item.item_name || item.id}</Text>
+          <Text style={{ color: '#d32f2f' }}>Error rendering item</Text>
         </View>
       );
     }

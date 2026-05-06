@@ -8,7 +8,7 @@ export interface OutsideSessionItem {
   id: string;
   session_id: string;
   item_id: string;
-  is_checked: boolean;
+  is_checked: number | boolean;  // SQLite returns 0/1, convert to boolean as needed
   checked_at: string | null; // ISO timestamp when checked
 }
 

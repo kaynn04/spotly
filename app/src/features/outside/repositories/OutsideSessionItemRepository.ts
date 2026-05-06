@@ -54,7 +54,7 @@ export class OutsideSessionItemRepository {
     const db = getDatabase();
 
     try {
-      const results = await db.getAllAsync<OutsideSessionItemWithContext>(
+      const results = await db.getAllAsync<any>(
         `
         SELECT 
           osi.id,
@@ -62,8 +62,8 @@ export class OutsideSessionItemRepository {
           osi.item_id,
           osi.is_checked,
           osi.checked_at,
-          i.name as item_name,
-          s.name as space_name,
+          COALESCE(i.name, 'Unknown Item') as item_name,
+          COALESCE(s.name, 'Unknown Space') as space_name,
           c.name as container_name
         FROM outside_session_items osi
         LEFT JOIN items i ON osi.item_id = i.id
@@ -75,7 +75,21 @@ export class OutsideSessionItemRepository {
         [sessionId]
       );
 
-      return results || [];
+      console.log('[OutsideSessionItemRepository] Raw results:', results);
+      
+      const parsed = (results || []).map((row: any) => ({
+        id: String(row.id),
+        session_id: String(row.session_id),
+        item_id: String(row.item_id),
+        is_checked: Number(row.is_checked),
+        checked_at: row.checked_at,
+        item_name: String(row.item_name || 'Unknown Item'),
+        space_name: String(row.space_name || 'Unknown Space'),
+        container_name: row.container_name ? String(row.container_name) : null,
+      }));
+
+      console.log('[OutsideSessionItemRepository] Parsed results:', parsed);
+      return parsed;
     } catch (error) {
       console.error('✗ Error fetching session items:', error);
       throw error;
