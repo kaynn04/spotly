@@ -56,11 +56,11 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
   const colors = Colors[colorScheme ?? 'light'];
 
   // Services - memoized to prevent re-creation on every render
+  const itemRepository = useMemo(() => new ItemRepository(), []);
   const lendingService = useMemo(() => {
     const lendingRepository = new LendingRepository();
-    const itemRepository = new ItemRepository();
     return new LendingService(lendingRepository, itemRepository);
-  }, []);
+  }, [itemRepository]);
 
   // State
   const [lending, setLending] = useState<Lending | null>(null);
