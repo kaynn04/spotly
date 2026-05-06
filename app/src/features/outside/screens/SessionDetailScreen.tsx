@@ -157,54 +157,6 @@ export default function SessionDetailScreen() {
     );
   }
 
-  const renderedItems = items.map((item, idx) => {
-    try {
-      return (
-        <View key={item.id} style={[styles.itemRow, { borderBottomColor: '#e0e0e0', borderBottomWidth: idx < items.length - 1 ? 1 : 0 }]}>
-          <TouchableOpacity
-            style={styles.checkboxContainer}
-            onPress={() => handleToggleItem(item.item_id)}
-          >
-            <View
-              style={[
-                styles.checkbox,
-                { backgroundColor: item.is_checked ? colors.tint : 'transparent', borderColor: colors.tint },
-              ]}
-            >
-              {item.is_checked && <Text style={styles.checkmark}>✓</Text>}
-            </View>
-          </TouchableOpacity>
-          <View style={styles.itemInfo}>
-            <Text
-              style={[
-                styles.itemName,
-                { color: colors.text, textDecorationLine: item.is_checked ? 'line-through' : 'none', opacity: item.is_checked ? 0.5 : 1 },
-              ]}
-            >
-              {item.item_name}
-            </Text>
-            <Text style={[styles.itemLocation, { color: colors.icon }]}>
-              {`${item.space_name || 'Unknown'}${item.container_name ? ` / ${item.container_name}` : ''}`}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={styles.removeButton}
-            onPress={() => handleRemoveItem(item.item_id)}
-          >
-            <Text style={{ color: '#d32f2f' }}>✕</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    } catch (err) {
-      console.error('[SessionDetailScreen] Error rendering item:', item, err);
-      return (
-        <View key={item.id} style={styles.itemRow}>
-          <Text style={{ color: 'red' }}>Error rendering item: {item.item_name || item.id}</Text>
-        </View>
-      );
-    }
-  });
-
   const renderItemComponent = ({ item, index }: { item: OutsideSessionItemWithContext; index: number }) => {
     try {
       return (
