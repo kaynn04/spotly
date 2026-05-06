@@ -186,7 +186,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
 
       {/* Footer */}
       {isActive && (
-        <View style={[styles.footer, { borderTopColor: borderColor, paddingBottom: insets.bottom + 12 }]}>
+        <View style={[styles.footer, { borderTopColor: borderColor, paddingBottom: insets.bottom || 16 }]}>
           <TouchableOpacity
             style={[styles.primaryButton, { backgroundColor: PRIMARY, opacity: submitting ? 0.6 : 1 }]}
             onPress={() => setShowConfirm(true)}
@@ -204,7 +204,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
       {/* Inline Confirm Dialog */}
       {showConfirm && (
         <View style={styles.dialogOverlay}>
-          <View style={[styles.dialogCard, { backgroundColor: cardBg }]}>
+          <View style={[styles.dialogCard, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
             <View style={[styles.dialogHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
             <Text style={[styles.dialogTitle, { color: colors.text }]}>Mark as Returned?</Text>
             <Text style={[styles.dialogMessage, { color: subtleText }]}>

@@ -118,7 +118,7 @@ export default function LendingPage() {
         <View style={styles.header}>
           <View>
             <Text style={[styles.title, { color: colors.text }]}>Lending</Text>
-            <Text style={[styles.subtitle, { color: subtleText }]}>Track items you&apos;ve lent out</Text>
+            <Text style={[styles.subtitle, { color: subtleText }]}>{"Track items you've lent out"}</Text>
           </View>
           <TouchableOpacity
             style={[styles.historyPill, { borderColor, backgroundColor: cardBg }]}
