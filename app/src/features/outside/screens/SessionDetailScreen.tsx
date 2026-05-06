@@ -14,7 +14,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
-  FlatList,
+  ScrollView,
   ActivityIndicator,
   Alert,
 } from 'react-native';
@@ -214,12 +214,9 @@ export default function SessionDetailScreen() {
           <Text style={[styles.emptyText, { color: colors.icon }]}>No items in this session</Text>
         </View>
       ) : (
-        <FlatList
-          data={renderedItems}
-          renderItem={({ item }) => item}
-          keyExtractor={(_, idx) => idx.toString()}
-          scrollEnabled={true}
-        />
+        <ScrollView style={styles.itemsList}>
+          {renderedItems}
+        </ScrollView>
       )}
 
       {/* Actions */}
@@ -307,6 +304,9 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
+  },
+  itemsList: {
+    flex: 1,
   },
   itemRow: {
     flexDirection: 'row',
