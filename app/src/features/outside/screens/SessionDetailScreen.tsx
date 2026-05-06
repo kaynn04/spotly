@@ -23,7 +23,7 @@ import { useOutsideService } from '../services/OutsideService';
 import { OutsideSessionItemWithContext } from '../models/OutsideSessionItem';
 import ItemPickerModal from './components/ItemPickerModal';
 
-const PRIMARY = '#0a84ff';
+const PRIMARY = '#6b7f99';
 
 export default function SessionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -124,8 +124,8 @@ export default function SessionDetailScreen() {
     );
   };
 
-  const borderColor = isDark ? '#2c2c2e' : '#e8e8ed';
-  const subtleText = isDark ? '#8e8e93' : '#6b7280';
+  const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
+  const subtleText = isDark ? '#8e8e93' : '#a0aec0';
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
 
   const checkedCount = session?.checkedCount ?? 0;
@@ -134,7 +134,7 @@ export default function SessionDetailScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#f2f2f7', paddingTop: insets.top }]}>
+      <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#f8f9fa', paddingTop: insets.top }]}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={PRIMARY} />
         </View>
@@ -144,9 +144,9 @@ export default function SessionDetailScreen() {
 
   if (error || !session) {
     return (
-      <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#f2f2f7', paddingTop: insets.top }]}>
+      <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#f8f9fa', paddingTop: insets.top }]}>
         <View style={styles.center}>
-          <Text style={[styles.errorText, { color: '#ef4444' }]}>{error || 'Session not found'}</Text>
+          <Text style={[styles.errorText, { color: '#d32f2f' }]}>{error || 'Session not found'}</Text>
           <TouchableOpacity
             style={[styles.primaryButton, { backgroundColor: PRIMARY }]}
             onPress={() => router.back()}
@@ -220,7 +220,7 @@ export default function SessionDetailScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f2f2f7' }]}>
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top, backgroundColor: isDark ? '#1c1c1e' : '#ffffff', borderBottomColor: borderColor }]}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -238,7 +238,7 @@ export default function SessionDetailScreen() {
           <Text style={[styles.progressLabel, { color: subtleText }]}>
             {checkedCount} of {itemCount} checked
           </Text>
-          <Text style={[styles.progressPercent, { color: progressPercent === 100 ? '#34c759' : PRIMARY }]}>
+          <Text style={[styles.progressPercent, { color: progressPercent === 100 ? '#6b9e7a' : PRIMARY }]}>
             {progressPercent}%
           </Text>
         </View>
@@ -248,7 +248,7 @@ export default function SessionDetailScreen() {
               styles.progressFill,
               {
                 width: `${progressPercent}%`,
-                backgroundColor: progressPercent === 100 ? '#34c759' : PRIMARY,
+                backgroundColor: progressPercent === 100 ? '#6b9e7a' : PRIMARY,
               },
             ]}
           />

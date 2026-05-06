@@ -22,7 +22,7 @@ import { Colors } from '@/constants/theme';
 import { useOutsideService } from '../services/OutsideService';
 import { OutsideSession } from '../models/OutsideSession';
 
-const PRIMARY = '#0a84ff';
+const PRIMARY = '#6b7f99';
 
 export default function SessionHistoryScreen() {
   const router = useRouter();
@@ -87,13 +87,13 @@ export default function SessionHistoryScreen() {
     }
   };
 
-  const borderColor = isDark ? '#2c2c2e' : '#e8e8ed';
-  const subtleText = isDark ? '#8e8e93' : '#6b7280';
+  const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
+  const subtleText = isDark ? '#8e8e93' : '#a0aec0';
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#f2f2f7', paddingTop: insets.top }]}>
+      <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#f8f9fa', paddingTop: insets.top }]}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={PRIMARY} />
         </View>
@@ -102,7 +102,7 @@ export default function SessionHistoryScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f2f2f7' }]}>
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
       {/* Header */}
       <View
         style={[
@@ -124,7 +124,7 @@ export default function SessionHistoryScreen() {
       {/* Error state */}
       {error ? (
         <View style={styles.center}>
-          <Text style={[styles.errorText, { color: '#ef4444' }]}>{error}</Text>
+          <Text style={[styles.errorText, { color: '#d32f2f' }]}>{error}</Text>
           <TouchableOpacity style={[styles.primaryButton, { backgroundColor: PRIMARY }]} onPress={loadSessions}>
             <Text style={styles.primaryButtonText}>Retry</Text>
           </TouchableOpacity>
@@ -154,7 +154,7 @@ export default function SessionHistoryScreen() {
               ]}
             >
               {/* Completion dot */}
-              <View style={[styles.completedDot, { backgroundColor: '#34c759' }]} />
+              <View style={styles.completedDot} />
 
               {/* Info */}
               <View style={styles.sessionInfo}>
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
-  completedDot: { width: 8, height: 8, borderRadius: 4 },
+  completedDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#6b9e7a' },
   sessionInfo: { flex: 1 },
   sessionTitle: { fontSize: 16, fontWeight: '600' },
   sessionDate: { fontSize: 12, marginTop: 2 },

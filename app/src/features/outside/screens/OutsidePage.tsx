@@ -29,7 +29,7 @@ interface SessionCardState {
   checkedCount: number;
 }
 
-const PRIMARY = '#0a84ff';
+const PRIMARY = '#6b7f99';
 
 export default function OutsidePage() {
   const router = useRouter();
@@ -107,11 +107,11 @@ export default function OutsidePage() {
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const sectionBg = isDark ? '#1c1c1e' : '#ffffff';
-  const borderColor = isDark ? '#2c2c2e' : '#e8e8ed';
-  const subtleText = isDark ? '#8e8e93' : '#6b7280';
+  const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
+  const subtleText = isDark ? '#8e8e93' : '#a0aec0';
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f2f2f7' }]}>
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8 }]}
         showsVerticalScrollIndicator={false}
@@ -134,7 +134,7 @@ export default function OutsidePage() {
           </View>
         ) : sessionCard.error ? (
           <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
-            <Text style={[styles.errorText, { color: '#ef4444' }]}>{sessionCard.error}</Text>
+            <Text style={[styles.errorText, { color: '#d32f2f' }]}>{sessionCard.error}</Text>
             <TouchableOpacity style={[styles.primaryButton, { backgroundColor: PRIMARY }]} onPress={loadActiveSession}>
               <Text style={styles.primaryButtonText}>Retry</Text>
             </TouchableOpacity>
@@ -169,12 +169,12 @@ export default function OutsidePage() {
                       styles.progressFill,
                       {
                         width: `${progressPercent}%`,
-                        backgroundColor: progressPercent === 100 ? '#34c759' : PRIMARY,
+                        backgroundColor: progressPercent === 100 ? '#6b9e7a' : PRIMARY,
                       },
                     ]}
                   />
                 </View>
-                <Text style={[styles.progressPercent, { color: progressPercent === 100 ? '#34c759' : PRIMARY }]}>
+                <Text style={[styles.progressPercent, { color: progressPercent === 100 ? '#6b9e7a' : PRIMARY }]}>
                   {progressPercent}% complete
                 </Text>
               </View>
