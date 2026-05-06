@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import LendingDetailScreen from '@/src/features/lending/screens/LendingDetailScreen';
 
 export default function LendingDetailRoute() {
@@ -18,5 +18,10 @@ export default function LendingDetailRoute() {
     return null;
   }
 
-  return <LendingDetailScreen lendingId={id} />;
+  return (
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <LendingDetailScreen lendingId={id} />
+    </>
+  );
 }
