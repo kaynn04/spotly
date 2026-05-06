@@ -126,8 +126,9 @@ export default function OutsidePage() {
             </TouchableOpacity>
           </View>
         ) : activeSessionId ? (
-          // Active Session Card
+          // Active Session Card with Quick Actions
           <View style={styles.cardContainer}>
+            {/* Progress Card */}
             <TouchableOpacity
             style={[styles.sessionCard, { backgroundColor: '#0a84ff' }]}
               onPress={handleOpenSession}
@@ -149,6 +150,16 @@ export default function OutsidePage() {
               </View>
               <Text style={styles.tapHint}>Tap to open</Text>
             </TouchableOpacity>
+
+            {/* Quick Action Buttons */}
+            <View style={styles.actionButtonsContainer}>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.actionButtonPrimary, { backgroundColor: '#0a84ff' }]}
+                onPress={handleOpenSession}
+              >
+                <Text style={[styles.actionButtonText, { color: '#fff' }]}>View Items</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ) : (
           // Empty State
@@ -259,6 +270,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255,255,255,0.6)',
     fontStyle: 'italic',
+  },
+  actionButtonsContainer: {
+    gap: 12,
+  },
+  actionButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionButtonPrimary: {
+    marginBottom: 8,
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   emptyContainer: {
     justifyContent: 'center',
