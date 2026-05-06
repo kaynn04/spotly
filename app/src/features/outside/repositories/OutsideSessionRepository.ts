@@ -21,7 +21,7 @@ export class OutsideSessionRepository {
     const now = new Date().toISOString();
 
     try {
-      await db.execAsync(
+      await db.runAsync(
         'INSERT INTO outside_sessions (id, title, status, created_at, completed_at) VALUES (?, ?, ?, ?, ?)',
         [id, title, OutsideSessionStatus.ACTIVE, now, null]
       );
@@ -119,7 +119,7 @@ export class OutsideSessionRepository {
         );
       }
 
-      await db.execAsync(
+      await db.runAsync(
         'UPDATE outside_sessions SET status = ?, completed_at = ? WHERE id = ?',
         [OutsideSessionStatus.COMPLETED, now, id]
       );
@@ -155,7 +155,7 @@ export class OutsideSessionRepository {
         );
       }
 
-      await db.execAsync('DELETE FROM outside_sessions WHERE id = ?', [id]);
+      await db.runAsync('DELETE FROM outside_sessions WHERE id = ?', [id]);
 
       console.log(`✓ Deleted outside session: ${id}`);
     } catch (error) {

@@ -24,7 +24,7 @@ export class OutsideSessionItemRepository {
       for (const itemId of itemIds) {
         const id = generateUUID();
 
-        await db.execAsync(
+        await db.runAsync(
           'INSERT INTO outside_session_items (id, session_id, item_id, is_checked, checked_at) VALUES (?, ?, ?, ?, ?)',
           [id, sessionId, itemId, 0, null]
         );
@@ -106,7 +106,7 @@ export class OutsideSessionItemRepository {
       const newCheckedState = current.is_checked ? 0 : 1;
       const newCheckedAt = newCheckedState ? new Date().toISOString() : null;
 
-      await db.execAsync(
+      await db.runAsync(
         'UPDATE outside_session_items SET is_checked = ?, checked_at = ? WHERE session_id = ? AND item_id = ?',
         [newCheckedState, newCheckedAt, sessionId, itemId]
       );
@@ -151,7 +151,7 @@ export class OutsideSessionItemRepository {
         );
       }
 
-      await db.execAsync(
+      await db.runAsync(
         'DELETE FROM outside_session_items WHERE session_id = ? AND item_id = ?',
         [sessionId, itemId]
       );
