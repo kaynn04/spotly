@@ -18,31 +18,31 @@ description: "Phase 1 Implementation tasks for Outside Checklist feature"
 
 ### Data Models
 
-- [ ] T001 Create OutsideSession domain types in `src/features/outside/models/OutsideSession.ts`
+- [x] T001 Create OutsideSession domain types in `src/features/outside/models/OutsideSession.ts`
   - Include: OutsideSessionStatus enum (ACTIVE, COMPLETED), OutsideSession interface, DTOs
   
-- [ ] T002 Create OutsideSessionItem domain types in `src/features/outside/models/OutsideSessionItem.ts`
+- [x] T002 Create OutsideSessionItem domain types in `src/features/outside/models/OutsideSessionItem.ts`
   - Include: OutsideSessionItem interface, DTOs, check state
 
 ### Database Layer
 
-- [ ] T003 Create SQLite migration in `src/db/migrations/004-create-outside-tables.ts`
+- [x] T003 Create SQLite migration in `src/db/migrations/004-create-outside-tables.ts`
   - Create `outside_sessions` table (id, title, status, created_at, completed_at)
   - Create `outside_session_items` table (id, session_id, item_id, is_checked, checked_at)
   - Add UNIQUE index on status='ACTIVE' for BR1 enforcement
   - Add UNIQUE(session_id, item_id) for BR3 enforcement
 
-- [ ] T004 [P] Create OutsideSessionRepository in `src/features/outside/repositories/OutsideSessionRepository.ts`
+- [x] T004 [P] Create OutsideSessionRepository in `src/features/outside/repositories/OutsideSessionRepository.ts`
   - Implement: create(), getActive(), getById(), complete(), delete()
   - Add error handling and logging
 
-- [ ] T005 [P] Create OutsideSessionItemRepository in `src/features/outside/repositories/OutsideSessionItemRepository.ts`
+- [x] T005 [P] Create OutsideSessionItemRepository in `src/features/outside/repositories/OutsideSessionItemRepository.ts`
   - Implement: addItems(), getSessionItems(), toggleCheck(), removeItem()
   - Add error handling and logging
 
 ### Business Logic Layer
 
-- [ ] T006 Create OutsideService in `src/features/outside/services/OutsideService.ts`
+- [x] T006 Create OutsideService in `src/features/outside/services/OutsideService.ts`
   - Implement: createSession(), addItemsToSession(), checkItem(), completeSession(), deleteSession()
   - Add validation (title not empty, max 100 chars, no active session exists, item uniqueness)
   - Add error codes: ACTIVE_SESSION_EXISTS, SESSION_NOT_FOUND, ITEM_NOT_FOUND, etc.

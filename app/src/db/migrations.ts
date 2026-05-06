@@ -9,6 +9,7 @@
 
 import { getDatabase } from './client';
 import { createLendingsTable, dropLendingsTable } from './migrations/003-create-lendings-table';
+import { createOutsideSessionsTables, dropOutsideSessionsTables } from './migrations/004-create-outside-tables';
 
 /**
  * Initialize the database schema
@@ -105,6 +106,9 @@ export async function initializeDatabase() {
     // Create lendings table (Migration 003)
     await createLendingsTable(db);
 
+    // Create outside sessions tables (Migration 004)
+    await createOutsideSessionsTables(db);
+
     console.log('✓ Database initialized successfully');
   } catch (error) {
     console.error('✗ Database initialization error:', error);
@@ -121,6 +125,8 @@ export async function resetDatabase() {
 
   try {
     await db.execAsync(`
+      DROP TABLE IF EXISTS outside_session_items;
+      DROP TABLE IF EXISTS outside_sessions;
       DROP TABLE IF EXISTS lendings;
       DROP TABLE IF EXISTS items;
       DROP TABLE IF EXISTS containers;
