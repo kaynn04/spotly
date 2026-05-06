@@ -10,7 +10,7 @@
  * Feature: 009 - Lending Tracker
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -52,10 +52,12 @@ export default function LendingHistoryScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
-  // Services
-  const lendingRepository = new LendingRepository();
-  const itemRepository = new ItemRepository();
-  const lendingService = new LendingService(lendingRepository, itemRepository);
+  // Services - memoized to prevent re-creation on every render
+  const lendingService = useMemo(() => {
+    const lendingRepository = new LendingRepository();
+    const itemRepository = new ItemRepository();
+    return new LendingService(lendingRepository, itemRepository);
+  }, []);
 
   // State
   const [allLendings, setAllLendings] = useState<Lending[]>([]);

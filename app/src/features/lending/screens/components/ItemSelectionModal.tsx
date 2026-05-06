@@ -8,7 +8,7 @@
  * Feature: 009 - Lending Tracker
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -43,7 +43,7 @@ export default function ItemSelectionModal({
   onClose,
   onItemSelected,
 }: ItemSelectionModalProps) {
-  const itemRepository = new ItemRepository();
+  const itemRepository = useMemo(() => new ItemRepository(), []);
 
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);

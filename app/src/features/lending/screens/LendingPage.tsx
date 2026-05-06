@@ -12,7 +12,7 @@
  * Feature: 009 - Lending Tracker
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -60,10 +60,12 @@ import LendingFormModal from './components/LendingFormModal';
 export default function LendingPage() {
   const router = useRouter();
 
-  // Service instances (can be moved to context/DI in future)
-  const lendingRepository = new LendingRepository();
-  const itemRepository = new ItemRepository();
-  const lendingService = new LendingService(lendingRepository, itemRepository);
+  // Service instances - memoized to prevent re-creation on every render
+  const lendingService = useMemo(() => {
+    const lendingRepository = new LendingRepository();
+    const itemRepository = new ItemRepository();
+    return new LendingService(lendingRepository, itemRepository);
+  }, []);
 
   // Data state
   const [lendings, setLendings] = useState<Lending[]>([]);
