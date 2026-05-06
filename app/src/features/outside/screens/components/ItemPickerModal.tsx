@@ -13,12 +13,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   Modal,
-  SafeAreaView,
   FlatList,
   TextInput,
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { ItemRepository } from '../../../../repositories/ItemRepository';
@@ -41,6 +41,7 @@ interface PickerItem {
 export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }: ItemPickerModalProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
 
   const [allItems, setAllItems] = useState<PickerItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<PickerItem[]>([]);
@@ -115,7 +116,7 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
     <TouchableOpacity
       style={[
         styles.itemRow,
-        { backgroundColor: selectedItemIds.has(item.id) ? colors.tint + '20' : 'transparent' },
+        { backgroundColor: selectedItemIds.has(item.id) ? '#0a84ff20' : 'transparent' },
       ]}
       onPress={() => handleToggleItem(item.id)}
     >
@@ -123,8 +124,8 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
         style={[
           styles.checkbox,
           {
-            backgroundColor: selectedItemIds.has(item.id) ? colors.tint : 'transparent',
-            borderColor: colors.tint,
+            backgroundColor: selectedItemIds.has(item.id) ? '#0a84ff' : 'transparent',
+            borderColor: '#0a84ff',
           },
         ]}
       >
@@ -141,11 +142,11 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
 
   return (
     <Modal visible={true} transparent animationType="slide">
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} disabled={loading}>
-            <Text style={[styles.closeButton, { color: colors.tint, opacity: loading ? 0.5 : 1 }]}>Cancel</Text>
+            <Text style={[styles.closeButton, { color: '#0a84ff', opacity: loading ? 0.5 : 1 }]}>Cancel</Text>
           </TouchableOpacity>
           <Text style={[styles.title, { color: colors.text }]}>Select Items</Text>
           <TouchableOpacity onPress={handleAddItems} disabled={loading || selectedItemIds.size === 0}>
@@ -153,7 +154,7 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
               style={[
                 styles.addButton,
                 {
-                  color: colors.tint,
+                  color: '#0a84ff',
                   opacity: loading || selectedItemIds.size === 0 ? 0.5 : 1,
                 },
               ]}
@@ -171,7 +172,7 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
               {
                 color: colors.text,
                 backgroundColor: colors.background === '#fff' ? '#f5f5f5' : '#2a2a2a',
-                borderColor: colors.tint,
+                borderColor: '#0a84ff',
               },
             ]}
             placeholder="Search items..."
@@ -185,13 +186,13 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
         {/* Items List */}
         {loading ? (
           <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={colors.tint} />
+            <ActivityIndicator size="large" color="#0a84ff" />
           </View>
         ) : error ? (
           <View style={styles.centerContainer}>
             <Text style={[styles.errorText, { color: '#d32f2f' }]}>{error}</Text>
             <TouchableOpacity
-              style={[styles.retryButton, { backgroundColor: colors.tint }]}
+            style={[styles.retryButton, { backgroundColor: '#0a84ff' }]}
               onPress={loadItems}
             >
               <Text style={[styles.retryButtonText, { color: '#fff' }]}>Retry</Text>
@@ -209,7 +210,7 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
             scrollEnabled={true}
           />
         )}
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }

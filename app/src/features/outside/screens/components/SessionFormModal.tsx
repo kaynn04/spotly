@@ -14,10 +14,10 @@ import {
   TextInput,
   TouchableOpacity,
   Modal,
-  SafeAreaView,
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
@@ -33,6 +33,7 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
   const colorScheme = useColorScheme();
   const outsideService = useOutsideService();
   const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
 
   const [title, setTitle] = useState('');
   const [loading, setLoading] = useState(false);
@@ -72,15 +73,15 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
 
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
         <View style={styles.content}>
           <View style={styles.header}>
             <TouchableOpacity onPress={handleCancel} disabled={loading}>
-              <Text style={[styles.cancelButton, { color: colors.tint, opacity: loading ? 0.5 : 1 }]}>Cancel</Text>
+              <Text style={[styles.cancelButton, { color: '#0a84ff', opacity: loading ? 0.5 : 1 }]}>Cancel</Text>
             </TouchableOpacity>
             <Text style={[styles.title, { color: colors.text }]}>New Session</Text>
             <TouchableOpacity onPress={handleCreateSession} disabled={loading}>
-              <Text style={[styles.createButton, { color: colors.tint, opacity: loading ? 0.5 : 1 }]}>
+              <Text style={[styles.createButton, { color: '#0a84ff', opacity: loading ? 0.5 : 1 }]}>
                 {loading ? '...' : 'Create'}
               </Text>
             </TouchableOpacity>
@@ -94,7 +95,7 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
                 {
                   color: colors.text,
                   backgroundColor: colors.background === '#fff' ? '#f5f5f5' : '#2a2a2a',
-                  borderColor: error ? '#d32f2f' : colors.tint,
+                  borderColor: error ? '#d32f2f' : '#0a84ff',
                 },
               ]}
               placeholder="e.g., Grocery run, Airport trip"
@@ -114,7 +115,7 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
               style={[
                 styles.createButtonFull,
                 {
-                  backgroundColor: colors.tint,
+                  backgroundColor: '#0a84ff',
                   opacity: loading ? 0.5 : 1,
                 },
               ]}
@@ -129,7 +130,7 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
             </TouchableOpacity>
           </View>
         </View>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }
