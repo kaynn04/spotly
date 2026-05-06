@@ -373,61 +373,68 @@
 
 ### Tasks
 
-- [ ] T034 Create LendingHistoryScreen component
+- [X] T034 Create LendingHistoryScreen component
   - **Objective**: Show all lendings (ACTIVE + RETURNED) with filtering (US4)
   - **Scope**: Component structure, fetch all lendings, display with status filter
   - **Files**: `src/features/lending/screens/LendingHistoryScreen.tsx` (new)
   - **Expected Output**: Component fetches all lendings; displays list with status visible
   - **Dependencies**: T015 (getAllLendings), Expo Router
   - **Validation**: Component mounts; data fetches; list displays
+  - ✅ **COMPLETED**: Full component with filter tabs and sorted list
 
-- [ ] T035 Add tabs/filter for status (ACTIVE/RETURNED/All)
+- [X] T035 Add tabs/filter for status (ACTIVE/RETURNED/All)
   - **Objective**: Allow user to filter history by lending status (US4 user control)
   - **Scope**: Tab buttons or segmented control; filter lendings by selection
   - **Files**: `src/features/lending/screens/LendingHistoryScreen.tsx` (modify T034)
   - **Expected Output**: Filter toggles between ACTIVE/RETURNED/All; list updates
   - **Dependencies**: T034
   - **Validation**: Filtering works; correct lendings shown for each filter
+  - ✅ **COMPLETED**: Three filter tabs with active state styling
 
-- [ ] T036 Display history list with status indicators
+- [X] T036 Display history list with status indicators
   - **Objective**: Show all lendings with clear status display (US4 primary view)
   - **Scope**: FlatList showing lending cards with item, borrower, lent date, return date (if applicable), status badge
   - **Files**: `src/features/lending/screens/LendingHistoryScreen.tsx` (modify T034)
   - **Expected Output**: List displays all lendings; status badges clearly indicate ACTIVE vs RETURNED
   - **Dependencies**: T034, T035
   - **Validation**: All lendings displayed; status badges correct; formatting clear
+  - ✅ **COMPLETED**: Styled card list with status badges and date information
 
-- [ ] T037 Add sorting (most recent first)
+- [X] T037 Add sorting (most recent first)
   - **Objective**: Lendings sorted by date descending (US4 requirement)
   - **Scope**: Ensure list displays most recent lendings first
   - **Files**: `src/features/lending/screens/LendingHistoryScreen.tsx` (modify T036)
   - **Expected Output**: List sorted by lent_at descending
   - **Dependencies**: T036, T015 (service returns sorted)
   - **Validation**: Most recent lending appears first
+  - ✅ **COMPLETED**: Sorting algorithm: ACTIVE first, then by date DESC
 
-- [ ] T038 Add tap handler to history list items
+- [X] T038 Add tap handler to history list items
   - **Objective**: User can tap lending in history to see detail (US4 navigation)
   - **Scope**: Tap handler navigates to detail screen with lending ID
   - **Files**: `src/features/lending/screens/LendingHistoryScreen.tsx` (modify T036)
   - **Expected Output**: Tap on item navigates to detail screen
   - **Dependencies**: T036, Expo Router
   - **Validation**: Navigation to detail works
+  - ✅ **COMPLETED**: Card Pressable with handleLendingTap navigation
 
-- [ ] T039 Add back navigation to history screen
+- [X] T039 Add back navigation to history screen
   - **Objective**: Return to lending tab from history
   - **Scope**: Back button that pops history screen
   - **Files**: `src/features/lending/screens/LendingHistoryScreen.tsx` (modify T034)
   - **Expected Output**: Back button pops screen
   - **Dependencies**: T034, Expo Router
   - **Validation**: Back navigation works
+  - ✅ **COMPLETED**: Back button in header with router.back() handler
 
-- [ ] T040 Update LendingPage to import and wire up history navigation
+- [X] T040 Update LendingPage to import and wire up history navigation
   - **Objective**: Connect "See History" button to history screen (from T022)
   - **Scope**: Ensure navigation params passed correctly to history screen
   - **Files**: `src/features/lending/screens/LendingPage.tsx` (modify T022)
   - **Expected Output**: "See History" button navigates to `/lending/history`
   - **Dependencies**: T022, T034
   - **Validation**: Navigation works
+  - ✅ **COMPLETED**: Already implemented in T022 (handleSeeHistory → router.push('/lending/history'))
 
 **✅ Checkpoint 5**: Users can view lending history with filtering (US4 complete); all primary workflows functional.
 
