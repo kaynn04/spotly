@@ -322,4 +322,93 @@ export class ItemRepository {
       return [];
     }
   }
+
+  /**
+   * Instance method: Get all items
+   * 
+   * Used by lending feature for item selection
+   * Returns all items with their space information
+   * 
+   * @returns Array of all items
+   * @throws Error if database query fails
+   */
+  async getAll(): Promise<Item[]> {
+    try {
+      const db = getDatabase();
+      const result = await db.getAllAsync(`
+        SELECT 
+          i.id,
+          i.name,
+          i.space_id,
+          i.container_id,
+          i.created_at,
+          s.name as space,
+          c.name as container
+        FROM items i
+        LEFT JOIN spaces s ON i.space_id = s.id
+        LEFT JOIN containers c ON i.container_id = c.id
+        ORDER BY i.name ASC
+      `);
+
+      return (result || []).map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        space_id: row.space_id,
+        container_id: row.container_id,
+        created_at: row.created_at,
+        space: row.space,
+        container: row.container,
+      }));
+    } catch (error) {
+      console.error('[ItemRepository.getAll] Database error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Instance method: Get item by ID
+   * 
+   * Used by lending feature for item lookup and validation
+   * Returns a single item with its space/container information
+   * 
+   * @param id - Item ID
+   * @returns Item object or null if not found
+   * @throws Error if database query fails
+   */
+  async getById(id: string): Promise<Item | null> {
+    try {
+      const db = getDatabase();
+      const result = await db.getFirstAsync(`
+        SELECT 
+          i.id,
+          i.name,
+          i.space_id,
+          i.container_id,
+          i.created_at,
+          s.name as space,
+          c.name as container
+        FROM items i
+        LEFT JOIN spaces s ON i.space_id = s.id
+        LEFT JOIN containers c ON i.container_id = c.id
+        WHERE i.id = ?
+      `, [id]);
+
+      if (!result) {
+        return null;
+      }
+
+      return {
+        id: result.id,
+        name: result.name,
+        space_id: result.space_id,
+        container_id: result.container_id,
+        created_at: result.created_at,
+        space: result.space,
+        container: result.container,
+      };
+    } catch (error) {
+      console.error('[ItemRepository.getById] Database error:', error);
+      throw error;
+    }
+  }
 }
