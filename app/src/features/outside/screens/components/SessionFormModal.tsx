@@ -81,18 +81,13 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
 
   const isValid = title.trim().length > 0;
 
-  return (
-    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={() => { Keyboard.dismiss(); handleCancel(); }}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); handleCancel(); }}>
-          <View style={styles.overlay}>
-            <TouchableWithoutFeedback>
-              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
-                {/* Handle */}
-                <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+  const content = (
+    <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); handleCancel(); }}>
+      <View style={styles.overlay}>
+        <TouchableWithoutFeedback>
+          <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+            {/* Handle */}
+            <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
                 {/* Title */}
                 <Text style={[styles.sheetTitle, { color: textColor }]}>New Session</Text>
@@ -156,7 +151,17 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
+  );
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={() => { Keyboard.dismiss(); handleCancel(); }}>
+      {Platform.OS === 'ios' ? (
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+          {content}
+        </KeyboardAvoidingView>
+      ) : (
+        content
+      )}
     </Modal>
   );
 }
