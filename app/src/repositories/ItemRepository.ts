@@ -293,7 +293,7 @@ export class ItemRepository {
    *
    * SQL: SELECT items.id, items.name, items.created_at, spaces.name as space_name
    *      FROM items JOIN spaces ON items.space_id = spaces.id
-   *      ORDER BY items.created_at DESC LIMIT ?
+   *      ORDER BY items.created_at DESC LIMIT <limit>
    */
   static async getRecentItems(
     limit: number = 5
@@ -301,13 +301,15 @@ export class ItemRepository {
     try {
       const db = getDatabase();
 
+      // Sanitize limit to be a positive integer
+      const sanitizedLimit = Math.max(1, Math.min(1000, Math.floor(limit)));
+
       const result = await db.getAllAsync(
         `SELECT items.id, items.name, items.created_at, spaces.name as space_name
          FROM items
          JOIN spaces ON items.space_id = spaces.id
          ORDER BY items.created_at DESC
-         LIMIT ?`,
-        [limit]
+         LIMIT ${sanitizedLimit}`
       );
 
       return result.map((row: any) => ({
