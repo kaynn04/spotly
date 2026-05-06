@@ -121,7 +121,7 @@ export default function SpaceDetailScreen() {
    */
   function handleContainerPress(containerId: string) {
     router.push({
-      pathname: '/container/[id]',
+      pathname: '../container/[id]',
       params: { id: containerId }
     });
   }

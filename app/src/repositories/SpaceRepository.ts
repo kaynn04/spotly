@@ -8,9 +8,9 @@
  * Implementation: T002 - Create app/src/repositories/SpaceRepository.ts
  */
 
-import { v4 as uuidv4 } from 'uuid';
 import type { Space, SpaceRow, ServiceError } from '../models/Space';
 import { getDatabase } from '../db/client';
+import { generateUUID } from '../utils/uuid';
 
 /**
  * SpaceRepository handles all space-related database operations
@@ -32,7 +32,7 @@ export class SpaceRepository {
       const db = getDatabase();
 
       // Generate UUID and current ISO 8601 timestamp
-      const id = uuidv4();
+      const id = generateUUID();
       const now = new Date().toISOString();
 
       // Execute parameterized INSERT query
@@ -161,6 +161,30 @@ export class SpaceRepository {
       console.error('[SpaceRepository.deleteSpace] Database error:', error);
 
       throw serviceError;
+    }
+  }
+
+  /**
+   * Get the total count of spaces
+   *
+   * @returns Number of spaces in database
+   * @throws ServiceError if database operation fails
+   *
+   * SQL: SELECT COUNT(*) FROM spaces
+   */
+  static async countSpaces(): Promise<number> {
+    try {
+      const db = getDatabase();
+
+      const result = await db.getFirstAsync<{ count: number }>(
+        'SELECT COUNT(*) as count FROM spaces'
+      );
+
+      return result?.count ?? 0;
+    } catch (error) {
+      // Log error but return 0 as fallback
+      console.error('[SpaceRepository.countSpaces] Database error:', error);
+      return 0;
     }
   }
   

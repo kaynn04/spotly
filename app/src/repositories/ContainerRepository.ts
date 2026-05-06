@@ -8,9 +8,9 @@
  * Implementation: T002 - Create app/src/repositories/ContainerRepository.ts
  */
 
-import { v4 as uuidv4 } from 'uuid';
 import type { Container, ContainerRow, ServiceError } from '../models/Container';
 import { getDatabase } from '../db/client';
+import { generateUUID } from '../utils/uuid';
 
 /**
  * ContainerRepository handles all container-related database operations
@@ -33,7 +33,7 @@ export class ContainerRepository {
       const db = getDatabase();
 
       // Generate UUID and current ISO 8601 timestamp
-      const id = uuidv4();
+      const id = generateUUID();
       const now = new Date().toISOString();
 
       // Execute parameterized INSERT query
@@ -143,6 +143,30 @@ export class ContainerRepository {
       console.error('[ContainerRepository.getContainerById] Database error:', error);
 
       throw serviceError;
+    }
+  }
+
+  /**
+   * Get the total count of containers across all spaces
+   *
+   * @returns Number of containers in database
+   * @throws ServiceError if database operation fails
+   *
+   * SQL: SELECT COUNT(*) FROM containers
+   */
+  static async countContainers(): Promise<number> {
+    try {
+      const db = getDatabase();
+
+      const result = await db.getFirstAsync<{ count: number }>(
+        'SELECT COUNT(*) as count FROM containers'
+      );
+
+      return result?.count ?? 0;
+    } catch (error) {
+      // Log error but return 0 as fallback
+      console.error('[ContainerRepository.countContainers] Database error:', error);
+      return 0;
     }
   }
 }
