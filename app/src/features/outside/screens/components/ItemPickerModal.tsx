@@ -116,7 +116,7 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
     <TouchableOpacity
       style={[
         styles.itemRow,
-        { backgroundColor: selectedItemIds.has(item.id) ? '#0a84ff20' : 'transparent' },
+        { backgroundColor: selectedItemIds.has(item.id) ? '#6b7f9920' : 'transparent' },
       ]}
       onPress={() => handleToggleItem(item.id)}
     >
@@ -124,8 +124,8 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
         style={[
           styles.checkbox,
           {
-            backgroundColor: selectedItemIds.has(item.id) ? '#0a84ff' : 'transparent',
-            borderColor: '#0a84ff',
+            backgroundColor: selectedItemIds.has(item.id) ? '#6b7f99' : 'transparent',
+            borderColor: '#6b7f99',
           },
         ]}
       >
@@ -146,7 +146,7 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} disabled={loading}>
-            <Text style={[styles.closeButton, { color: '#0a84ff', opacity: loading ? 0.5 : 1 }]}>Cancel</Text>
+            <Text style={[styles.closeButton, { color: '#6b7f99', opacity: loading ? 0.5 : 1 }]}>Cancel</Text>
           </TouchableOpacity>
           <Text style={[styles.title, { color: colors.text }]}>Select Items</Text>
           <TouchableOpacity onPress={handleAddItems} disabled={loading || selectedItemIds.size === 0}>
@@ -154,7 +154,7 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
               style={[
                 styles.addButton,
                 {
-                  color: '#0a84ff',
+                  color: '#6b7f99',
                   opacity: loading || selectedItemIds.size === 0 ? 0.5 : 1,
                 },
               ]}
@@ -172,7 +172,7 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
               {
                 color: colors.text,
                 backgroundColor: colors.background === '#fff' ? '#f5f5f5' : '#2a2a2a',
-                borderColor: '#0a84ff',
+                borderColor: '#6b7f99',
               },
             ]}
             placeholder="Search items..."
@@ -186,13 +186,13 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
         {/* Items List */}
         {loading ? (
           <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color="#0a84ff" />
+            <ActivityIndicator size="large" color="#6b7f99" />
           </View>
         ) : error ? (
           <View style={styles.centerContainer}>
             <Text style={[styles.errorText, { color: '#d32f2f' }]}>{error}</Text>
             <TouchableOpacity
-            style={[styles.retryButton, { backgroundColor: '#0a84ff' }]}
+            style={[styles.retryButton, { backgroundColor: '#6b7f99' }]}
               onPress={loadItems}
             >
               <Text style={[styles.retryButtonText, { color: '#fff' }]}>Retry</Text>
