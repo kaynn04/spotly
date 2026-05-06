@@ -7,7 +7,7 @@
  * Implementation: T007
  */
 
-import React, { useCallback, useState, useMemo } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -28,7 +28,7 @@ interface SessionCardState {
 export default function OutsidePage() {
   const router = useRouter();
   const colorScheme = useColorScheme();
-  const outsideService = useMemo(() => useOutsideService(), []);
+  const outsideService = useOutsideService();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
 
