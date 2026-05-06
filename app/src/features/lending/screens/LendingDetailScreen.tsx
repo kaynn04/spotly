@@ -105,7 +105,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
     } finally {
       setLoading(false);
     }
-  }, [lendingId, lendingService]);
+  }, [lendingId, lendingService, itemRepository]);
 
   // Load on mount and on screen focus
   useFocusEffect(
@@ -235,7 +235,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header with Back Button */}}
+      {/* Header with Back Button */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()}>
           <Text style={[styles.backButton, { color: colors.tint }]}>← Back</Text>

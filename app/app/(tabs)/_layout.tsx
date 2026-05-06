@@ -14,6 +14,7 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Text, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 /**
  * TabIcon - Consistent icon rendering with active state styling
@@ -24,9 +25,9 @@ interface TabIconProps {
 }
 
 const TabIcon: React.FC<TabIconProps> = ({ emoji, color }) => (
-  <View style={styles.iconContainer}>
+  <SafeAreaView style={styles.iconContainer}>
     <Text style={[styles.icon, { color }]}>{emoji}</Text>
-  </View>
+  </SafeAreaView>
 );
 
 export default function TabLayout() {
