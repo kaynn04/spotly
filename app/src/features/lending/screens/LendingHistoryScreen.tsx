@@ -211,7 +211,7 @@ export default function LendingHistoryScreen() {
 
     return (
       <Pressable
-        style={[styles.lendingCard, { borderColor: colors.border }]}
+        style={styles.lendingCard}
         onPress={() => handleLendingTap(item)}
       >
         <View style={styles.lendingCardContent}>
@@ -338,7 +338,7 @@ export default function LendingHistoryScreen() {
       </View>
 
       {/* Filter Tabs */}
-      <View style={[styles.filterContainer, { borderBottomColor: colors.border }]}>
+      <View style={styles.filterContainer}>
         {renderFilterTab('ALL', 'All')}
         {renderFilterTab('ACTIVE', 'Active')}
         {renderFilterTab('RETURNED', 'Returned')}
@@ -388,6 +388,7 @@ const styles = StyleSheet.create({
   filterContainer: {
     flexDirection: 'row',
     borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
     paddingHorizontal: 16,
   },
   filterTab: {
@@ -410,6 +411,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderRadius: 8,
     borderWidth: 1,
+    borderColor: '#e0e0e0',
     backgroundColor: '#f9f9f9',
   },
   lendingCardContent: {
