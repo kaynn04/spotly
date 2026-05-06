@@ -287,13 +287,6 @@ export default function LendingHistoryScreen() {
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()}>
-            <Text style={[styles.backButton, { color: colors.tint }]}>← Back</Text>
-          </Pressable>
-          <Text style={[styles.title, { color: colors.text }]}>History</Text>
-          <View style={styles.headerSpacer} />
-        </View>
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.tint} />
           <Text style={[styles.loadingText, { color: colors.text }]}>Loading history...</Text>
@@ -306,13 +299,6 @@ export default function LendingHistoryScreen() {
   if (error) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()}>
-            <Text style={[styles.backButton, { color: colors.tint }]}>← Back</Text>
-          </Pressable>
-          <Text style={[styles.title, { color: colors.text }]}>History</Text>
-          <View style={styles.headerSpacer} />
-        </View>
         <View style={styles.centerContent}>
           <Text style={[styles.errorText, { color: '#d32f2f' }]}>{error}</Text>
           <Pressable
@@ -328,15 +314,6 @@ export default function LendingHistoryScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header with Back Button */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Text style={[styles.backButton, { color: colors.tint }]}>← Back</Text>
-        </Pressable>
-        <Text style={[styles.title, { color: colors.text }]}>History</Text>
-        <View style={styles.headerSpacer} />
-      </View>
-
       {/* Filter Tabs */}
       <View style={styles.filterContainer}>
         {renderFilterTab('ALL', 'All')}
@@ -360,30 +337,6 @@ export default function LendingHistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  backButton: {
-    fontSize: 16,
-    fontWeight: '600',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    flex: 1,
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 60,
   },
   filterContainer: {
     flexDirection: 'row',
