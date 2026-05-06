@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import LendingDetailScreen from '@/src/features/lending/screens/LendingDetailScreen';
+import LendingDetailScreen from '@/src/features/lending/screens/LendingDetailScreen.tsx';
 
 export default function LendingDetailRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
