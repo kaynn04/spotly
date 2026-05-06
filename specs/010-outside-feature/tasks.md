@@ -58,14 +58,14 @@ description: "Phase 1 Implementation tasks for Outside Checklist feature"
 
 ### Screens
 
-- [ ] T007 Create OutsidePage in `app/src/features/outside/screens/OutsidePage.tsx`
+- [x] T007 Create OutsidePage in `app/src/features/outside/screens/OutsidePage.tsx`
   - Show empty state if no active session
   - Show active session card with item count + checked count
   - Add "Create Session" button
   - Add "View History" link
   - Wrap with SafeAreaView
 
-- [ ] T008 Create SessionDetailScreen in `app/src/features/outside/screens/SessionDetailScreen.tsx`
+- [x] T008 Create SessionDetailScreen in `app/src/features/outside/screens/SessionDetailScreen.tsx`
   - Load session by ID
   - Display session title in header
   - Show item list with checkboxes (space/container context)
@@ -74,17 +74,17 @@ description: "Phase 1 Implementation tasks for Outside Checklist feature"
   - Add "Complete Session" button
   - Wrap with SafeAreaView
 
-- [ ] T009 Create SessionHistoryScreen in `app/src/features/outside/screens/SessionHistoryScreen.tsx` (Phase 2 - placeholder for now)
+- [x] T009 Create SessionHistoryScreen in `app/src/features/outside/screens/SessionHistoryScreen.tsx` (Phase 2 - placeholder for now)
   - Basic structure only, full implementation in Phase 2
 
 ### Modals
 
-- [ ] T010 Create SessionFormModal in `app/src/features/outside/screens/components/SessionFormModal.tsx`
+- [x] T010 Create SessionFormModal in `app/src/features/outside/screens/components/SessionFormModal.tsx`
   - Input field for session title (max 100 chars)
   - "Create" and "Cancel" buttons
   - Validate title before submission
 
-- [ ] T011 Create ItemPickerModal in `app/src/features/outside/screens/components/ItemPickerModal.tsx`
+- [x] T011 Create ItemPickerModal in `app/src/features/outside/screens/components/ItemPickerModal.tsx`
   - Load all items from all spaces/containers
   - Show item with space/container name
   - Multi-select checkboxes
@@ -99,19 +99,19 @@ description: "Phase 1 Implementation tasks for Outside Checklist feature"
 
 ### Route Handlers
 
-- [ ] T012 Create route handler in `app/outside.tsx`
+- [x] T012 Create route handler in `app/outside.tsx`
   - Render OutsidePage with Stack.Screen (headerShown: false)
 
-- [ ] T013 Create route handler in `app/outside/session/[id].tsx`
+- [x] T013 Create route handler in `app/app/outside/[id].tsx`
   - Extract session ID from params
   - Render SessionDetailScreen with Stack.Screen (headerShown: false)
 
-- [ ] T014 Create route handler in `app/outside/history.tsx`
+- [x] T014 Create route handler in `app/app/outside/history.tsx`
   - Render SessionHistoryScreen with Stack.Screen (headerShown: false)
 
 ### Navigation Setup
 
-- [ ] T015 Add "Outside" tab to `app/(tabs)/_layout.tsx`
+- [x] T015 Add "Outside" tab to `app/(tabs)/_layout.tsx`
   - Add to tab navigator with icon
   - Point to `/outside` route
 
