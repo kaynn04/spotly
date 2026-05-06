@@ -87,7 +87,7 @@ export default function SessionHistoryScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={colors.tint} />
+          <ActivityIndicator size="large" color="#0a84ff" />
         </View>
       </View>
     );
@@ -98,7 +98,7 @@ export default function SessionHistoryScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { paddingTop: insets.top }]}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={[styles.backButton, { color: colors.tint }]}>← Back</Text>
+            <Text style={[styles.backButton, { color: '#0a84ff' }]}>← Back</Text>
           </TouchableOpacity>
           <Text style={[styles.title, { color: colors.text }]}>History</Text>
           <View style={{ width: 60 }} />
@@ -106,7 +106,7 @@ export default function SessionHistoryScreen() {
         <View style={styles.centerContainer}>
           <Text style={[styles.errorText, { color: '#d32f2f' }]}>{error}</Text>
           <TouchableOpacity
-            style={[styles.retryButton, { backgroundColor: colors.tint }]}
+            style={[styles.retryButton, { backgroundColor: '#0a84ff' }]}
             onPress={loadSessions}
           >
             <Text style={[styles.retryButtonText, { color: '#fff' }]}>Retry</Text>
@@ -121,7 +121,7 @@ export default function SessionHistoryScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={[styles.backButton, { color: colors.tint }]}>← Back</Text>
+          <Text style={[styles.backButton, { color: '#0a84ff' }]}>← Back</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.text }]}>History</Text>
         <View style={{ width: 60 }} />

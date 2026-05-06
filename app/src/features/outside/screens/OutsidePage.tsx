@@ -103,7 +103,7 @@ export default function OutsidePage() {
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>Outside</Text>
           <TouchableOpacity
-            style={[styles.historyButton, { backgroundColor: colors.tint }]}
+            style={[styles.historyButton, { backgroundColor: '#0a84ff' }]}
             onPress={handleViewHistory}
           >
             <Text style={[styles.historyButtonText, { color: '#fff' }]}>History</Text>
@@ -113,14 +113,14 @@ export default function OutsidePage() {
         {/* Content */}
         {sessionCard.loading ? (
           <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={colors.tint} />
+            <ActivityIndicator size="large" color="#0a84ff" />
           </View>
         ) : sessionCard.error ? (
           <View style={styles.centerContainer}>
             <Text style={[styles.errorText, { color: '#d32f2f' }]}>Error: {sessionCard.error}</Text>
             <TouchableOpacity
-              style={[styles.retryButton, { backgroundColor: colors.tint }]}
-              onPress={loadActiveSession}
+            style={[styles.retryButton, { backgroundColor: '#0a84ff' }]}
+            onPress={loadActiveSession}
             >
               <Text style={[styles.retryButtonText, { color: '#fff' }]}>Retry</Text>
             </TouchableOpacity>
@@ -129,7 +129,7 @@ export default function OutsidePage() {
           // Active Session Card
           <View style={styles.cardContainer}>
             <TouchableOpacity
-              style={[styles.sessionCard, { backgroundColor: colors.tint }]}
+            style={[styles.sessionCard, { backgroundColor: '#0a84ff' }]}
               onPress={handleOpenSession}
               activeOpacity={0.7}
             >
@@ -159,7 +159,7 @@ export default function OutsidePage() {
               Create a new checklist for your next trip
             </Text>
             <TouchableOpacity
-              style={[styles.createButton, { backgroundColor: colors.tint }]}
+            style={[styles.createButton, { backgroundColor: '#0a84ff' }]}
               onPress={handleCreateSession}
             >
               <Text style={styles.createButtonText}>Create New Session</Text>

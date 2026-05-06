@@ -134,7 +134,7 @@ export default function SessionDetailScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={colors.tint} />
+          <ActivityIndicator size="large" color="#0a84ff" />
         </View>
       </View>
     );
@@ -146,7 +146,7 @@ export default function SessionDetailScreen() {
         <View style={styles.centerContainer}>
           <Text style={[styles.errorText, { color: '#d32f2f' }]}>{error || 'Session not found'}</Text>
           <TouchableOpacity
-            style={[styles.retryButton, { backgroundColor: colors.tint }]}
+            style={[styles.retryButton, { backgroundColor: '#0a84ff' }]}
             onPress={() => {
               router.back();
             }}
@@ -196,7 +196,7 @@ export default function SessionDetailScreen() {
             <View
               style={[
                 styles.checkbox,
-                { backgroundColor: isChecked ? colors.tint : 'transparent', borderColor: colors.tint },
+                { backgroundColor: isChecked ? '#0a84ff' : 'transparent', borderColor: '#0a84ff' },
               ]}
             >
               {isChecked && <Text style={styles.checkmark}>✓</Text>}
@@ -238,14 +238,14 @@ export default function SessionDetailScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={[styles.backButton, { color: colors.tint }]}>← Back</Text>
+          <Text style={[styles.backButton, { color: '#0a84ff' }]}>← Back</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.text }]}>{session?.title || 'Session'}</Text>
         <View style={{ width: 60 }} />
       </View>
 
       {/* Stats */}
-      <View style={[styles.statsContainer, { backgroundColor: colors.tint }]}>
+      <View style={[styles.statsContainer, { backgroundColor: '#0a84ff' }]}>
         <Text style={styles.statsText}>
           {session?.checkedCount ?? 0} of {session?.itemCount ?? 0} items checked
         </Text>
@@ -270,13 +270,13 @@ export default function SessionDetailScreen() {
       {/* Actions */}
       <View style={[styles.actionBar, { paddingBottom: insets.bottom }]}>
         <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: colors.tint }]}
+          style={[styles.addButton, { backgroundColor: '#0a84ff' }]}
           onPress={handleAddItems}
         >
           <Text style={styles.addButtonText}>+ Add Items</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.completeButton, { backgroundColor: colors.tint }]}
+          style={[styles.completeButton, { backgroundColor: '#0a84ff' }]}
           onPress={handleCompleteSession}
         >
           <Text style={styles.completeButtonText}>Complete</Text>
