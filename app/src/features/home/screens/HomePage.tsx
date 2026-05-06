@@ -1,407 +1,388 @@
 /**
- * Home Dashboard Screen
+ * HomePage
  *
- * Primary landing page showing:
- * - Welcome header
- * - Quick statistics cards (items, spaces, containers)
- * - Recent items section (5 most recent)
- * - Empty state when no spaces created yet
+ * Main dashboard -- minimalist redesign uniform with all other features.
  *
- * Feature: 008 - Dashboard Navigation Structure
- * Task: T002 - Create Home Dashboard Screen
+ * Greeting: Good morning/afternoon/evening + user name (persisted via AsyncStorage)
+ * Sections:
+ *   - Inventory overview (items, spaces, containers)
+ *   - Active lending cards (who has what)
+ *   - Outside session progress (if active)
+ *   - Recently added items
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
+  TouchableOpacity,
   ActivityIndicator,
-  SafeAreaView,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
 import { DashboardService } from '@/src/services/DashboardService';
+import { UserService } from '@/src/services/UserService';
 import { ItemRepository } from '@/src/repositories/ItemRepository';
 import { SpaceRepository } from '@/src/repositories/SpaceRepository';
 import { ContainerRepository } from '@/src/repositories/ContainerRepository';
-import type { Dashboard } from '@/src/services/DashboardService';
+import { LendingService } from '@/src/features/lending/services/LendingService';
+import { LendingRepository } from '@/src/features/lending/repositories/LendingRepository';
+import { useOutsideService } from '@/src/features/outside/services/OutsideService';
+import { Lending } from '@/src/features/lending/models/Lending';
+import NamePromptModal from './components/NamePromptModal';
 
-/**
- * StatCard - Reusable statistics card component
- */
-interface StatCardProps {
-  label: string;
-  value: number;
-  icon: string;
+const PRIMARY = '#6b7f99';
+const SUCCESS = '#6b9e7a';
+
+function getGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
 }
 
-const StatCard: React.FC<StatCardProps> = ({ label, value, icon }) => (
-  <View style={styles.statCard}>
-    <Text style={styles.statIcon}>{icon}</Text>
-    <Text style={styles.statValue}>{value}</Text>
-    <Text style={styles.statLabel}>{label}</Text>
-  </View>
-);
+function formatDate(dateString: string) {
+  return new Date(dateString).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 
-/**
- * HomePage - Main dashboard component
- */
+interface DashboardData {
+  stats: { totalItems: number; totalSpaces: number; totalContainers: number };
+  recentItems: { id: string; name: string; spaceName: string; createdAt: string }[];
+  activeLendings: Lending[];
+  activeSession: { id: string; title: string; itemCount: number; checkedCount: number } | null;
+  isEmpty: boolean;
+}
+
+DashboardService.initialize(ItemRepository, SpaceRepository, ContainerRepository);
+
 export default function HomePage() {
-  const [dashboard, setDashboard] = useState<Dashboard | null>(null);
+  const router = useRouter();
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
+  const isDark = colorScheme === 'dark';
+  const outsideService = useOutsideService();
+
+  const lendingService = React.useMemo(
+    () => new LendingService(new LendingRepository(), new ItemRepository()),
+    []
+  );
+
   const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
 
-  // Initialize DashboardService once on mount
-  useEffect(() => {
-    DashboardService.initialize(
-      ItemRepository,
-      SpaceRepository,
-      ContainerRepository
-    );
-  }, []);
+  const cardBg = isDark ? '#1c1c1e' : '#ffffff';
+  const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
+  const subtleText = isDark ? '#8e8e93' : '#a0aec0';
 
-  // Fetch dashboard data whenever screen comes into focus
   useFocusEffect(
-    React.useCallback(() => {
-      const loadDashboard = async () => {
-        try {
-          setLoading(true);
-          const data = await DashboardService.getFullDashboard();
-          setDashboard(data);
-        } catch (error) {
-          console.error('[HomePage] Error loading dashboard:', error);
-          // Set empty state on error
-          setDashboard({
-            recentItems: [],
-            stats: { totalItems: 0, totalSpaces: 0, totalContainers: 0 },
-            isEmpty: true,
-          });
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      loadDashboard();
+    useCallback(() => {
+      loadAll();
     }, [])
   );
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color="#0a84ff" />
-          <Text style={styles.loadingText}>Loading dashboard...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const loadAll = async () => {
+    setLoading(true);
+    try {
+      const [name, dashboard, activeLendings, session] = await Promise.all([
+        UserService.getName(),
+        DashboardService.getFullDashboard(),
+        lendingService.getActiveLendings().catch(() => []),
+        outsideService.getActiveSession().catch(() => null),
+      ]);
 
-  // Empty state when no spaces created
-  if (dashboard?.isEmpty) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.emoji}>📱</Text>
-            <Text style={styles.title}>Welcome to Spotly</Text>
-          </View>
+      if (!name) setShowNamePrompt(true);
+      else setUserName(name);
 
-          {/* Empty State Content */}
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>📦</Text>
-            <Text style={styles.emptyTitle}>No spaces yet</Text>
-            <Text style={styles.emptyDescription}>
-              Create one to get started!
-            </Text>
-            <Text style={styles.emptyHint}>
-              Tap the &quot;Spaces&quot; tab to create your first space and start
-              organizing your belongings.
-            </Text>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
+      setData({
+        stats: dashboard.stats,
+        recentItems: dashboard.recentItems,
+        activeLendings,
+        activeSession: session
+          ? { id: session.id, title: session.title, itemCount: session.itemCount, checkedCount: session.checkedCount }
+          : null,
+        isEmpty: dashboard.isEmpty,
+      });
+    } catch (err) {
+      console.error('[HomePage] loadAll error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Full dashboard view
+  const progressPercent =
+    data?.activeSession && data.activeSession.itemCount > 0
+      ? Math.round((data.activeSession.checkedCount / data.activeSession.itemCount) * 100)
+      : 0;
+
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        {/* ── Greeting header ────────────────────────────────── */}
         <View style={styles.header}>
-          <Text style={styles.emoji}>📱</Text>
-          <Text style={styles.title}>Dashboard</Text>
-        </View>
-
-        {/* Statistics Cards Section */}
-        <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>Overview</Text>
-          <View style={styles.statsGrid}>
-            <StatCard
-              icon="📦"
-              value={dashboard?.stats.totalItems ?? 0}
-              label="Items"
-            />
-            <StatCard
-              icon="🏠"
-              value={dashboard?.stats.totalSpaces ?? 0}
-              label="Spaces"
-            />
-            <StatCard
-              icon="📂"
-              value={dashboard?.stats.totalContainers ?? 0}
-              label="Containers"
-            />
+          <View style={styles.headerLeft}>
+            <Text style={[styles.greetingText, { color: subtleText }]}>{getGreeting()}</Text>
+            <Text style={[styles.nameText, { color: colors.text }]}>
+              {userName ?? 'there'} {'\uD83D\uDC4B'}
+            </Text>
           </View>
         </View>
 
-        {/* Recent Items Section */}
-        {dashboard?.recentItems && dashboard.recentItems.length > 0 && (
-          <View style={styles.recentSection}>
-            <Text style={styles.sectionTitle}>Recently Added</Text>
-            <View style={styles.itemsList}>
-              {dashboard.recentItems.map((item) => (
-                <View key={item.id} style={styles.recentItem}>
-                  <View style={styles.itemContent}>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                    <Text style={styles.itemSpace}>• {item.spaceName}</Text>
-                  </View>
-                  <Text style={styles.itemIcon}>✓</Text>
-                </View>
-              ))}
+        {loading ? (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color={PRIMARY} />
+          </View>
+        ) : (
+          <>
+            {/* ── Inventory overview ──────────────────────────── */}
+            <View style={styles.statsRow}>
+              <TouchableOpacity
+                style={[styles.statCard, { backgroundColor: cardBg, borderColor }]}
+                onPress={() => router.push('/(tabs)/spaces' as any)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.statValue, { color: colors.text }]}>
+                  {data?.stats.totalItems ?? 0}
+                </Text>
+                <Text style={[styles.statLabel, { color: subtleText }]}>Items</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.statCard, { backgroundColor: cardBg, borderColor }]}
+                onPress={() => router.push('/(tabs)/spaces' as any)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.statValue, { color: colors.text }]}>
+                  {data?.stats.totalSpaces ?? 0}
+                </Text>
+                <Text style={[styles.statLabel, { color: subtleText }]}>Spaces</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.statCard, { backgroundColor: cardBg, borderColor }]}
+                onPress={() => router.push('/(tabs)/spaces' as any)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.statValue, { color: colors.text }]}>
+                  {data?.stats.totalContainers ?? 0}
+                </Text>
+                <Text style={[styles.statLabel, { color: subtleText }]}>Containers</Text>
+              </TouchableOpacity>
             </View>
-          </View>
+
+            {/* ── Active outside session ─────────────────────── */}
+            {data?.activeSession && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Outside</Text>
+                  <TouchableOpacity onPress={() => router.push(`/outside/${data.activeSession!.id}` as any)}>
+                    <Text style={[styles.seeAll, { color: PRIMARY }]}>View</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  style={[styles.card, { backgroundColor: cardBg, borderColor }]}
+                  onPress={() => router.push(`/outside/${data.activeSession!.id}` as any)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.sessionRow}>
+                    <View style={[styles.activeDot, { backgroundColor: PRIMARY }]} />
+                    <Text style={[styles.sessionTitle, { color: colors.text }]} numberOfLines={1}>
+                      {data.activeSession.title}
+                    </Text>
+                    <View style={[styles.statusPill, { backgroundColor: `${PRIMARY}18` }]}>
+                      <Text style={[styles.statusPillText, { color: PRIMARY }]}>Active</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.progressTrack, { backgroundColor: isDark ? '#2c2c2e' : '#e8e8ed', marginTop: 12 }]}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        {
+                          width: `${progressPercent}%`,
+                          backgroundColor: progressPercent === 100 ? SUCCESS : PRIMARY,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <Text style={[styles.progressLabel, { color: subtleText, marginTop: 6 }]}>
+                    {data.activeSession.checkedCount}/{data.activeSession.itemCount} items checked
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* ── Active lendings ────────────────────────────── */}
+            {(data?.activeLendings?.length ?? 0) > 0 && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Lent Out</Text>
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/lending' as any)}>
+                    <Text style={[styles.seeAll, { color: PRIMARY }]}>See all</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+                  {data!.activeLendings.slice(0, 3).map((lending, index) => (
+                    <View
+                      key={lending.id}
+                      style={[
+                        styles.lendingRow,
+                        index < Math.min(data!.activeLendings.length, 3) - 1 && {
+                          borderBottomWidth: 1,
+                          borderBottomColor: borderColor,
+                        },
+                      ]}
+                    >
+                      <View style={[styles.lendingDot, { backgroundColor: PRIMARY }]} />
+                      <View style={styles.lendingContent}>
+                        <Text style={[styles.lendingBorrower, { color: colors.text }]} numberOfLines={1}>
+                          {lending.borrower_name}
+                        </Text>
+                        <Text style={[styles.lendingMeta, { color: subtleText }]} numberOfLines={1}>
+                          since {formatDate(lending.lent_at.toString())}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                  {data!.activeLendings.length > 3 && (
+                    <TouchableOpacity
+                      style={styles.viewAllRow}
+                      onPress={() => router.push('/(tabs)/lending' as any)}
+                    >
+                      <Text style={[styles.viewAllText, { color: PRIMARY }]}>
+                        +{data!.activeLendings.length - 3} more
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            )}
+
+            {/* ── Recently added items ───────────────────────── */}
+            {(data?.recentItems?.length ?? 0) > 0 && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Recently Added</Text>
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/spaces' as any)}>
+                    <Text style={[styles.seeAll, { color: PRIMARY }]}>Spaces</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+                  {data!.recentItems.map((item, index) => (
+                    <View
+                      key={item.id}
+                      style={[
+                        styles.recentRow,
+                        index < data!.recentItems.length - 1 && {
+                          borderBottomWidth: 1,
+                          borderBottomColor: borderColor,
+                        },
+                      ]}
+                    >
+                      <View style={styles.recentContent}>
+                        <Text style={[styles.recentName, { color: colors.text }]} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <Text style={[styles.recentMeta, { color: subtleText }]}>
+                          {item.spaceName}
+                        </Text>
+                      </View>
+                      <Text style={[styles.recentDate, { color: subtleText }]}>
+                        {formatDate(item.createdAt)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* ── Empty state ────────────────────────────────── */}
+            {data?.isEmpty && (
+              <View style={[styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
+                <Text style={styles.emptyIcon}>{'\uD83D\uDCE6'}</Text>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>Nothing here yet</Text>
+                <Text style={[styles.emptySubtitle, { color: subtleText }]}>
+                  Go to the Spaces tab to create your first space and start organizing.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.emptyBtn, { backgroundColor: PRIMARY }]}
+                  onPress={() => router.push('/(tabs)/spaces' as any)}
+                >
+                  <Text style={styles.emptyBtnText}>Create a Space</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <View style={{ height: insets.bottom + 16 }} />
+          </>
         )}
-
-        {/* Lending Placeholder */}
-        <View style={styles.placeholderCard}>
-          <Text style={styles.placeholderIcon}>🤝</Text>
-          <Text style={styles.placeholderTitle}>Lending Tracker</Text>
-          <Text style={styles.placeholderText}>Coming soon</Text>
-        </View>
-
-        {/* Outside Items Placeholder */}
-        <View style={styles.placeholderCard}>
-          <Text style={styles.placeholderIcon}>🧳</Text>
-          <Text style={styles.placeholderTitle}>Outside Items</Text>
-          <Text style={styles.placeholderText}>Coming soon</Text>
-        </View>
-
-        {/* Bottom Padding */}
-        <View style={styles.bottomPadding} />
       </ScrollView>
-    </SafeAreaView>
+
+      <NamePromptModal
+        visible={showNamePrompt}
+        onDone={(name) => {
+          setUserName(name);
+          setShowNamePrompt(false);
+        }}
+      />
+    </View>
   );
 }
 
-/**
- * Styles for Home Dashboard
- */
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fafafa',
-  },
-
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-  },
-
-  centerContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-
-  /* Header */
-  header: {
-    marginBottom: 24,
-    alignItems: 'center',
-  },
-
-  emoji: {
-    fontSize: 48,
-    marginBottom: 8,
-  },
-
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-
-  /* Statistics Section */
-  statsSection: {
-    marginBottom: 28,
-  },
-
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 12,
-  },
-
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-
-  statCard: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-
-  statIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#0a84ff',
-    marginBottom: 4,
-  },
-
-  statLabel: {
-    fontSize: 12,
-    color: '#666',
-    fontWeight: '500',
-  },
-
-  /* Recent Items Section */
-  recentSection: {
-    marginBottom: 28,
-  },
-
-  itemsList: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-
-  recentItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-
-  itemContent: {
-    flex: 1,
-  },
-
-  itemName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 2,
-  },
-
-  itemSpace: {
-    fontSize: 12,
-    color: '#999',
-  },
-
-  itemIcon: {
-    fontSize: 16,
-    color: '#0a84ff',
-    marginLeft: 12,
-  },
-
-  /* Placeholder Cards */
-  placeholderCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-
-  placeholderIcon: {
-    fontSize: 40,
-    marginBottom: 12,
-  },
-
-  placeholderTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 4,
-  },
-
-  placeholderText: {
-    fontSize: 13,
-    color: '#999',
-    fontWeight: '500',
-  },
-
-  /* Empty State */
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-
-  emptyEmoji: {
-    fontSize: 72,
-    marginBottom: 16,
-  },
-
-  emptyTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 8,
-  },
-
-  emptyDescription: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 12,
-    fontWeight: '500',
-  },
-
-  emptyHint: {
-    fontSize: 13,
-    color: '#999',
-    textAlign: 'center',
-    lineHeight: 20,
-    maxWidth: 280,
-  },
-
-  /* Bottom Padding */
-  bottomPadding: {
-    height: 40,
-  },
+  container: { flex: 1 },
+  scrollContent: { paddingHorizontal: 16 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24, paddingTop: 4 },
+  headerLeft: {},
+  greetingText: { fontSize: 15, fontWeight: '500' },
+  nameText: { fontSize: 30, fontWeight: '700', letterSpacing: -0.5, marginTop: 2 },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 80 },
+  // Stats row
+  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
+  statCard: { flex: 1, borderRadius: 14, borderWidth: 1, padding: 16, alignItems: 'center' },
+  statValue: { fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
+  statLabel: { fontSize: 12, fontWeight: '500', marginTop: 4 },
+  // Sections
+  section: { marginBottom: 20 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  sectionTitle: { fontSize: 17, fontWeight: '700' },
+  seeAll: { fontSize: 14, fontWeight: '500' },
+  card: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+  // Outside session card
+  sessionRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10 },
+  activeDot: { width: 8, height: 8, borderRadius: 4 },
+  sessionTitle: { flex: 1, fontSize: 15, fontWeight: '600' },
+  statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  statusPillText: { fontSize: 12, fontWeight: '600' },
+  progressTrack: { height: 5, borderRadius: 4, marginHorizontal: 14 },
+  progressFill: { height: 5, borderRadius: 4 },
+  progressLabel: { fontSize: 12, paddingHorizontal: 14, paddingBottom: 14 },
+  // Lending rows
+  lendingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 14, gap: 12 },
+  lendingDot: { width: 6, height: 6, borderRadius: 3 },
+  lendingContent: { flex: 1 },
+  lendingBorrower: { fontSize: 15, fontWeight: '600' },
+  lendingMeta: { fontSize: 12, marginTop: 2 },
+  viewAllRow: { paddingVertical: 12, paddingHorizontal: 14 },
+  viewAllText: { fontSize: 13, fontWeight: '600' },
+  // Recent items
+  recentRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 14 },
+  recentContent: { flex: 1 },
+  recentName: { fontSize: 15, fontWeight: '500' },
+  recentMeta: { fontSize: 12, marginTop: 2 },
+  recentDate: { fontSize: 12 },
+  // Empty state
+  emptyCard: { borderRadius: 16, borderWidth: 1, padding: 32, alignItems: 'center', marginTop: 8 },
+  emptyIcon: { fontSize: 40, marginBottom: 12 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
+  emptySubtitle: { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
+  emptyBtn: { paddingVertical: 14, paddingHorizontal: 28, borderRadius: 12, alignSelf: 'stretch', alignItems: 'center' },
+  emptyBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 });
