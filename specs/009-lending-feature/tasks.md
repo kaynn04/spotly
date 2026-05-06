@@ -33,21 +33,23 @@
   - **Validation**: TypeScript compiles without errors; types match spec
   - ✅ **COMPLETED**: LendingStatus enum, Lending interface, DTOs (Create/Return), LendingWithItemContext, ServiceError
 
-- [ ] T002 Create database migration file in `src/db/migrations/`
+- [X] T002 Create database migration file in `src/db/migrations/`
   - **Objective**: Add lendings table schema to SQLite
   - **Scope**: Migration file creation (not execution; execution happens at app startup)
   - **Files**: `src/db/migrations/003-create-lendings-table.ts` (new)
   - **Expected Output**: Migration that creates lendings table with proper schema, indexes, constraints
   - **Dependencies**: T001 (need Lending type reference)
   - **Validation**: Migration file is valid TypeScript; idempotent (safe to run multiple times)
+  - ✅ **COMPLETED**: Migration file with full schema, 4 indexes, check constraints, unique constraints
 
-- [ ] T003 Update migrations.ts to include new lending migration
+- [X] T003 Update migrations.ts to include new lending migration
   - **Objective**: Wire up migration to run at app startup
   - **Scope**: Update main migrations file to reference and execute the new lending migration
   - **Files**: `src/db/migrations.ts` (existing)
   - **Expected Output**: New migration registered and will execute on app startup
   - **Dependencies**: T002
   - **Validation**: Migration runs without errors on app startup
+  - ✅ **COMPLETED**: Import added, createLendingsTable() called in initializeDatabase(), lendings added to resetDatabase()
 
 - [ ] T004 [P] Create LendingRepository interface and skeleton in `src/features/lending/repositories/`
   - **Objective**: Define repository contract and method signatures

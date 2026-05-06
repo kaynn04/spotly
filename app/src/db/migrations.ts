@@ -8,6 +8,7 @@
  */
 
 import { getDatabase } from './client';
+import { createLendingsTable, dropLendingsTable } from './migrations/003-create-lendings-table';
 
 /**
  * Initialize the database schema
@@ -101,6 +102,9 @@ export async function initializeDatabase() {
       ON items(container_id);
     `);
 
+    // Create lendings table (Migration 003)
+    await createLendingsTable(db);
+
     console.log('✓ Database initialized successfully');
   } catch (error) {
     console.error('✗ Database initialization error:', error);
@@ -117,6 +121,7 @@ export async function resetDatabase() {
 
   try {
     await db.execAsync(`
+      DROP TABLE IF EXISTS lendings;
       DROP TABLE IF EXISTS items;
       DROP TABLE IF EXISTS containers;
       DROP TABLE IF EXISTS spaces;
