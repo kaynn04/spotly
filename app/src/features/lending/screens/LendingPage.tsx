@@ -154,6 +154,7 @@ export default function LendingPage() {
       // Reload list
       await loadLendings();
     } catch (err: any) {
+      console.error('Error creating lending:', err);
       const errorMessage = err.code === 'DUPLICATE_ACTIVE_LENDING'
         ? 'Item is already lent out'
         : err.message || 'Failed to create lending';

@@ -161,29 +161,39 @@ export class LendingRepository {
     const id = uuidv4();
     const now = new Date().toISOString();
 
-    await this.db.runAsync(
-      `INSERT INTO lendings (
-        id, item_id, borrower_name, note, lent_at, returned_at, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        input.item_id,
-        input.borrower_name,
-        input.note || null,
-        now,
-        null,
-        LendingStatus.ACTIVE,
-        now,
-        now,
-      ]
-    );
+    try {
+      await this.db.runAsync(
+        `INSERT INTO lendings (
+          id, item_id, borrower_name, note, lent_at, returned_at, status, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          input.item_id,
+          input.borrower_name,
+          input.note || null,
+          now,
+          null,
+          LendingStatus.ACTIVE,
+          now,
+          now,
+        ]
+      );
+    } catch (error) {
+      console.error('LendingRepository.create INSERT error:', error);
+      throw error;
+    }
 
     // Return created lending
-    const created = await this.getById(id);
-    if (!created) {
-      throw new Error('Failed to retrieve created lending');
+    try {
+      const created = await this.getById(id);
+      if (!created) {
+        throw new Error('Failed to retrieve created lending');
+      }
+      return created;
+    } catch (error) {
+      console.error('LendingRepository.create getById error:', error);
+      throw error;
     }
-    return created;
   }
 
   /**

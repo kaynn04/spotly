@@ -124,6 +124,7 @@ export class LendingService {
     try {
       item = await this.itemRepository.getById(input.item_id);
     } catch (error) {
+      console.error('ItemRepository.getById error:', error);
       throw createServiceError(
         'DATABASE_ERROR',
         'Failed to check item existence'
@@ -161,6 +162,7 @@ export class LendingService {
         note: input.note ? input.note.trim() : undefined,
       });
     } catch (error: any) {
+      console.error('LendingService.createLending repository.create error:', error);
       // Handle unique constraint violation from repository
       if (
         error.message &&
