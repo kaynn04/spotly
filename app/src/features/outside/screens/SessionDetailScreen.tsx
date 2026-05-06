@@ -51,11 +51,14 @@ export default function SessionDetailScreen() {
     setError(null);
     try {
       const sessionData = await outsideService.getSession(id!);
+      console.log('[SessionDetailScreen] Session loaded:', sessionData);
       setSession(sessionData);
       const itemsData = await outsideService.getSessionItems(id!);
+      console.log('[SessionDetailScreen] Items loaded:', itemsData);
+      console.log('[SessionDetailScreen] First item structure:', itemsData[0]);
       setItems(itemsData);
     } catch (err) {
-      console.error('Error loading session:', err);
+      console.error('[SessionDetailScreen] Error loading session:', err);
       setError('Failed to load session');
     } finally {
       setLoading(false);
@@ -153,42 +156,53 @@ export default function SessionDetailScreen() {
     );
   }
 
-  const renderedItems = items.map((item, idx) => (
-    <View key={item.id} style={[styles.itemRow, { borderBottomColor: '#e0e0e0', borderBottomWidth: idx < items.length - 1 ? 1 : 0 }]}>
-      <TouchableOpacity
-        style={styles.checkboxContainer}
-        onPress={() => handleToggleItem(item.item_id)}
-      >
-        <View
-          style={[
-            styles.checkbox,
-            { backgroundColor: item.is_checked ? colors.tint : 'transparent', borderColor: colors.tint },
-          ]}
-        >
-          {item.is_checked && <Text style={styles.checkmark}>✓</Text>}
+  const renderedItems = items.map((item, idx) => {
+    try {
+      return (
+        <View key={item.id} style={[styles.itemRow, { borderBottomColor: '#e0e0e0', borderBottomWidth: idx < items.length - 1 ? 1 : 0 }]}>
+          <TouchableOpacity
+            style={styles.checkboxContainer}
+            onPress={() => handleToggleItem(item.item_id)}
+          >
+            <View
+              style={[
+                styles.checkbox,
+                { backgroundColor: item.is_checked ? colors.tint : 'transparent', borderColor: colors.tint },
+              ]}
+            >
+              {item.is_checked && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+          </TouchableOpacity>
+          <View style={styles.itemInfo}>
+            <Text
+              style={[
+                styles.itemName,
+                { color: colors.text, textDecorationLine: item.is_checked ? 'line-through' : 'none', opacity: item.is_checked ? 0.5 : 1 },
+              ]}
+            >
+              {item.item_name}
+            </Text>
+            <Text style={[styles.itemLocation, { color: colors.icon }]}>
+              {`${item.space_name || 'Unknown'}${item.container_name ? ` / ${item.container_name}` : ''}`}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.removeButton}
+            onPress={() => handleRemoveItem(item.item_id)}
+          >
+            <Text style={{ color: '#d32f2f' }}>✕</Text>
+          </TouchableOpacity>
         </View>
-      </TouchableOpacity>
-      <View style={styles.itemInfo}>
-        <Text
-          style={[
-            styles.itemName,
-            { color: colors.text, textDecorationLine: item.is_checked ? 'line-through' : 'none', opacity: item.is_checked ? 0.5 : 1 },
-          ]}
-        >
-          {item.item_name}
-        </Text>
-        <Text style={[styles.itemLocation, { color: colors.icon }]}>
-          {item.space_name || 'Unknown'} {item.container_name ? `/ ${item.container_name}` : ''}
-        </Text>
-      </View>
-      <TouchableOpacity
-        style={styles.removeButton}
-        onPress={() => handleRemoveItem(item.item_id)}
-      >
-        <Text style={{ color: '#d32f2f' }}>✕</Text>
-      </TouchableOpacity>
-    </View>
-  ));
+      );
+    } catch (err) {
+      console.error('[SessionDetailScreen] Error rendering item:', item, err);
+      return (
+        <View key={item.id} style={styles.itemRow}>
+          <Text style={{ color: 'red' }}>Error rendering item: {item.item_name || item.id}</Text>
+        </View>
+      );
+    }
+  });
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -197,14 +211,14 @@ export default function SessionDetailScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={[styles.backButton, { color: colors.tint }]}>← Back</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>{session.title}</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{session?.title || 'Session'}</Text>
         <View style={{ width: 60 }} />
       </View>
 
       {/* Stats */}
       <View style={[styles.statsContainer, { backgroundColor: colors.tint }]}>
         <Text style={styles.statsText}>
-          {session.checkedCount} of {session.itemCount} items checked
+          {session?.checkedCount ?? 0} of {session?.itemCount ?? 0} items checked
         </Text>
       </View>
 
