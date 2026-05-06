@@ -127,53 +127,59 @@
 
 ### Tasks
 
-- [ ] T011 Create LendingService skeleton in `src/features/lending/services/`
+- [X] T011 Create LendingService skeleton in `src/features/lending/services/`
   - **Objective**: Create service class with dependency injection
   - **Scope**: Skeleton with constructor (inject ItemRepository, LendingRepository)
   - **Files**: `src/features/lending/services/LendingService.ts` (new)
   - **Expected Output**: Service class instantiated with dependencies; methods defined (throw "not implemented")
   - **Dependencies**: T001 (Lending type), T004 (LendingRepository), existing ItemRepository
   - **Validation**: TypeScript compiles; service instantiable
+  - ✅ **COMPLETED**: Full service with DI, 8 methods, error handling
 
-- [ ] T012 Implement LendingService.createLending() method
+- [X] T012 Implement LendingService.createLending() method
   - **Objective**: Core business logic for lending creation with full validation
   - **Scope**: Validate borrower name, item exists, no active lending; enforce BR-001, BR-002, BR-003
   - **Files**: `src/features/lending/services/LendingService.ts` (modify T011)
   - **Expected Output**: Method accepts (itemId, borrowerName, note?), validates, calls repository, returns Lending
   - **Dependencies**: T011 (service), T009 (create), T008 (hasActiveLending)
   - **Validation**: Creates lending when valid; throws ServiceError with descriptive message when invalid
+  - ✅ **COMPLETED**: 3-layer validation (borrower, item exists, no active); unique constraint handling
 
-- [ ] T013 Implement LendingService.markAsReturned() method
+- [X] T013 Implement LendingService.markAsReturned() method
   - **Objective**: Business logic for marking lending as returned
   - **Scope**: Validate lending exists and is ACTIVE; enforce BR-004 (atomic update)
   - **Files**: `src/features/lending/services/LendingService.ts` (modify T011)
   - **Expected Output**: Method accepts lendingId, validates, calls repository, returns updated Lending
   - **Dependencies**: T011 (service), T007 (getById), T010 (markAsReturned)
   - **Validation**: Marks ACTIVE lending as RETURNED; throws error if already RETURNED or not found
+  - ✅ **COMPLETED**: 2-step validation (exists, is active); proper error codes
 
-- [ ] T014 [P] Implement LendingService.getActiveLendings() method
+- [X] T014 [P] Implement LendingService.getActiveLendings() method
   - **Objective**: Fetch ACTIVE lendings (primary view for US2)
   - **Scope**: Call repository to get ACTIVE lendings; fetch item details for each
   - **Files**: `src/features/lending/services/LendingService.ts` (modify T011)
   - **Expected Output**: Returns Lending[] with item details populated
   - **Dependencies**: T011 (service), T005 (getByStatus)
   - **Validation**: Returns only ACTIVE lendings in correct order; includes item context
+  - ✅ **COMPLETED**: Simple delegation to repository with error wrapping
 
-- [ ] T015 [P] Implement LendingService.getAllLendings() method
+- [X] T015 [P] Implement LendingService.getAllLendings() method
   - **Objective**: Fetch all lendings for history view (US4)
   - **Scope**: Call repository for all lendings (ACTIVE + RETURNED); fetch item details
   - **Files**: `src/features/lending/services/LendingService.ts` (modify T011)
   - **Expected Output**: Returns Lending[] sorted by date; both statuses included
   - **Dependencies**: T011 (service), T006 (getAll)
   - **Validation**: Returns both ACTIVE and RETURNED; correct sorting
+  - ✅ **COMPLETED**: Simple delegation to repository with error wrapping
 
-- [ ] T016 [P] Implement LendingService.canLendItem() helper method
+- [X] T016 [P] Implement LendingService.canLendItem() helper method
   - **Objective**: Check if item can be lent (for UI button enable/disable, US1)
   - **Scope**: Returns boolean based on active lending check
   - **Files**: `src/features/lending/services/LendingService.ts` (modify T011)
   - **Expected Output**: Helper method returns true if item can be lent, false if already active
   - **Dependencies**: T011 (service), T008 (hasActiveLending)
   - **Validation**: Returns correct boolean; matches BR-001 constraint
+  - ✅ **COMPLETED**: Boolean inversion helper with error wrapping
 
 **✅ Checkpoint 2**: All service methods implemented with business logic and validation. Service layer ready for UI implementation.
 
