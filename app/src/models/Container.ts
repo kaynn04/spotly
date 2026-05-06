@@ -1,34 +1,32 @@
 /**
- * Item Entity
+ * Container Entity
  *
- * TypeScript types for Item domain model
- * Maps to items table in SQLite
+ * TypeScript types for Container domain model
+ * Maps to containers table in SQLite
  *
- * Implementation: T001 - Create app/src/models/Item.ts
+ * Implementation: T001 - Create app/src/models/Container.ts
  */
 
 /**
- * Item entity as returned by repository and service
- * Represents an item within a space (at space-level or in a container)
+ * Container entity as returned by repository and service
+ * Represents a logical grouping of items within a space
  */
-export interface Item {
+export interface Container {
   id: string;                    // UUID, unique identifier
-  name: string;                  // User-provided item name
+  name: string;                  // User-provided container name (1-50 chars)
   spaceId: string;               // Foreign key reference to space
-  containerId?: string | null;   // Optional: FK reference to container (null = space-level item)
   createdAt: string;             // ISO 8601 timestamp, immutable
 }
 
 /**
  * Database row representation
  * Uses snake_case to match SQLite column names
- * Repository maps this to Item (camelCase) for service layer
+ * Repository maps this to Container (camelCase) for service layer
  */
-export interface ItemRow {
+export interface ContainerRow {
   id: string;
   name: string;
   space_id: string;
-  container_id?: string | null;  // Optional container reference
   created_at: string;
 }
 
