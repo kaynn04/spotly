@@ -56,16 +56,39 @@ export async function initializeDatabase() {
       ON containers(space_id);
     `);
 
-    // First: Create items table with minimal schema if it doesn't exist
-    // This handles both new databases and existing ones
-    await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS items (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        space_id TEXT NOT NULL,
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-      );
-    `);
+    // Check if items table exists and has correct schema
+    const itemsTableInfo = await db.getAllAsync("PRAGMA table_info(items);");
+    const hasContainerId = itemsTableInfo.some((col: any) => col.name === 'container_id');
+
+    if (itemsTableInfo.length === 0) {
+      // Table doesn't exist, create it with correct schema
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS items (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          space_id TEXT NOT NULL,
+          container_id TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+      `);
+      console.log('✓ Created items table with container_id column');
+    } else if (!hasContainerId) {
+      // Table exists but is missing container_id column - drop and recreate
+      console.log('⚠ Items table schema incorrect, recreating...');
+      await db.execAsync('DROP TABLE IF EXISTS items;');
+      await db.execAsync(`
+        CREATE TABLE items (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          space_id TEXT NOT NULL,
+          container_id TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+      `);
+      console.log('✓ Recreated items table with correct schema');
+    } else {
+      console.log('✓ Items table schema is correct');
+    }
 
     // Create indexes
     await db.execAsync(`
@@ -73,18 +96,6 @@ export async function initializeDatabase() {
       ON items(space_id);
     `);
 
-    // Second: Add container_id column if it doesn't exist (migration for existing dbs)
-    try {
-      await db.execAsync(`
-        ALTER TABLE items ADD COLUMN container_id TEXT;
-      `);
-      console.log('✓ Added container_id column to items table');
-    } catch (migrationError: any) {
-      // Column already exists, which is fine - skip silently
-      console.log('✓ container_id column already exists');
-    }
-
-    // Create index on container_id after column is guaranteed to exist
     await db.execAsync(`
       CREATE INDEX IF NOT EXISTS idx_items_container_id 
       ON items(container_id);

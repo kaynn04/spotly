@@ -8,9 +8,9 @@
  * Implementation: T003 - Create app/src/repositories/ItemRepository.ts
  */
 
-import { v4 as uuidv4 } from 'uuid';
 import type { Item, ItemRow, ServiceError } from '../models/Item';
 import { getDatabase } from '../db/client';
+import { generateUUID } from '../utils/uuid';
 
 /**
  * ItemRepository handles all item-related database operations
@@ -38,7 +38,7 @@ export class ItemRepository {
       const db = getDatabase();
 
       // Generate UUID and current ISO 8601 timestamp
-      const id = uuidv4();
+      const id = generateUUID();
       const now = new Date().toISOString();
 
       // Execute parameterized INSERT query (handle optional containerId)
@@ -64,6 +64,11 @@ export class ItemRepository {
 
       // Log error for debugging
       console.error('[ItemRepository.createItem] Database error:', error);
+      console.error('[ItemRepository.createItem] Error details:', {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorCode: (error as any)?.code,
+        errorStack: error instanceof Error ? error.stack : undefined,
+      });
 
       throw serviceError;
     }
@@ -91,6 +96,7 @@ export class ItemRepository {
         id: row.id,
         name: row.name,
         spaceId: row.space_id,
+        containerId: row.container_id,
         createdAt: row.created_at,
       }));
     } catch (error) {
@@ -211,6 +217,69 @@ export class ItemRepository {
       console.error('[ItemRepository.deleteItem] Database error:', error);
 
       throw serviceError;
+    }
+  }
+
+  /**
+   * Get the total count of items across all spaces
+   *
+   * @returns Number of items in database
+   * @throws ServiceError if database operation fails
+   *
+   * SQL: SELECT COUNT(*) FROM items
+   */
+  static async countItems(): Promise<number> {
+    try {
+      const db = getDatabase();
+
+      const result = await db.getFirstAsync<{ count: number }>(
+        'SELECT COUNT(*) as count FROM items'
+      );
+
+      return result?.count ?? 0;
+    } catch (error) {
+      // Log error but return 0 as fallback
+      console.error('[ItemRepository.countItems] Database error:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get the N most recent items across all spaces
+   *
+   * @param limit - Number of items to return (default: 5)
+   * @returns Array of items with space name, ordered by creation date (newest first)
+   * @throws ServiceError if database operation fails
+   *
+   * SQL: SELECT items.id, items.name, items.created_at, spaces.name as space_name
+   *      FROM items JOIN spaces ON items.space_id = spaces.id
+   *      ORDER BY items.created_at DESC LIMIT ?
+   */
+  static async getRecentItems(
+    limit: number = 5
+  ): Promise<Array<{ id: string; name: string; spaceName: string; createdAt: string }>> {
+    try {
+      const db = getDatabase();
+
+      const result = await db.getAllAsync(
+        `SELECT items.id, items.name, items.created_at, spaces.name as space_name
+         FROM items
+         JOIN spaces ON items.space_id = spaces.id
+         ORDER BY items.created_at DESC
+         LIMIT ?`,
+        [limit]
+      );
+
+      return result.map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        spaceName: row.space_name,
+        createdAt: row.created_at,
+      }));
+    } catch (error) {
+      // Log error but return empty array as fallback
+      console.error('[ItemRepository.getRecentItems] Database error:', error);
+      return [];
     }
   }
 }
