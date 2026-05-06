@@ -180,14 +180,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    flexGrow: 1,
     padding: 16,
+    paddingBottom: 32,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
+    paddingTop: 8,
   },
   title: {
     fontSize: 28,
@@ -203,10 +204,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   centerContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: 200,
+    marginVertical: 32,
   },
   errorText: {
     fontSize: 16,
@@ -259,10 +260,10 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   emptyContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: 300,
+    paddingVertical: 60,
+    paddingHorizontal: 16,
   },
   emptyIcon: {
     fontSize: 64,

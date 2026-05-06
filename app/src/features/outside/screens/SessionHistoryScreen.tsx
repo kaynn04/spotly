@@ -155,6 +155,7 @@ export default function SessionHistoryScreen() {
           )}
           keyExtractor={item => item.id}
           scrollEnabled={true}
+          contentContainerStyle={{ paddingBottom: 80 }}
         />
       )}
     </SafeAreaView>
@@ -171,6 +172,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    paddingTop: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
