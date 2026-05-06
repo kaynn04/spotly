@@ -13,7 +13,7 @@
 
 import { LendingRepository } from '../repositories/LendingRepository';
 import { Lending, LendingCreateInput, LendingStatus } from '../models/Lending';
-import { ItemRepository } from '../../repositories/ItemRepository';
+import { ItemRepository } from '../../../repositories/ItemRepository';
 
 /**
  * Service Error

@@ -21,8 +21,8 @@ import {
 } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
-import { ItemRepository } from '../../../repositories/ItemRepository';
-import { useOutsideService } from '../services/OutsideService';
+import { ItemRepository } from '../../../../repositories/ItemRepository';
+import { useOutsideService } from '../../services/OutsideService';
 
 interface ItemPickerModalProps {
   sessionId: string;

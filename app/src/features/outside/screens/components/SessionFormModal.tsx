@@ -21,7 +21,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
-import { useOutsideService } from '../services/OutsideService';
+import { useOutsideService } from '../../services/OutsideService';
 
 interface SessionFormModalProps {
   visible: boolean;
