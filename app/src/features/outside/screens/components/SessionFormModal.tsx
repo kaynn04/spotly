@@ -17,6 +17,7 @@ import {
   Modal,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -81,12 +82,12 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
   const isValid = title.trim().length > 0;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={() => { Keyboard.dismiss(); handleCancel(); }}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <TouchableWithoutFeedback onPress={handleCancel}>
+        <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); handleCancel(); }}>
           <View style={styles.overlay}>
             <TouchableWithoutFeedback>
               <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
