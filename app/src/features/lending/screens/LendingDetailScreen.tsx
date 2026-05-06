@@ -246,7 +246,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Item Information Section */}
-        <View style={[styles.section, { borderColor: colors.border }]}>
+        <View style={[styles.section, { borderColor: '#e0e0e0' }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Item</Text>
           {item ? (
             <View>
@@ -277,7 +277,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
         </View>
 
         {/* Lending Information Section */}
-        <View style={[styles.section, { borderColor: colors.border }]}>
+        <View style={[styles.section, { borderColor: '#e0e0e0' }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Lending Details</Text>
 
           {/* Borrower Name */}
@@ -362,7 +362,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
             </Text>
             <View style={styles.dialogButtons}>
               <Pressable
-                style={[styles.dialogButton, { borderColor: colors.border }]}
+                style={[styles.dialogButton, { borderColor: '#e0e0e0' }]}
                 onPress={handleCancelReturn}
               >
                 <Text style={[styles.dialogButtonText, { color: colors.tint }]}>Cancel</Text>
