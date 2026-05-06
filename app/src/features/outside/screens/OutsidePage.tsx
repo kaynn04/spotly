@@ -1,14 +1,18 @@
 /**
  * OutsidePage
- * 
- * Main Outside tab view
- * Shows active session with item preview and quick actions
- * 
- * Implementation: T007
+ *
+ * Main Outside tab — modern minimalist redesign
  */
 
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -25,12 +29,15 @@ interface SessionCardState {
   checkedCount: number;
 }
 
+const PRIMARY = '#0a84ff';
+
 export default function OutsidePage() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const outsideService = useOutsideService();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
+  const isDark = colorScheme === 'dark';
 
   const [sessionCard, setSessionCard] = useState<SessionCardState>({
     loading: false,
@@ -56,10 +63,8 @@ export default function OutsidePage() {
       if (session) {
         setActiveSessionId(session.id);
         setActiveSessionTitle(session.title);
-        
         const items = await outsideService.getSessionItems(session.id);
         setSessionItems(items);
-        
         setSessionCard({
           loading: false,
           error: null,
@@ -70,21 +75,11 @@ export default function OutsidePage() {
         setActiveSessionId(null);
         setActiveSessionTitle('');
         setSessionItems([]);
-        setSessionCard({
-          loading: false,
-          error: null,
-          itemCount: 0,
-          checkedCount: 0,
-        });
+        setSessionCard({ loading: false, error: null, itemCount: 0, checkedCount: 0 });
       }
     } catch (err) {
       console.error('Error loading active session:', err);
-      setSessionCard({
-        loading: false,
-        error: 'Failed to load session',
-        itemCount: 0,
-        checkedCount: 0,
-      });
+      setSessionCard({ loading: false, error: 'Failed to load session', itemCount: 0, checkedCount: 0 });
     }
   };
 
@@ -98,175 +93,189 @@ export default function OutsidePage() {
     }
   };
 
-  const handleCreateSession = () => {
-    setFormVisible(true);
-  };
-
-  const handleOpenSession = () => {
-    if (activeSessionId) {
-      router.push(`/outside/${activeSessionId}`);
-    }
-  };
-
-  const handleAddItems = () => {
-    if (activeSessionId) {
-      router.push(`/outside/${activeSessionId}`);
-    }
-  };
-
-  const handleCompleteSession = () => {
-    if (activeSessionId) {
-      router.push(`/outside/${activeSessionId}`);
-    }
-  };
-
-  const handleViewHistory = () => {
-    router.push('/outside/history');
-  };
+  const handleViewHistory = () => router.push('/outside/history');
+  const handleOpenSession = () => activeSessionId && router.push(`/outside/${activeSessionId}`);
+  const handleAddItems = () => activeSessionId && router.push(`/outside/${activeSessionId}`);
+  const handleCompleteSession = () => activeSessionId && router.push(`/outside/${activeSessionId}`);
+  const handleCreateSession = () => setFormVisible(true);
 
   const previewItems = sessionItems.slice(0, 5);
+  const progressPercent =
+    sessionCard.itemCount > 0
+      ? Math.round((sessionCard.checkedCount / sessionCard.itemCount) * 100)
+      : 0;
+
+  const cardBg = isDark ? '#1c1c1e' : '#ffffff';
+  const sectionBg = isDark ? '#1c1c1e' : '#ffffff';
+  const borderColor = isDark ? '#2c2c2e' : '#e8e8ed';
+  const subtleText = isDark ? '#8e8e93' : '#6b7280';
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top }]}>
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f2f2f7' }]}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8 }]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Outside</Text>
-          <TouchableOpacity
-            style={[styles.historyButton, { backgroundColor: '#0a84ff' }]}
-            onPress={handleViewHistory}
-          >
-            <Text style={[styles.historyButtonText, { color: '#fff' }]}>History</Text>
+          <View>
+            <Text style={[styles.title, { color: colors.text }]}>Outside</Text>
+            <Text style={[styles.subtitle, { color: subtleText }]}>Track items you've taken out</Text>
+          </View>
+          <TouchableOpacity style={[styles.historyPill, { borderColor: borderColor, backgroundColor: cardBg }]} onPress={handleViewHistory}>
+            <Text style={[styles.historyPillText, { color: PRIMARY }]}>History</Text>
           </TouchableOpacity>
         </View>
 
         {/* Content */}
         {sessionCard.loading ? (
           <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color="#0a84ff" />
+            <ActivityIndicator size="large" color={PRIMARY} />
           </View>
         ) : sessionCard.error ? (
-          <View style={styles.centerContainer}>
-            <Text style={[styles.errorText, { color: '#d32f2f' }]}>Error: {sessionCard.error}</Text>
-            <TouchableOpacity
-              style={[styles.retryButton, { backgroundColor: '#0a84ff' }]}
-              onPress={loadActiveSession}
-            >
-              <Text style={[styles.retryButtonText, { color: '#fff' }]}>Retry</Text>
+          <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+            <Text style={[styles.errorText, { color: '#ef4444' }]}>{sessionCard.error}</Text>
+            <TouchableOpacity style={[styles.primaryButton, { backgroundColor: PRIMARY }]} onPress={loadActiveSession}>
+              <Text style={styles.primaryButtonText}>Retry</Text>
             </TouchableOpacity>
           </View>
         ) : activeSessionId ? (
-          /* Active Session with Preview and Actions */
-          <View style={styles.cardContainer}>
-            {/* Progress Card */}
-            <View style={[styles.sessionCard, { backgroundColor: '#0a84ff' }]}>
-              <Text style={styles.sessionTitle}>{activeSessionTitle}</Text>
-              <Text style={styles.sessionStats}>
-                {sessionCard.checkedCount} of {sessionCard.itemCount} items checked
-              </Text>
-              <View style={styles.progressBar}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    {
-                      width: `${sessionCard.itemCount > 0 ? (sessionCard.checkedCount / sessionCard.itemCount) * 100 : 0}%`,
-                    },
-                  ]}
-                />
+          <View style={styles.activeSection}>
+
+            {/* Session Status Card */}
+            <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+              {/* Session name row */}
+              <View style={styles.sessionHeaderRow}>
+                <View style={[styles.sessionDot, { backgroundColor: PRIMARY }]} />
+                <Text style={[styles.sessionCardTitle, { color: colors.text }]} numberOfLines={1}>
+                  {activeSessionTitle}
+                </Text>
+                <View style={[styles.activeBadge, { backgroundColor: `${PRIMARY}18` }]}>
+                  <Text style={[styles.activeBadgeText, { color: PRIMARY }]}>Active</Text>
+                </View>
+              </View>
+
+              {/* Progress row */}
+              <View style={styles.progressSection}>
+                <View style={styles.progressLabelRow}>
+                  <Text style={[styles.progressLabel, { color: subtleText }]}>Progress</Text>
+                  <Text style={[styles.progressValue, { color: colors.text }]}>
+                    {sessionCard.checkedCount}/{sessionCard.itemCount} items
+                  </Text>
+                </View>
+                <View style={[styles.progressTrack, { backgroundColor: isDark ? '#2c2c2e' : '#e8e8ed' }]}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {
+                        width: `${progressPercent}%`,
+                        backgroundColor: progressPercent === 100 ? '#34c759' : PRIMARY,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={[styles.progressPercent, { color: progressPercent === 100 ? '#34c759' : PRIMARY }]}>
+                  {progressPercent}% complete
+                </Text>
               </View>
             </View>
 
-            {/* Item Preview Section */}
+            {/* Items Preview Card */}
             {previewItems.length > 0 && (
-              <View style={[styles.previewSection, { borderColor: colors.icon }]}>
-                <Text style={[styles.previewTitle, { color: colors.text }]}>Items ({sessionCard.itemCount})</Text>
-                <View style={styles.itemsList}>
-                  {previewItems.map((item) => (
+              <View style={[styles.card, { backgroundColor: sectionBg, borderColor }]}>
+                <View style={styles.cardHeader}>
+                  <Text style={[styles.cardHeaderTitle, { color: colors.text }]}>Items</Text>
+                  <Text style={[styles.cardHeaderCount, { color: subtleText }]}>{sessionCard.itemCount} total</Text>
+                </View>
+
+                {previewItems.map((item, index) => {
+                  const checked = Boolean(item.is_checked);
+                  return (
                     <TouchableOpacity
                       key={item.id}
                       style={[
-                        styles.previewItem,
-                        { 
-                          backgroundColor: Boolean(item.is_checked) ? 'rgba(10, 132, 255, 0.1)' : colors.background,
-                          borderBottomColor: colors.icon,
-                        }
+                        styles.itemRow,
+                        index < previewItems.length - 1 && { borderBottomWidth: 1, borderBottomColor: borderColor },
                       ]}
                       onPress={() => handleToggleItem(item.item_id)}
+                      activeOpacity={0.6}
                     >
-                      <View style={styles.itemCheckbox}>
-                        <Text style={{ fontSize: 20, color: Boolean(item.is_checked) ? '#0a84ff' : colors.icon }}>
-                          {Boolean(item.is_checked) ? '☑' : '☐'}
-                        </Text>
+                      {/* Custom checkbox */}
+                      <View style={[styles.checkCircle, checked ? { backgroundColor: PRIMARY, borderColor: PRIMARY } : { borderColor: isDark ? '#48484a' : '#c7c7cc' }]}>
+                        {checked && <Text style={styles.checkMark}>✓</Text>}
                       </View>
-                      <View style={styles.itemInfo}>
+
+                      <View style={styles.itemTextGroup}>
                         <Text
                           style={[
-                            styles.itemName,
+                            styles.itemNameText,
                             {
-                              color: colors.text,
-                              textDecorationLine: Boolean(item.is_checked) ? 'line-through' : 'none',
+                              color: checked ? subtleText : colors.text,
+                              textDecorationLine: checked ? 'line-through' : 'none',
                             },
                           ]}
+                          numberOfLines={1}
                         >
                           {item.item_name}
                         </Text>
-                        {item.space_name && (
-                          <Text style={[styles.itemSpace, { color: colors.icon }]}>
-                            in {item.space_name}
+                        {item.space_name && item.space_name !== 'Unknown Space' && (
+                          <Text style={[styles.itemLocationText, { color: subtleText }]}>
+                            {item.space_name}
                           </Text>
                         )}
                       </View>
                     </TouchableOpacity>
-                  ))}
-                </View>
+                  );
+                })}
+
                 {sessionCard.itemCount > 5 && (
-                  <TouchableOpacity
-                    style={styles.viewAllLink}
-                    onPress={handleOpenSession}
-                  >
-                    <Text style={{ color: '#0a84ff', fontSize: 14, fontWeight: '600' }}>
-                      View all {sessionCard.itemCount} items →
+                  <TouchableOpacity style={styles.viewAllRow} onPress={handleOpenSession}>
+                    <Text style={[styles.viewAllText, { color: PRIMARY }]}>
+                      See all {sessionCard.itemCount} items
                     </Text>
+                    <Text style={{ color: PRIMARY, fontSize: 14 }}>›</Text>
                   </TouchableOpacity>
                 )}
               </View>
             )}
 
-            {/* Quick Action Buttons */}
-            <View style={styles.actionButtonsContainer}>
+            {/* Actions */}
+            <View style={styles.actionsRow}>
               <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#0a84ff' }]}
+                style={[styles.outlineButton, { borderColor: PRIMARY, backgroundColor: cardBg }]}
                 onPress={handleAddItems}
               >
-                <Text style={styles.actionButtonText}>+ Add Items</Text>
+                <Text style={[styles.outlineButtonText, { color: PRIMARY }]}>+ Add Items</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#0a84ff' }]}
+                style={[styles.primaryButton, { backgroundColor: PRIMARY, flex: 1 }]}
                 onPress={handleCompleteSession}
               >
-                <Text style={styles.actionButtonText}>✓ Complete Session</Text>
+                <Text style={styles.primaryButtonText}>Complete</Text>
               </TouchableOpacity>
             </View>
+
           </View>
         ) : (
           /* Empty State */
-          <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyIcon]}>📦</Text>
+          <View style={[styles.card, styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
+            <View style={[styles.emptyIconContainer, { backgroundColor: `${PRIMARY}12` }]}>
+              <Text style={styles.emptyIconText}>📦</Text>
+            </View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No Active Session</Text>
-            <Text style={[styles.emptySubtitle, { color: colors.icon }]}>
-              Create a new checklist for your next trip
+            <Text style={[styles.emptySubtitle, { color: subtleText }]}>
+              Start a checklist to track items you take outside
             </Text>
             <TouchableOpacity
-              style={[styles.createButton, { backgroundColor: '#0a84ff' }]}
+              style={[styles.primaryButton, { backgroundColor: PRIMARY, alignSelf: 'stretch' }]}
               onPress={handleCreateSession}
             >
-              <Text style={styles.createButtonText}>Create New Session</Text>
+              <Text style={styles.primaryButtonText}>Start New Session</Text>
             </TouchableOpacity>
           </View>
         )}
       </ScrollView>
 
-      {/* Session Form Modal */}
       <SessionFormModal
         visible={formVisible}
         onClose={() => {
@@ -279,168 +288,91 @@ export default function OutsidePage() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 32,
-  },
+  container: { flex: 1 },
+  scrollContent: { padding: 16, paddingBottom: 40 },
+
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
+    alignItems: 'flex-start',
+    marginBottom: 20,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+  title: { fontSize: 30, fontWeight: '700', letterSpacing: -0.5 },
+  subtitle: { fontSize: 13, marginTop: 2 },
+  historyPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
   },
-  historyButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+  historyPillText: { fontSize: 14, fontWeight: '600' },
+
+  centerContainer: { justifyContent: 'center', alignItems: 'center', minHeight: 200 },
+  errorText: { fontSize: 15, marginBottom: 16, textAlign: 'center' },
+
+  card: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 12,
   },
-  historyButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  centerContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: 200,
-    marginVertical: 32,
-  },
-  errorText: {
-    fontSize: 16,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  retryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  cardContainer: {
-    marginBottom: 16,
-  },
-  sessionCard: {
-    padding: 20,
+  activeSection: { gap: 0 },
+
+  /* Session header */
+  sessionHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 8 },
+  sessionDot: { width: 8, height: 8, borderRadius: 4 },
+  sessionCardTitle: { fontSize: 17, fontWeight: '600', flex: 1 },
+  activeBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  activeBadgeText: { fontSize: 11, fontWeight: '600' },
+
+  /* Progress */
+  progressSection: { gap: 6 },
+  progressLabelRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  progressLabel: { fontSize: 13 },
+  progressValue: { fontSize: 13, fontWeight: '600' },
+  progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 3 },
+  progressPercent: { fontSize: 12, fontWeight: '600', textAlign: 'right' },
+
+  /* Card header */
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  cardHeaderTitle: { fontSize: 16, fontWeight: '600' },
+  cardHeaderCount: { fontSize: 13 },
+
+  /* Item row */
+  itemRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 12 },
+  checkCircle: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
+  checkMark: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  itemTextGroup: { flex: 1 },
+  itemNameText: { fontSize: 15, fontWeight: '500' },
+  itemLocationText: { fontSize: 12, marginTop: 1 },
+
+  viewAllRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, marginTop: 4, borderTopWidth: 1, borderTopColor: 'transparent' },
+  viewAllText: { fontSize: 14, fontWeight: '600' },
+
+  /* Action buttons */
+  actionsRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  primaryButton: {
+    paddingVertical: 14,
     borderRadius: 12,
-    marginBottom: 16,
-  },
-  sessionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  sessionStats: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 12,
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 3,
-    marginBottom: 0,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: 'rgba(255,255,255,0.8)',
-    borderRadius: 3,
-  },
-  previewSection: {
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    paddingVertical: 12,
-    marginBottom: 16,
-  },
-  previewTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  itemsList: {
-    marginBottom: 12,
-  },
-  previewItem: {
-    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-  },
-  itemCheckbox: {
-    marginRight: 12,
     justifyContent: 'center',
   },
-  itemInfo: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 15,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  itemSpace: {
-    fontSize: 12,
-  },
-  viewAllLink: {
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-  },
-  actionButtonsContainer: {
-    gap: 12,
-  },
-  actionButton: {
+  primaryButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  outlineButton: {
     paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    justifyContent: 'center',
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    borderWidth: 1.5,
     alignItems: 'center',
-  },
-  actionButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  emptyContainer: {
     justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 16,
   },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    fontSize: 16,
-    marginBottom: 24,
-    textAlign: 'center',
-    maxWidth: 280,
-  },
-  createButton: {
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 8,
-  },
-  createButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
+  outlineButtonText: { fontSize: 15, fontWeight: '600' },
+
+  /* Empty state */
+  emptyCard: { alignItems: 'center', paddingVertical: 36, gap: 12, marginTop: 24 },
+  emptyIconContainer: { width: 72, height: 72, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  emptyIconText: { fontSize: 36 },
+  emptyTitle: { fontSize: 20, fontWeight: '700' },
+  emptySubtitle: { fontSize: 14, textAlign: 'center', lineHeight: 20, paddingHorizontal: 16, marginBottom: 8 },
 });

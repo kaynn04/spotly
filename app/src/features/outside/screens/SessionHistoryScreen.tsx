@@ -1,9 +1,7 @@
 /**
  * SessionHistoryScreen
- * 
- * View completed sessions
- * 
- * Implementation: T009
+ *
+ * View completed outside sessions — modern minimalist redesign
  */
 
 import React, { useCallback, useState } from 'react';
@@ -24,12 +22,15 @@ import { Colors } from '@/constants/theme';
 import { useOutsideService } from '../services/OutsideService';
 import { OutsideSession } from '../models/OutsideSession';
 
+const PRIMARY = '#0a84ff';
+
 export default function SessionHistoryScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const outsideService = useOutsideService();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
+  const isDark = colorScheme === 'dark';
 
   const [sessions, setSessions] = useState<OutsideSession[]>([]);
   const [loading, setLoading] = useState(false);
@@ -56,14 +57,14 @@ export default function SessionHistoryScreen() {
   };
 
   const handleDeleteSession = (sessionId: string, sessionTitle: string) => {
-    Alert.alert('Delete Session', `Delete "${sessionTitle}"? This cannot be undone.`, [
-      { text: 'Cancel', onPress: () => {}, style: 'cancel' },
+    Alert.alert('Delete Session', `Delete "${sessionTitle}"?`, [
+      { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         onPress: async () => {
           try {
             await outsideService.deleteSession(sessionId);
-            setSessions(sessions.filter(s => s.id !== sessionId));
+            setSessions(prev => prev.filter(s => s.id !== sessionId));
           } catch (err) {
             console.error('Error deleting session:', err);
             Alert.alert('Error', 'Failed to delete session');
@@ -76,165 +77,149 @@ export default function SessionHistoryScreen() {
 
   const formatDate = (dateStr: string) => {
     try {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      return new Date(dateStr).toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
     } catch {
       return dateStr;
     }
   };
 
+  const borderColor = isDark ? '#2c2c2e' : '#e8e8ed';
+  const subtleText = isDark ? '#8e8e93' : '#6b7280';
+  const cardBg = isDark ? '#1c1c1e' : '#ffffff';
+
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#0a84ff" />
-        </View>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { paddingTop: insets.top }]}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={[styles.backButton, { color: '#0a84ff' }]}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: colors.text }]}>History</Text>
-          <View style={{ width: 60 }} />
-        </View>
-        <View style={styles.centerContainer}>
-          <Text style={[styles.errorText, { color: '#d32f2f' }]}>{error}</Text>
-          <TouchableOpacity
-            style={[styles.retryButton, { backgroundColor: '#0a84ff' }]}
-            onPress={loadSessions}
-          >
-            <Text style={[styles.retryButtonText, { color: '#fff' }]}>Retry</Text>
-          </TouchableOpacity>
+      <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#f2f2f7', paddingTop: insets.top }]}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={PRIMARY} />
         </View>
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f2f2f7' }]}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={[styles.backButton, { color: '#0a84ff' }]}>← Back</Text>
+      <View
+        style={[
+          styles.header,
+          {
+            paddingTop: insets.top,
+            backgroundColor: isDark ? '#1c1c1e' : '#ffffff',
+            borderBottomColor: borderColor,
+          },
+        ]}
+      >
+        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text style={[styles.backText, { color: PRIMARY }]}>‹ Back</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>History</Text>
-        <View style={{ width: 60 }} />
+        <Text style={[styles.headerTitle, { color: colors.text }]}>History</Text>
+        <View style={{ width: 52 }} />
       </View>
 
-      {/* Sessions List - Flex Container */}
-      <View style={styles.sessionsList}>
-        {sessions.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, { color: colors.icon }]}>No completed sessions yet</Text>
+      {/* Error state */}
+      {error ? (
+        <View style={styles.center}>
+          <Text style={[styles.errorText, { color: '#ef4444' }]}>{error}</Text>
+          <TouchableOpacity style={[styles.primaryButton, { backgroundColor: PRIMARY }]} onPress={loadSessions}>
+            <Text style={styles.primaryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : sessions.length === 0 ? (
+        /* Empty state */
+        <View style={styles.center}>
+          <View style={[styles.emptyIconWrap, { backgroundColor: `${PRIMARY}12` }]}>
+            <Text style={styles.emptyIconText}>🕓</Text>
           </View>
-        ) : (
-          <FlatList
-            data={sessions}
-            renderItem={({ item }) => (
-              <View
-                key={item.id}
-                style={[styles.sessionItem, { backgroundColor: colors.background, borderBottomColor: '#e0e0e0' }]}
-              >
-                <View style={styles.sessionInfo}>
-                  <Text style={[styles.sessionTitle, { color: colors.text }]}>{item.title}</Text>
-                  <Text style={[styles.sessionDate, { color: colors.icon }]}>
-                    {item.completed_at ? formatDate(item.completed_at) : 'N/A'}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => handleDeleteSession(item.id, item.title)}
-                >
-                  <Text style={{ color: '#d32f2f', fontSize: 20 }}>✕</Text>
-                </TouchableOpacity>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>No History Yet</Text>
+          <Text style={[styles.emptySubtitle, { color: subtleText }]}>
+            Completed sessions will appear here
+          </Text>
+        </View>
+      ) : (
+        /* Session list */
+        <FlatList
+          data={sessions}
+          keyExtractor={item => item.id}
+          contentContainerStyle={[styles.listContent, { backgroundColor: cardBg }]}
+          renderItem={({ item, index }) => (
+            <View
+              style={[
+                styles.sessionRow,
+                index < sessions.length - 1 && { borderBottomWidth: 1, borderBottomColor: borderColor },
+              ]}
+            >
+              {/* Completion dot */}
+              <View style={[styles.completedDot, { backgroundColor: '#34c759' }]} />
+
+              {/* Info */}
+              <View style={styles.sessionInfo}>
+                <Text style={[styles.sessionTitle, { color: colors.text }]} numberOfLines={1}>
+                  {item.title}
+                </Text>
+                <Text style={[styles.sessionDate, { color: subtleText }]}>
+                  {item.completed_at ? formatDate(item.completed_at) : 'Unknown date'}
+                </Text>
               </View>
-            )}
-            keyExtractor={item => item.id}
-            scrollEnabled={true}
-          />
-        )}
-      </View>
+
+              {/* Delete */}
+              <TouchableOpacity
+                style={styles.deleteBtn}
+                onPress={() => handleDeleteSession(item.id, item.title)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={[styles.deleteIcon, { color: isDark ? '#48484a' : '#c7c7cc' }]}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+
   header: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
-  backButton: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  sessionsList: {
-    flex: 1,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    fontSize: 16,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  retryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 16,
-  },
-  sessionItem: {
+  backText: { fontSize: 17, fontWeight: '600', width: 52 },
+  headerTitle: { fontSize: 17, fontWeight: '700', flex: 1, textAlign: 'center' },
+
+  listContent: { marginTop: 16, marginHorizontal: 16, borderRadius: 16, overflow: 'hidden' },
+
+  sessionRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
+    paddingVertical: 14,
+    gap: 12,
   },
-  sessionInfo: {
-    flex: 1,
-  },
-  sessionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  sessionDate: {
-    fontSize: 12,
-  },
-  deleteButton: {
-    padding: 8,
-  },
+  completedDot: { width: 8, height: 8, borderRadius: 4 },
+  sessionInfo: { flex: 1 },
+  sessionTitle: { fontSize: 16, fontWeight: '600' },
+  sessionDate: { fontSize: 12, marginTop: 2 },
+  deleteBtn: { padding: 4 },
+  deleteIcon: { fontSize: 14 },
+
+  /* Empty state */
+  emptyIconWrap: { width: 72, height: 72, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  emptyIconText: { fontSize: 36 },
+  emptyTitle: { fontSize: 20, fontWeight: '700', marginBottom: 6 },
+  emptySubtitle: { fontSize: 14, textAlign: 'center' },
+
+  errorText: { fontSize: 15, marginBottom: 16, textAlign: 'center' },
+  primaryButton: { paddingVertical: 14, paddingHorizontal: 32, borderRadius: 12, alignItems: 'center' },
+  primaryButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
 });

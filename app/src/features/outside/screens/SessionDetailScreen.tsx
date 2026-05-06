@@ -1,10 +1,7 @@
 /**
  * SessionDetailScreen
- * 
- * Manage an active outside session
- * Add items, check off items, complete session
- * 
- * Implementation: T008
+ *
+ * Manage an active outside session — modern minimalist redesign
  */
 
 import React, { useCallback, useState } from 'react';
@@ -13,7 +10,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   FlatList,
   ActivityIndicator,
   Alert,
@@ -27,6 +23,8 @@ import { useOutsideService } from '../services/OutsideService';
 import { OutsideSessionItemWithContext } from '../models/OutsideSessionItem';
 import ItemPickerModal from './components/ItemPickerModal';
 
+const PRIMARY = '#0a84ff';
+
 export default function SessionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -34,6 +32,7 @@ export default function SessionDetailScreen() {
   const outsideService = useOutsideService();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
+  const isDark = colorScheme === 'dark';
 
   const [session, setSession] = useState<any>(null);
   const [items, setItems] = useState<OutsideSessionItemWithContext[]>([]);
@@ -41,7 +40,6 @@ export default function SessionDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showItemPicker, setShowItemPicker] = useState(false);
 
-  // Load session and items
   useFocusEffect(
     useCallback(() => {
       if (id) loadSession();
@@ -53,11 +51,8 @@ export default function SessionDetailScreen() {
     setError(null);
     try {
       const sessionData = await outsideService.getSession(id!);
-      console.log('[SessionDetailScreen] Session loaded:', sessionData);
       setSession(sessionData);
       const itemsData = await outsideService.getSessionItems(id!);
-      console.log('[SessionDetailScreen] Items loaded:', itemsData);
-      console.log('[SessionDetailScreen] First item structure:', itemsData[0]);
       setItems(itemsData);
     } catch (err) {
       console.error('[SessionDetailScreen] Error loading session:', err);
@@ -79,7 +74,7 @@ export default function SessionDetailScreen() {
 
   const handleRemoveItem = (itemId: string) => {
     Alert.alert('Remove Item', 'Remove this item from the session?', [
-      { text: 'Cancel', onPress: () => {}, style: 'cancel' },
+      { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
         onPress: async () => {
@@ -96,10 +91,6 @@ export default function SessionDetailScreen() {
     ]);
   };
 
-  const handleAddItems = () => {
-    setShowItemPicker(true);
-  };
-
   const handleItemsSelected = async (itemIds: string[]) => {
     setShowItemPicker(false);
     try {
@@ -112,29 +103,40 @@ export default function SessionDetailScreen() {
   };
 
   const handleCompleteSession = () => {
-    Alert.alert('Complete Session', 'Mark this session as completed?', [
-      { text: 'Cancel', onPress: () => {}, style: 'cancel' },
-      {
-        text: 'Complete',
-        onPress: async () => {
-          try {
-            await outsideService.completeSession(id!);
-            router.replace('/outside/history');
-          } catch (err) {
-            console.error('Error completing session:', err);
-            Alert.alert('Error', 'Failed to complete session');
-          }
+    Alert.alert(
+      'Complete Session',
+      'All done? This will mark the session as completed.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Complete',
+          onPress: async () => {
+            try {
+              await outsideService.completeSession(id!);
+              router.replace('/outside/history');
+            } catch (err) {
+              console.error('Error completing session:', err);
+              Alert.alert('Error', 'Failed to complete session');
+            }
+          },
         },
-        style: 'default',
-      },
-    ]);
+      ]
+    );
   };
+
+  const borderColor = isDark ? '#2c2c2e' : '#e8e8ed';
+  const subtleText = isDark ? '#8e8e93' : '#6b7280';
+  const cardBg = isDark ? '#1c1c1e' : '#ffffff';
+
+  const checkedCount = session?.checkedCount ?? 0;
+  const itemCount = session?.itemCount ?? 0;
+  const progressPercent = itemCount > 0 ? Math.round((checkedCount / itemCount) * 100) : 0;
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#0a84ff" />
+      <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#f2f2f7', paddingTop: insets.top }]}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={PRIMARY} />
         </View>
       </View>
     );
@@ -142,148 +144,160 @@ export default function SessionDetailScreen() {
 
   if (error || !session) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
-        <View style={styles.centerContainer}>
-          <Text style={[styles.errorText, { color: '#d32f2f' }]}>{error || 'Session not found'}</Text>
+      <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#f2f2f7', paddingTop: insets.top }]}>
+        <View style={styles.center}>
+          <Text style={[styles.errorText, { color: '#ef4444' }]}>{error || 'Session not found'}</Text>
           <TouchableOpacity
-            style={[styles.retryButton, { backgroundColor: '#0a84ff' }]}
-            onPress={() => {
-              router.back();
-            }}
+            style={[styles.primaryButton, { backgroundColor: PRIMARY }]}
+            onPress={() => router.back()}
           >
-            <Text style={[styles.retryButtonText, { color: '#fff' }]}>Go Back</Text>
+            <Text style={styles.primaryButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
       </View>
     );
   }
 
-  const renderItemComponent = ({ item, index }: { item: OutsideSessionItemWithContext; index: number }) => {
-    try {
-      // Log item structure for debugging
-      console.log('[renderItemComponent] Item data:', {
-        id: item.id,
-        item_name: item.item_name,
-        space_name: item.space_name,
-        container_name: item.container_name,
-        is_checked: item.is_checked,
-      });
+  const renderItem = ({ item, index }: { item: OutsideSessionItemWithContext; index: number }) => {
+    const checked = Boolean(item.is_checked);
+    const spaceName = item.space_name && item.space_name !== 'Unknown Space' ? item.space_name : null;
+    const containerName = item.container_name ?? null;
+    const location = containerName ? `${spaceName ?? ''} › ${containerName}` : spaceName;
 
-      // Validate required fields
-      if (!item.item_name) {
-        console.warn('[renderItemComponent] Missing item_name:', item);
-        return (
-          <View style={styles.itemRow}>
-            <Text style={{ color: '#d32f2f' }}>Error: Missing item name</Text>
-          </View>
-        );
-      }
-
-      // Safe boolean conversion from SQLite 0/1
-      const isChecked = Boolean(item.is_checked);
-
-      // Safe string conversion
-      const spaceName = String(item.space_name || 'Unknown');
-      const containerName = item.container_name ? String(item.container_name) : null;
-      const locationText = containerName ? `${spaceName} / ${containerName}` : spaceName;
-
-      return (
-        <View style={[styles.itemRow, { borderBottomColor: '#e0e0e0', borderBottomWidth: index < items.length - 1 ? 1 : 0 }]}>
-          <TouchableOpacity
-            style={styles.checkboxContainer}
-            onPress={() => handleToggleItem(item.item_id)}
-          >
-            <View
-              style={[
-                styles.checkbox,
-                { backgroundColor: isChecked ? '#0a84ff' : 'transparent', borderColor: '#0a84ff' },
-              ]}
-            >
-              {isChecked && <Text style={styles.checkmark}>✓</Text>}
-            </View>
-          </TouchableOpacity>
-          <View style={styles.itemInfo}>
-            <Text
-              style={[
-                styles.itemName,
-                { color: colors.text, textDecorationLine: isChecked ? 'line-through' : 'none', opacity: isChecked ? 0.5 : 1 },
-              ]}
-            >
-              {String(item.item_name)}
-            </Text>
-            <Text style={[styles.itemLocation, { color: colors.icon }]}>
-              {locationText}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={styles.removeButton}
-            onPress={() => handleRemoveItem(item.item_id)}
-          >
-            <Text style={{ color: '#d32f2f' }}>✕</Text>
-          </TouchableOpacity>
+    return (
+      <TouchableOpacity
+        style={[
+          styles.itemRow,
+          index < items.length - 1 && { borderBottomWidth: 1, borderBottomColor: borderColor },
+          checked && { opacity: 0.7 },
+        ]}
+        onPress={() => handleToggleItem(item.item_id)}
+        activeOpacity={0.6}
+      >
+        {/* Checkbox */}
+        <View
+          style={[
+            styles.checkCircle,
+            checked
+              ? { backgroundColor: PRIMARY, borderColor: PRIMARY }
+              : { borderColor: isDark ? '#48484a' : '#c7c7cc' },
+          ]}
+        >
+          {checked && <Text style={styles.checkMark}>✓</Text>}
         </View>
-      );
-    } catch (err) {
-      console.error('[renderItemComponent] Error rendering item:', { item, error: err });
-      return (
-        <View style={styles.itemRow}>
-          <Text style={{ color: '#d32f2f' }}>Error rendering item</Text>
+
+        {/* Text */}
+        <View style={styles.itemTextGroup}>
+          <Text
+            style={[
+              styles.itemName,
+              {
+                color: colors.text,
+                textDecorationLine: checked ? 'line-through' : 'none',
+              },
+            ]}
+            numberOfLines={1}
+          >
+            {item.item_name}
+          </Text>
+          {location && (
+            <Text style={[styles.itemLocation, { color: subtleText }]} numberOfLines={1}>
+              {location}
+            </Text>
+          )}
         </View>
-      );
-    }
+
+        {/* Remove */}
+        <TouchableOpacity
+          style={styles.removeBtn}
+          onPress={() => handleRemoveItem(item.item_id)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={[styles.removeIcon, { color: isDark ? '#48484a' : '#c7c7cc' }]}>✕</Text>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f2f2f7' }]}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={[styles.backButton, { color: '#0a84ff' }]}>← Back</Text>
+      <View style={[styles.header, { paddingTop: insets.top, backgroundColor: isDark ? '#1c1c1e' : '#ffffff', borderBottomColor: borderColor }]}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text style={[styles.backText, { color: PRIMARY }]}>‹ Back</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>{session?.title || 'Session'}</Text>
-        <View style={{ width: 60 }} />
-      </View>
-
-      {/* Stats */}
-      <View style={[styles.statsContainer, { backgroundColor: '#0a84ff' }]}>
-        <Text style={styles.statsText}>
-          {session?.checkedCount ?? 0} of {session?.itemCount ?? 0} items checked
+        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+          {session.title}
         </Text>
+        <View style={{ width: 52 }} />
       </View>
 
-      {/* Items List - Flex Container */}
-      <View style={styles.itemsList}>
+      {/* Progress bar */}
+      <View style={[styles.progressHeader, { backgroundColor: isDark ? '#1c1c1e' : '#ffffff', borderBottomColor: borderColor }]}>
+        <View style={styles.progressLabelRow}>
+          <Text style={[styles.progressLabel, { color: subtleText }]}>
+            {checkedCount} of {itemCount} checked
+          </Text>
+          <Text style={[styles.progressPercent, { color: progressPercent === 100 ? '#34c759' : PRIMARY }]}>
+            {progressPercent}%
+          </Text>
+        </View>
+        <View style={[styles.progressTrack, { backgroundColor: isDark ? '#2c2c2e' : '#e8e8ed' }]}>
+          <View
+            style={[
+              styles.progressFill,
+              {
+                width: `${progressPercent}%`,
+                backgroundColor: progressPercent === 100 ? '#34c759' : PRIMARY,
+              },
+            ]}
+          />
+        </View>
+      </View>
+
+      {/* Items list */}
+      <View style={styles.listWrapper}>
         {items.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, { color: colors.icon }]}>No items in this session</Text>
+          <View style={styles.center}>
+            <Text style={[styles.emptyText, { color: subtleText }]}>No items yet</Text>
+            <Text style={[styles.emptyHint, { color: subtleText }]}>Tap "+ Add Items" to get started</Text>
           </View>
         ) : (
           <FlatList
             data={items}
-            renderItem={renderItemComponent}
+            renderItem={renderItem}
             keyExtractor={(item) => item.id}
-            scrollEnabled={true}
+            contentContainerStyle={[styles.listContent, { backgroundColor: cardBg }]}
+            scrollEnabled
           />
         )}
       </View>
 
-      {/* Actions */}
-      <View style={[styles.actionBar, { paddingBottom: insets.bottom }]}>
+      {/* Bottom action bar */}
+      <View
+        style={[
+          styles.actionBar,
+          {
+            paddingBottom: insets.bottom + 8,
+            backgroundColor: isDark ? '#1c1c1e' : '#ffffff',
+            borderTopColor: borderColor,
+          },
+        ]}
+      >
         <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: '#0a84ff' }]}
-          onPress={handleAddItems}
+          style={[styles.outlineButton, { borderColor: PRIMARY }]}
+          onPress={() => setShowItemPicker(true)}
         >
-          <Text style={styles.addButtonText}>+ Add Items</Text>
+          <Text style={[styles.outlineButtonText, { color: PRIMARY }]}>+ Add Items</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.completeButton, { backgroundColor: '#0a84ff' }]}
+          style={[styles.primaryButton, { flex: 1, backgroundColor: PRIMARY }]}
           onPress={handleCompleteSession}
         >
-          <Text style={styles.completeButtonText}>Complete</Text>
+          <Text style={styles.primaryButtonText}>Complete</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Item Picker Modal */}
       {showItemPicker && (
         <ItemPickerModal
           sessionId={id!}
@@ -296,128 +310,82 @@ export default function SessionDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+
   header: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
-  backButton: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  statsContainer: {
+  backText: { fontSize: 17, fontWeight: '600', width: 52 },
+  headerTitle: { fontSize: 17, fontWeight: '700', flex: 1, textAlign: 'center' },
+
+  progressHeader: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    marginVertical: 8,
+    gap: 8,
+    borderBottomWidth: 1,
   },
-  statsText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    fontSize: 16,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  retryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 16,
-  },
-  itemsList: {
-    flex: 1,
-  },
+  progressLabelRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  progressLabel: { fontSize: 13 },
+  progressPercent: { fontSize: 13, fontWeight: '600' },
+  progressTrack: { height: 5, borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 3 },
+
+  listWrapper: { flex: 1 },
+  listContent: { borderRadius: 0 },
+
   itemRow: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
     alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 12,
   },
-  checkboxContainer: {
-    marginRight: 12,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
+  checkCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  checkmark: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  itemInfo: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  itemLocation: {
-    fontSize: 12,
-  },
-  removeButton: {
-    padding: 8,
-  },
+  checkMark: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  itemTextGroup: { flex: 1 },
+  itemName: { fontSize: 16, fontWeight: '500' },
+  itemLocation: { fontSize: 12, marginTop: 2 },
+  removeBtn: { padding: 4 },
+  removeIcon: { fontSize: 14 },
+
+  emptyText: { fontSize: 17, fontWeight: '600', marginBottom: 6 },
+  emptyHint: { fontSize: 14 },
+  errorText: { fontSize: 15, marginBottom: 16, textAlign: 'center' },
+
   actionBar: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
   },
-  addButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+  primaryButton: {
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  completeButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+  primaryButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  outlineButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    borderWidth: 1.5,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  completeButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  outlineButtonText: { fontSize: 15, fontWeight: '600' },
 });
