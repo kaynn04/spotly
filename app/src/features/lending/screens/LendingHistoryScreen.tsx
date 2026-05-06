@@ -53,22 +53,26 @@ export default function LendingHistoryScreen() {
   const colors = Colors[colorScheme ?? 'light'];
 
   // Services - memoized to prevent re-creation on every render
-  const lendingService = useMemo(() => {
+  const repositories = useMemo(() => {
     const lendingRepository = new LendingRepository();
     const itemRepository = new ItemRepository();
-    return new LendingService(lendingRepository, itemRepository);
+    return { lendingRepository, itemRepository };
   }, []);
 
-  // State
-  const [allLendings, setAllLendings] = useState<Lending[]>([]);
+  const lendingService = useMemo(() => {
+    return new LendingService(repositories.lendingRepository, repositories.itemRepository);
+  }, [repositories]);
+
+  // State - store lendings with item names
+  const [allLendings, setAllLendings] = useState<(Lending & { itemName?: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('ALL');
 
   /**
-   * Load All Lendings
+   * Load All Lendings with Item Names
    *
-   * Fetch all lendings from service and sort appropriately.
+   * Fetch all lendings from service, load item names, and sort appropriately.
    * Sorting: ACTIVE first, then by date descending (most recent first)
    */
   const loadAllLendings = useCallback(async () => {
@@ -79,8 +83,27 @@ export default function LendingHistoryScreen() {
       // Fetch all lendings
       const lendings = await lendingService.getAllLendings();
 
+      // Load item names for each lending
+      const lendingsWithItems = await Promise.all(
+        lendings.map(async (lending) => {
+          try {
+            const item = await repositories.itemRepository.getById(lending.item_id);
+            return {
+              ...lending,
+              itemName: item?.name || 'Unknown Item',
+            };
+          } catch (err) {
+            console.error(`Failed to load item for lending ${lending.id}:`, err);
+            return {
+              ...lending,
+              itemName: 'Unknown Item',
+            };
+          }
+        })
+      );
+
       // Sort: ACTIVE before RETURNED, then by date descending
-      const sorted = [...lendings].sort((a, b) => {
+      const sorted = [...lendingsWithItems].sort((a, b) => {
         // First: ACTIVE before RETURNED
         if (a.status !== b.status) {
           return a.status === 'ACTIVE' ? -1 : 1;
@@ -98,7 +121,7 @@ export default function LendingHistoryScreen() {
     } finally {
       setLoading(false);
     }
-  }, [lendingService]);
+  }, [lendingService, repositories.itemRepository]);
 
   // Load on mount and on screen focus
   useFocusEffect(
@@ -180,9 +203,9 @@ export default function LendingHistoryScreen() {
   /**
    * Render Lending Item
    *
-   * List item component showing lending details.
+   * List item component showing lending details with item name.
    */
-  const renderLendingItem = ({ item }: { item: Lending }) => {
+  const renderLendingItem = ({ item }: { item: Lending & { itemName?: string } }) => {
     const isActive = item.status === 'ACTIVE';
     const statusColor = isActive ? '#4caf50' : '#9e9e9e';
 
@@ -192,9 +215,14 @@ export default function LendingHistoryScreen() {
         onPress={() => handleLendingTap(item)}
       >
         <View style={styles.lendingCardContent}>
+          {/* Item Name */}
+          <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={1}>
+            {item.itemName || 'Unknown Item'}
+          </Text>
+
           {/* Borrower Name */}
           <Text style={[styles.borrowerName, { color: colors.text }]} numberOfLines={1}>
-            {item.borrower_name}
+            Lent to: {item.borrower_name}
           </Text>
 
           {/* Status Badge and Date Info */}
@@ -387,9 +415,14 @@ const styles = StyleSheet.create({
   lendingCardContent: {
     flex: 1,
   },
+  itemName: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
   borrowerName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '500',
     marginBottom: 8,
   },
   metaRow: {

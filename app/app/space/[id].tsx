@@ -7,7 +7,7 @@
  * Implementation: T005 - Display space details in SpaceDetailScreen
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, Button, Alert, Pressable, FlatList, TextInput, Modal, StatusBar, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -17,6 +17,9 @@ import type { Container } from '../../src/models/Container';
 import { SpaceService } from '../../src/services/SpaceService';
 import { ItemService } from '../../src/services/ItemService';
 import { ContainerService } from '../../src/services/ContainerService';
+import { LendingService } from '../../src/features/lending/services/LendingService';
+import { LendingRepository } from '../../src/features/lending/repositories/LendingRepository';
+import { ItemRepository } from '../../src/repositories/ItemRepository';
 import { Breadcrumb, type BreadcrumbItem } from '../../components/breadcrumb';
 
 export default function SpaceDetailScreen() {
@@ -36,6 +39,20 @@ export default function SpaceDetailScreen() {
   const [showHeaderMenu, setShowHeaderMenu] = useState<boolean>(false);
   const [showFabMenu, setShowFabMenu] = useState<boolean>(false);
   const [selectedItemMenuId, setSelectedItemMenuId] = useState<string | null>(null);
+
+  // Lending-related state
+  const [showLendModal, setShowLendModal] = useState<boolean>(false);
+  const [selectedLendItemId, setSelectedLendItemId] = useState<string | null>(null);
+  const [borrowerName, setBorrowerName] = useState<string>('');
+  const [lendNote, setLendNote] = useState<string>('');
+  const [lendLoading, setLendLoading] = useState<boolean>(false);
+
+  // Lending service - memoized
+  const lendingService = useMemo(() => {
+    const lendingRepository = new LendingRepository();
+    const itemRepository = new ItemRepository();
+    return new LendingService(lendingRepository, itemRepository);
+  }, []);
 
   // Fetch space details on mount
   useEffect(() => {
@@ -170,6 +187,48 @@ export default function SpaceDetailScreen() {
         },
       ]
     );
+  }
+
+  function handleLendPress(itemId: string) {
+    setSelectedLendItemId(itemId);
+    setBorrowerName('');
+    setLendNote('');
+    setShowLendModal(true);
+  }
+
+  async function handleLendSubmit() {
+    if (!borrowerName.trim()) {
+      Alert.alert('Required', 'Please enter a borrower name');
+      return;
+    }
+
+    if (!selectedLendItemId) return;
+
+    setLendLoading(true);
+    try {
+      await lendingService.createLending({
+        item_id: selectedLendItemId,
+        borrower_name: borrowerName.trim(),
+        note: lendNote.trim() || undefined,
+      });
+
+      Alert.alert('Success', 'Item lent out successfully');
+
+      // Reset and close modal
+      setBorrowerName('');
+      setLendNote('');
+      setSelectedLendItemId(null);
+      setShowLendModal(false);
+      setSelectedItemMenuId(null);
+    } catch (err: any) {
+      console.error('Error creating lending:', err);
+      const errorMessage = err.code === 'DUPLICATE_ACTIVE_LENDING'
+        ? 'Item is already lent out'
+        : err.message || 'Failed to create lending';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setLendLoading(false);
+    }
   }
 
   async function deleteItem(itemId: string) {
@@ -383,6 +442,15 @@ export default function SpaceDetailScreen() {
                               <Text style={styles.itemMenuOptionText}>Move</Text>
                             </Pressable>
                             <Pressable
+                              style={styles.itemMenuOption}
+                              onPress={() => {
+                                setSelectedItemMenuId(null);
+                                handleLendPress(item.id);
+                              }}
+                            >
+                              <Text style={styles.itemMenuOptionText}>Lend</Text>
+                            </Pressable>
+                            <Pressable
                               style={[styles.itemMenuOption, styles.itemMenuOptionDelete]}
                               onPress={() => {
                                 setSelectedItemMenuId(null);
@@ -589,6 +657,62 @@ export default function SpaceDetailScreen() {
                         setShowAddContainerModal(false);
                         setContainerName('');
                       }}
+                    >
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            </Modal>
+
+            {/* Modal for Lending Item */}
+            <Modal
+              visible={showLendModal}
+              transparent={true}
+              animationType="slide"
+              onRequestClose={() => {
+                setShowLendModal(false);
+                setBorrowerName('');
+                setLendNote('');
+              }}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                  <Text style={styles.modalTitle}>Lend Item</Text>
+                  <TextInput
+                    style={styles.itemInput}
+                    placeholder="Borrower name (required)"
+                    value={borrowerName}
+                    onChangeText={setBorrowerName}
+                    placeholderTextColor="#999"
+                    autoFocus={true}
+                  />
+                  <TextInput
+                    style={[styles.itemInput, styles.noteInput]}
+                    placeholder="Note (optional)"
+                    value={lendNote}
+                    onChangeText={setLendNote}
+                    placeholderTextColor="#999"
+                    multiline
+                    numberOfLines={4}
+                  />
+                  <Text style={styles.charCounter}>{lendNote.length}/500</Text>
+                  <View style={styles.modalButtonContainer}>
+                    <Pressable
+                      style={[styles.button, styles.addButton, !borrowerName.trim() && styles.buttonDisabled]}
+                      onPress={handleLendSubmit}
+                      disabled={!borrowerName.trim() || lendLoading}
+                    >
+                      <Text style={styles.addButtonText}>{lendLoading ? 'Lending...' : 'Lend'}</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.button, styles.cancelButton]}
+                      onPress={() => {
+                        setShowLendModal(false);
+                        setBorrowerName('');
+                        setLendNote('');
+                      }}
+                      disabled={lendLoading}
                     >
                       <Text style={styles.cancelButtonText}>Cancel</Text>
                     </Pressable>
@@ -960,5 +1084,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#d32f2f',
+  },
+  noteInput: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+    paddingTop: 8,
+  },
+  charCounter: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 16,
+    textAlign: 'right',
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
 });

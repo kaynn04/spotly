@@ -28,79 +28,83 @@ import { LendingService } from '../services/LendingService';
 import { LendingRepository } from '../repositories/LendingRepository';
 import { ItemRepository } from '../../../repositories/ItemRepository';
 import { Lending } from '../models/Lending';
-import ItemSelectionModal from './components/ItemSelectionModal';
-import LendingFormModal from './components/LendingFormModal';
 
 /**
  * LendingPage Component
  *
  * Main lending tab showing:
  * - List of active lendings (items currently lent)
- * - Button to lend a new item
  * - Link to view lending history
+ * - Lending creation is handled from item options (move/delete)
  *
  * State Management:
- * - lendings: Array of Lending records
+ * - lendings: Array of Lending records with item names
  * - loading: Loading state for data fetch
  * - error: Error message if fetch fails
- * - showItemModal: Show/hide item selection modal
- * - showFormModal: Show/hide borrower form
- * - selectedItem: Selected item for new lending
  *
  * Flow:
- * 1. On screen focus, load active lendings
- * 2. User taps "Lend Item"
- * 3. Item selection modal opens
- * 4. User selects item
- * 5. Form modal opens
- * 6. User enters borrower name and note
- * 7. Submit creates lending via service
- * 8. List refreshes automatically
+ * 1. On screen focus, load active lendings with item names
+ * 2. User taps on a lending to see details
+ * 3. User accesses "Lend Item" from item options in spaces
  */
 export default function LendingPage() {
   const router = useRouter();
 
   // Service instances - memoized to prevent re-creation on every render
-  const lendingService = useMemo(() => {
+  const repositories = useMemo(() => {
     const lendingRepository = new LendingRepository();
     const itemRepository = new ItemRepository();
-    return new LendingService(lendingRepository, itemRepository);
+    return { lendingRepository, itemRepository };
   }, []);
 
-  // Data state
-  const [lendings, setLendings] = useState<Lending[]>([]);
+  const lendingService = useMemo(() => {
+    return new LendingService(repositories.lendingRepository, repositories.itemRepository);
+  }, [repositories]);
+
+  // Data state - store lendings with item names
+  const [lendings, setLendings] = useState<(Lending & { itemName?: string })[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Modal state
-  const [showItemModal, setShowItemModal] = useState(false);
-  const [showFormModal, setShowFormModal] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<any | null>(null);
-
-  // Form state
-  const [borrowerName, setBorrowerName] = useState('');
-  const [note, setNote] = useState('');
-  const [formLoading, setFormLoading] = useState(false);
-
   /**
-   * Load Active Lendings
+   * Load Active Lendings with Item Names
    *
-   * Fetches active lendings from service.
-   * Called on mount and after successful lending creation.
+   * Fetches active lendings from service, then loads item names
+   * Called on mount and after screen focus
    */
   const loadLendings = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const result = await lendingService.getActiveLendings();
-      setLendings(result);
+      const activeLendings = await lendingService.getActiveLendings();
+      
+      // Load item names for each lending
+      const lendingsWithItems = await Promise.all(
+        activeLendings.map(async (lending) => {
+          try {
+            const item = await repositories.itemRepository.getById(lending.item_id);
+            return {
+              ...lending,
+              itemName: item?.name || 'Unknown Item',
+            };
+          } catch (err) {
+            console.error(`Failed to load item for lending ${lending.id}:`, err);
+            return {
+              ...lending,
+              itemName: 'Unknown Item',
+            };
+          }
+        })
+      );
+      
+      setLendings(lendingsWithItems);
     } catch (err: any) {
       setError(err.message || 'Failed to load lendings');
       console.error('Error loading lendings:', err);
     } finally {
       setLoading(false);
     }
-  }, [lendingService]);
+  }, [lendingService, repositories.itemRepository]);
 
   // Load lendings on screen focus
   useFocusEffect(
@@ -110,75 +114,7 @@ export default function LendingPage() {
   );
 
   /**
-   * Handle Item Selection
-   *
-   * User selected an item from the modal.
-   * Close item modal, set selected item, open form modal.
-   */
-  const handleItemSelected = (item: any) => {
-    setShowItemModal(false);
-    setSelectedItem(item);
-    setShowFormModal(true);
-  };
-
-  /**
-   * Handle Form Submission
-   *
-   * Create lending with selected item and form data.
-   * Validate borrower name, call service, refresh list.
-   */
-  const handleFormSubmit = async () => {
-    // Validate
-    if (!borrowerName.trim()) {
-      Alert.alert('Required', 'Please enter a borrower name');
-      return;
-    }
-
-    setFormLoading(true);
-    try {
-      await lendingService.createLending({
-        item_id: selectedItem.id,
-        borrower_name: borrowerName.trim(),
-        note: note.trim() || undefined,
-      });
-
-      // Success feedback
-      Alert.alert('Success', 'Item lent out successfully');
-
-      // Reset form
-      setBorrowerName('');
-      setNote('');
-      setSelectedItem(null);
-      setShowFormModal(false);
-
-      // Reload list
-      await loadLendings();
-    } catch (err: any) {
-      console.error('Error creating lending:', err);
-      const errorMessage = err.code === 'DUPLICATE_ACTIVE_LENDING'
-        ? 'Item is already lent out'
-        : err.message || 'Failed to create lending';
-      Alert.alert('Error', errorMessage);
-    } finally {
-      setFormLoading(false);
-    }
-  };
-
-  /**
-   * Handle Form Cancel
-   *
-   * User cancelled the form.
-   * Reset state and close modals.
-   */
-  const handleFormCancel = () => {
-    setBorrowerName('');
-    setNote('');
-    setSelectedItem(null);
-    setShowFormModal(false);
-  };
-
-  /**
-   * Handle Item Tap
+   * Handle Lending Tap
    *
    * User tapped on a lending in the list.
    * Navigate to detail screen with lending ID.
@@ -199,16 +135,16 @@ export default function LendingPage() {
   /**
    * Render Lending Item
    *
-   * List item component showing lending details.
+   * List item component showing lending details with item name.
    */
-  const renderLendingItem = ({ item }: { item: Lending }) => (
+  const renderLendingItem = ({ item }: { item: Lending & { itemName?: string } }) => (
     <Pressable
       style={styles.lendingCard}
       onPress={() => handleLendingTap(item)}
     >
       <View style={styles.cardContent}>
         <Text style={styles.cardTitle} numberOfLines={1}>
-          {selectedItem?.name || 'Item'}
+          {item.itemName || 'Unknown Item'}
         </Text>
         <Text style={styles.cardSubtitle}>
           Borrowed by: {item.borrower_name}
@@ -235,7 +171,7 @@ export default function LendingPage() {
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyTitle}>No active lendings</Text>
       <Text style={styles.emptyMessage}>
-        Tap "Lend Item" to lend something to a friend
+        Select an item and tap "Lend" to lend something to a friend
       </Text>
     </View>
   );
@@ -280,34 +216,6 @@ export default function LendingPage() {
           />
         </>
       )}
-
-      {/* Lend Item button */}
-      <Pressable
-        style={styles.lendButton}
-        onPress={() => setShowItemModal(true)}
-      >
-        <Text style={styles.lendButtonText}>+ Lend Item</Text>
-      </Pressable>
-
-      {/* Item selection modal */}
-      <ItemSelectionModal
-        visible={showItemModal}
-        onClose={() => setShowItemModal(false)}
-        onItemSelected={handleItemSelected}
-      />
-
-      {/* Lending form modal */}
-      <LendingFormModal
-        visible={showFormModal}
-        item={selectedItem}
-        borrowerName={borrowerName}
-        onBorrowerNameChange={setBorrowerName}
-        note={note}
-        onNoteChange={setNote}
-        onSubmit={handleFormSubmit}
-        onCancel={handleFormCancel}
-        loading={formLoading}
-      />
     </View>
   );
 }
@@ -429,18 +337,5 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     lineHeight: 20,
-  },
-  lendButton: {
-    backgroundColor: '#0a7ea4',
-    marginHorizontal: 16,
-    marginBottom: 20,
-    paddingVertical: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  lendButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
   },
 });
