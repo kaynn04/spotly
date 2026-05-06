@@ -47,9 +47,15 @@ export async function createLendingsTable(db: any): Promise<void> {
         updated_at TEXT NOT NULL,
         FOREIGN KEY (item_id) REFERENCES items(id),
         CHECK (status IN ('ACTIVE', 'RETURNED')),
-        CHECK (returned_at IS NULL OR returned_at >= lent_at),
-        UNIQUE (item_id, status) WHERE status = 'ACTIVE'
+        CHECK (returned_at IS NULL OR returned_at >= lent_at)
       );
+    `);
+
+    // Partial unique index: Only one ACTIVE lending per item
+    // SQLite: Partial indexes support WHERE clauses for conditional uniqueness
+    await db.execAsync(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_lendings_unique_active_item
+      ON lendings(item_id, status) WHERE status = 'ACTIVE';
     `);
 
     // Index for finding lendings by status, sorted by date (primary query pattern)
