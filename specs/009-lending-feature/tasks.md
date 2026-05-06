@@ -288,69 +288,77 @@
 
 ### Tasks
 
-- [ ] T026 Create LendingDetailScreen component
+- [X] T026 Create LendingDetailScreen component
   - **Objective**: Show lending details and mark-as-returned option (US3)
   - **Scope**: Fetch lending by ID; display all lending info (item, borrower, dates, note, status)
   - **Files**: `src/features/lending/screens/LendingDetailScreen.tsx` (new)
   - **Expected Output**: Screen shows lending details; fetches on mount using route params
   - **Dependencies**: T007 (getById), Expo Router route params
   - **Validation**: Component mounts; lending data fetches and displays
+  - ✅ **COMPLETED**: Full component with loading, error, and data display
 
-- [ ] T027 Add item information display to detail screen
+- [X] T027 Add item information display to detail screen
   - **Objective**: Show which item is lent (context for user)
   - **Scope**: Display item name, space, container where item belongs
   - **Files**: `src/features/lending/screens/LendingDetailScreen.tsx` (modify T026)
   - **Expected Output**: Item info displayed prominently
   - **Dependencies**: T026, existing ItemRepository lookup
   - **Validation**: Item context displays correctly; handles orphaned items (deleted items)
+  - ✅ **COMPLETED**: Item section with graceful orphan handling
 
-- [ ] T028 Add lending information section to detail screen
+- [X] T028 Add lending information section to detail screen
   - **Objective**: Display borrower, lent date, note, status (US3 info needed)
   - **Scope**: Show all lending fields formatted nicely
   - **Files**: `src/features/lending/screens/LendingDetailScreen.tsx` (modify T026)
   - **Expected Output**: All lending fields visible; status badge shows ACTIVE/RETURNED
   - **Dependencies**: T026
   - **Validation**: All info displays; formatting looks good
+  - ✅ **COMPLETED**: Full lending details section with formatted dates and status badge
 
-- [ ] T029 Add "Mark as Returned" button (conditional display)
+- [X] T029 Add "Mark as Returned" button (conditional display)
   - **Objective**: Show button only when lending is ACTIVE (US3 entry point)
   - **Scope**: Button visible only if status === 'ACTIVE'; hidden if RETURNED
   - **Files**: `src/features/lending/screens/LendingDetailScreen.tsx` (modify T028)
   - **Expected Output**: Button visible for ACTIVE; not visible for RETURNED
   - **Dependencies**: T028
   - **Validation**: Button visibility matches status correctly
+  - ✅ **COMPLETED**: Conditional button rendering based on isActive flag
 
-- [ ] T030 Add confirmation dialog for mark-as-returned
+- [X] T030 Add confirmation dialog for mark-as-returned
   - **Objective**: Confirm action before marking as returned (UX safety)
   - **Scope**: Show alert: "Mark this item as returned?"
   - **Files**: `src/features/lending/screens/LendingDetailScreen.tsx` (modify T029)
   - **Expected Output**: Dialog shows on button press; Yes/No handlers
   - **Dependencies**: T029
   - **Validation**: Dialog appears and buttons work
+  - ✅ **COMPLETED**: Custom dialog overlay with Cancel/Confirm buttons
 
-- [ ] T031 Implement mark-as-returned submission
+- [X] T031 Implement mark-as-returned submission
   - **Objective**: Call LendingService.markAsReturned() (US3 action)
   - **Scope**: Handle button press, show loading, call service, update state
   - **Files**: `src/features/lending/screens/LendingDetailScreen.tsx` (modify T030)
   - **Expected Output**: Calling service updates lending status to RETURNED
   - **Dependencies**: T013 (markAsReturned), T030 (dialog)
   - **Validation**: Lending marked as returned; DB updated; lending no longer in ACTIVE list
+  - ✅ **COMPLETED**: Service call with submitting state, error handling, validation
 
-- [ ] T032 Add success feedback and navigation
+- [X] T032 Add success feedback and navigation
   - **Objective**: Show success message after marking returned; navigate back (US3 completion)
   - **Scope**: Toast/alert showing success; pop screen after brief delay
   - **Files**: `src/features/lending/screens/LendingDetailScreen.tsx` (modify T031)
   - **Expected Output**: Success feedback shown; navigates back to LendingPage
   - **Dependencies**: T031
   - **Validation**: Success message appears; navigation works
+  - ✅ **COMPLETED**: Alert with success message and router.back() navigation
 
-- [ ] T033 Add back navigation to detail screen
+- [X] T033 Add back navigation to detail screen
   - **Objective**: Allow user to return to lending list from detail
   - **Scope**: Back button in header that pops screen
   - **Files**: `src/features/lending/screens/LendingDetailScreen.tsx` (modify T026)
   - **Expected Output**: Back button navigates to previous screen
   - **Dependencies**: T026, Expo Router
   - **Validation**: Back navigation works
+  - ✅ **COMPLETED**: Back button in header with router.back() handler
 
 **✅ Checkpoint 4**: Users can mark items returned (US3 complete); detail workflow functional; returned lending disappears from active list.
 
