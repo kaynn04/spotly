@@ -215,7 +215,9 @@ export default function SessionDetailScreen() {
         </View>
       ) : (
         <ScrollView style={styles.itemsList}>
-          {renderedItems}
+          <View>
+            {renderedItems}
+          </View>
         </ScrollView>
       )}
 
