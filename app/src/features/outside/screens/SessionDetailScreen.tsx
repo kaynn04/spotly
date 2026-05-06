@@ -13,12 +13,12 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   FlatList,
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -33,6 +33,7 @@ export default function SessionDetailScreen() {
   const colorScheme = useColorScheme();
   const outsideService = useOutsideService();
   const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
 
   const [session, setSession] = useState<any>(null);
   const [items, setItems] = useState<OutsideSessionItemWithContext[]>([]);
@@ -131,17 +132,17 @@ export default function SessionDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={colors.tint} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (error || !session) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
         <View style={styles.centerContainer}>
           <Text style={[styles.errorText, { color: '#d32f2f' }]}>{error || 'Session not found'}</Text>
           <TouchableOpacity
@@ -153,7 +154,7 @@ export default function SessionDetailScreen() {
             <Text style={[styles.retryButtonText, { color: '#fff' }]}>Go Back</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -233,9 +234,9 @@ export default function SessionDetailScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={[styles.backButton, { color: colors.tint }]}>← Back</Text>
         </TouchableOpacity>
@@ -290,7 +291,7 @@ export default function SessionDetailScreen() {
           onClose={() => setShowItemPicker(false)}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -304,7 +305,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingTop: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
