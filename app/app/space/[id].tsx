@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Button, Alert, Pressable, FlatList, TextInput, Modal, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, Button, Alert, Pressable, FlatList, TextInput, Modal, StatusBar, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import type { Space } from '../../src/models/Space';
@@ -137,6 +137,21 @@ export default function SpaceDetailScreen() {
       await loadItems();
     } catch (error) {
       console.error('Failed to move item:', error);
+      Alert.alert('Error', 'Failed to move item. Please try again.');
+    }
+  }
+
+  async function handleSelectTargetContainer(containerId: string) {
+    if (!selectedMoveItemId || !space) return;
+
+    try {
+      await ItemService.moveItemToContainer(selectedMoveItemId, space.id, containerId);
+      setShowMoveModal(false);
+      setSelectedMoveItemId(null);
+      // Refresh items from current space
+      await loadItems();
+    } catch (error) {
+      console.error('Failed to move item to container:', error);
       Alert.alert('Error', 'Failed to move item. Please try again.');
     }
   }
@@ -304,7 +319,7 @@ export default function SpaceDetailScreen() {
               contentContainerStyle={styles.itemsListContent}
               data={[
                 ...containers.map(c => ({ type: 'container' as const, data: c })),
-                ...items.map(i => ({ type: 'item' as const, data: i })),
+                ...spaceLevelItems.map(i => ({ type: 'item' as const, data: i })),
               ]}
               keyExtractor={(item, index) => {
                 if ('type' in item) {
@@ -425,21 +440,41 @@ export default function SpaceDetailScreen() {
             >
               <View style={styles.modalOverlay}>
                 <View style={styles.modalContent}>
-                  <Text style={styles.modalTitle}>Move to space</Text>
+                  <Text style={styles.modalTitle}>Move item</Text>
                   
-                  <FlatList
-                    data={allSpaces.filter((s) => s.id !== space?.id)}
-                    keyExtractor={(s) => s.id}
-                    renderItem={({ item: targetSpace }) => (
-                      <Pressable
-                        style={styles.spaceOption}
-                        onPress={() => handleSelectTargetSpace(targetSpace.id)}
-                      >
-                        <Text style={styles.spaceOptionText}>{targetSpace.name}</Text>
-                      </Pressable>
+                  <ScrollView>
+                    {/* Move to Container Section */}
+                    {containers.length > 0 && (
+                      <>
+                        <Text style={styles.sectionTitle}>In this space:</Text>
+                        {containers.map((container) => (
+                          <Pressable
+                            key={container.id}
+                            style={styles.spaceOption}
+                            onPress={() => handleSelectTargetContainer(container.id)}
+                          >
+                            <Text style={styles.spaceOptionText}>📁 {container.name}</Text>
+                          </Pressable>
+                        ))}
+                      </>
                     )}
-                    scrollEnabled={true}
-                  />
+
+                    {/* Move to Space Section */}
+                    {allSpaces.filter((s) => s.id !== space?.id).length > 0 && (
+                      <>
+                        <Text style={styles.sectionTitle}>Move to another space:</Text>
+                        {allSpaces.filter((s) => s.id !== space?.id).map((targetSpace) => (
+                          <Pressable
+                            key={targetSpace.id}
+                            style={styles.spaceOption}
+                            onPress={() => handleSelectTargetSpace(targetSpace.id)}
+                          >
+                            <Text style={styles.spaceOptionText}>{targetSpace.name}</Text>
+                          </Pressable>
+                        ))}
+                      </>
+                    )}
+                  </ScrollView>
 
                   <Pressable
                     style={[styles.button, styles.cancelButton]}
@@ -883,6 +918,15 @@ const styles = StyleSheet.create({
     color: '#333',
     fontSize: 14,
     fontWeight: '600',
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#f5f5f5',
+    marginTop: 12,
   },
   spaceOption: {
     paddingHorizontal: 12,

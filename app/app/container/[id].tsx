@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Button, Alert, Pressable, FlatList, TextInput, Modal, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, Button, Alert, Pressable, FlatList, TextInput, Modal, StatusBar, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import type { Space } from '../../src/models/Space';
@@ -32,6 +32,7 @@ export default function ContainerDetailScreen() {
   const [showAddItemModal, setShowAddItemModal] = useState<boolean>(false);
   const [showMoveModal, setShowMoveModal] = useState<boolean>(false);
   const [selectedMoveItemId, setSelectedMoveItemId] = useState<string | null>(null);
+  const [showItemMenu, setShowItemMenu] = useState<string | null>(null);
   const [showFabMenu, setShowFabMenu] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -113,6 +114,22 @@ export default function ContainerDetailScreen() {
       await loadItems();
     } catch (error) {
       console.error('Failed to move item:', error);
+      Alert.alert('Error', 'Failed to move item. Please try again.');
+    }
+  }
+
+  async function handleMoveToRootSpace() {
+    if (!selectedMoveItemId || !space) return;
+
+    try {
+      // Move item to root space (remove from container)
+      await ItemService.moveItemToContainer(selectedMoveItemId, space.id, '');
+      setShowMoveModal(false);
+      setSelectedMoveItemId(null);
+      // Refresh items from container
+      await loadItems();
+    } catch (error) {
+      console.error('Failed to move item to root space:', error);
       Alert.alert('Error', 'Failed to move item. Please try again.');
     }
   }
@@ -204,26 +221,43 @@ export default function ContainerDetailScreen() {
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <View style={styles.itemCard}>
-                <Text style={styles.itemName}>{item.name}</Text>
-                <View style={styles.itemActions}>
+                <View style={styles.itemHeader}>
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemName}>{item.name}</Text>
+                  </View>
                   <Pressable
-                    style={[
-                      styles.button,
-                      styles.moveButton,
-                      allSpaces.length < 2 && styles.disabledButton,
-                    ]}
-                    onPress={() => handleMovePress(item.id)}
-                    disabled={allSpaces.length < 2}
+                    style={styles.itemMenu}
+                    onPress={() => setShowItemMenu(showItemMenu === item.id ? null : item.id)}
                   >
-                    <Text style={styles.moveButtonText}>Move</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.button, styles.deleteItemButton]}
-                    onPress={() => handleDeleteItemPress(item.id, item.name)}
-                  >
-                    <Text style={styles.deleteItemButtonText}>Delete</Text>
+                    <Text style={styles.itemMenuText}>⋯</Text>
                   </Pressable>
                 </View>
+                {showItemMenu === item.id && (
+                  <View style={styles.itemMenuDropdown}>
+                    <Pressable
+                      style={[
+                        styles.itemMenuOption,
+                        allSpaces.length < 2 && styles.itemMenuOptionDisabled,
+                      ]}
+                      onPress={() => {
+                        setShowItemMenu(null);
+                        handleMovePress(item.id);
+                      }}
+                      disabled={allSpaces.length < 2}
+                    >
+                      <Text style={styles.itemMenuOptionText}>Move</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.itemMenuOption, styles.itemMenuOptionDelete]}
+                      onPress={() => {
+                        setShowItemMenu(null);
+                        handleDeleteItemPress(item.id, item.name);
+                      }}
+                    >
+                      <Text style={styles.itemMenuOptionDeleteText}>Delete</Text>
+                    </Pressable>
+                  </View>
+                )}
               </View>
             )}
             ListEmptyComponent={
@@ -313,21 +347,34 @@ export default function ContainerDetailScreen() {
           >
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Move to space</Text>
+                <Text style={styles.modalTitle}>Move item</Text>
 
-                <FlatList
-                  data={allSpaces.filter((s) => s.id !== space?.id)}
-                  keyExtractor={(s) => s.id}
-                  renderItem={({ item: targetSpace }) => (
-                    <Pressable
-                      style={styles.spaceOption}
-                      onPress={() => handleSelectTargetSpace(targetSpace.id)}
-                    >
-                      <Text style={styles.spaceOptionText}>{targetSpace.name}</Text>
-                    </Pressable>
+                <ScrollView>
+                  {/* Move to Root Space Section */}
+                  <Text style={styles.sectionTitle}>In this space:</Text>
+                  <Pressable
+                    style={styles.spaceOption}
+                    onPress={handleMoveToRootSpace}
+                  >
+                    <Text style={styles.spaceOptionText}>📍 Root space</Text>
+                  </Pressable>
+
+                  {/* Move to Other Spaces Section */}
+                  {allSpaces.filter((s) => s.id !== space?.id).length > 0 && (
+                    <>
+                      <Text style={styles.sectionTitle}>Move to another space:</Text>
+                      {allSpaces.filter((s) => s.id !== space?.id).map((targetSpace) => (
+                        <Pressable
+                          key={targetSpace.id}
+                          style={styles.spaceOption}
+                          onPress={() => handleSelectTargetSpace(targetSpace.id)}
+                        >
+                          <Text style={styles.spaceOptionText}>{targetSpace.name}</Text>
+                        </Pressable>
+                      ))}
+                    </>
                   )}
-                  scrollEnabled={true}
-                />
+                </ScrollView>
 
                 <Pressable
                   style={[styles.button, styles.cancelButton]}
@@ -393,11 +440,55 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#0a84ff',
   },
+  itemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  itemInfo: {
+    flex: 1,
+  },
   itemName: {
     fontSize: 16,
     fontWeight: '500',
-    marginBottom: 8,
     color: '#333',
+  },
+  itemMenu: {
+    padding: 8,
+    marginRight: -8,
+  },
+  itemMenuText: {
+    fontSize: 18,
+    color: '#999',
+  },
+  itemMenuDropdown: {
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    paddingTop: 8,
+  },
+  itemMenuOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: '#e3f2fd',
+    marginBottom: 6,
+  },
+  itemMenuOptionDelete: {
+    backgroundColor: '#ffebee',
+  },
+  itemMenuOptionText: {
+    color: '#0a84ff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  itemMenuOptionDeleteText: {
+    color: '#d32f2f',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  itemMenuOptionDisabled: {
+    opacity: 0.5,
   },
   itemActions: {
     flexDirection: 'row',
@@ -408,22 +499,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 6,
     alignItems: 'center',
-  },
-  moveButton: {
-    backgroundColor: '#e3f2fd',
-  },
-  moveButtonText: {
-    color: '#0a84ff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  deleteItemButton: {
-    backgroundColor: '#ffebee',
-  },
-  deleteItemButtonText: {
-    color: '#d32f2f',
-    fontSize: 12,
-    fontWeight: '600',
   },
   disabledButton: {
     opacity: 0.5,
@@ -545,6 +620,15 @@ const styles = StyleSheet.create({
     color: '#333',
     fontSize: 14,
     fontWeight: '600',
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#f5f5f5',
+    marginTop: 12,
   },
   spaceOption: {
     paddingHorizontal: 12,

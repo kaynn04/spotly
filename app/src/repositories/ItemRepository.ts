@@ -154,22 +154,25 @@ export class ItemRepository {
 
   /**
    * Update an item's space_id to move it to a different space
+   * Also clears container_id if item was in a container
    *
    * @param itemId - The item id to move
    * @param newSpaceId - The new space id to move the item to
    * @returns void (no return value)
    * @throws ServiceError if database operation fails
    *
-   * SQL: UPDATE items SET space_id = ? WHERE id = ?
+   * SQL: UPDATE items SET space_id = ?, container_id = NULL WHERE id = ?
    * Parameterized query prevents SQL injection
+   * Clears container_id to remove item from container when moving to different space
    */
   static async updateSpaceId(itemId: string, newSpaceId: string): Promise<void> {
     try {
       const db = getDatabase();
 
       // Execute parameterized UPDATE query
+      // When moving to a different space, remove from container (container_id = NULL)
       await db.runAsync(
-        'UPDATE items SET space_id = ? WHERE id = ?',
+        'UPDATE items SET space_id = ?, container_id = NULL WHERE id = ?',
         [newSpaceId, itemId]
       );
     } catch (error) {
@@ -181,6 +184,43 @@ export class ItemRepository {
 
       // Log error for debugging
       console.error('[ItemRepository.updateSpaceId] Database error:', error);
+
+      throw serviceError;
+    }
+  }
+
+  /**
+   * Update an item's container_id to move it to a different container
+   * Pass empty string to clear container (move to root space)
+   *
+   * @param itemId - The item id to move
+   * @param containerId - The new container id (empty string to move to root space)
+   * @returns void (no return value)
+   * @throws ServiceError if database operation fails
+   *
+   * SQL: UPDATE items SET container_id = ? WHERE id = ?
+   * Parameterized query prevents SQL injection
+   * Empty string sets container_id to NULL
+   */
+  static async updateContainerId(itemId: string, containerId: string): Promise<void> {
+    try {
+      const db = getDatabase();
+
+      // Execute parameterized UPDATE query
+      // Empty string is converted to NULL for root space
+      await db.runAsync(
+        'UPDATE items SET container_id = ? WHERE id = ?',
+        [containerId || null, itemId]
+      );
+    } catch (error) {
+      // Convert database error to ServiceError
+      const serviceError: ServiceError = {
+        code: 'DB_ERROR',
+        message: 'Failed to move item to container. Try again.',
+      };
+
+      // Log error for debugging
+      console.error('[ItemRepository.updateContainerId] Database error:', error);
 
       throw serviceError;
     }

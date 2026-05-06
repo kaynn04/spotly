@@ -136,6 +136,45 @@ export class ItemService {
   }
 
   /**
+   * Move an item to a container within the same space
+   * Pass empty string to move item to root space (remove from container)
+   *
+   * @param itemId - The item id to move
+   * @param spaceId - The space id (for validation)
+   * @param containerId - The container id to move the item to (empty string for root space)
+   * @returns void (no return value)
+   * @throws ServiceError if validation fails or database operation fails
+   *
+   * Validation:
+   * - Item must be in the same space as the container
+   * - Empty containerId moves item to root of space
+   */
+  static async moveItemToContainer(
+    itemId: string,
+    spaceId: string,
+    containerId: string
+  ): Promise<void> {
+    try {
+      // Move item to container in database via repository
+      await ItemRepository.updateContainerId(itemId, containerId);
+    } catch (error) {
+      // If already a ServiceError, re-throw it
+      if (error && typeof error === 'object' && 'code' in error) {
+        throw error;
+      }
+
+      // Convert unexpected errors to ServiceError
+      const serviceError: ServiceError = {
+        code: 'DB_ERROR',
+        message: 'Failed to move item to container. Try again.',
+      };
+
+      console.error('[ItemService.moveItemToContainer] Unexpected error:', error);
+      throw serviceError;
+    }
+  }
+
+  /**
    * Delete an item (permanent deletion)
    *
    * @param itemId - The item id to delete
