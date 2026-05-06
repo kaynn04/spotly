@@ -216,7 +216,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
           <View style={styles.headerSpacer} />
         </View>
         <View style={styles.centerContent}>
-          <Text style={[styles.errorText, { color: colors.error || '#d32f2f' }]}>
+          <Text style={[styles.errorText, { color: '#d32f2f' }]}>
             {error || 'Lending not found'}
           </Text>
           <Pressable
@@ -358,7 +358,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
           <View style={[styles.dialogContent, { backgroundColor: colors.background }]}>
             <Text style={[styles.dialogTitle, { color: colors.text }]}>Mark as Returned?</Text>
             <Text style={[styles.dialogMessage, { color: colors.tabIconDefault }]}>
-              Are you sure you want to mark "{lending.borrower_name}" as returned?
+              Are you sure you want to mark &quot;{lending.borrower_name}&quot; as returned?
             </Text>
             <View style={styles.dialogButtons}>
               <Pressable
