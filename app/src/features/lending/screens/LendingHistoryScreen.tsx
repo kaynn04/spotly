@@ -314,7 +314,7 @@ export default function LendingHistoryScreen() {
           <View style={styles.headerSpacer} />
         </View>
         <View style={styles.centerContent}>
-          <Text style={[styles.errorText, { color: colors.error || '#d32f2f' }]}>{error}</Text>
+          <Text style={[styles.errorText, { color: '#d32f2f' }]}>{error}</Text>
           <Pressable
             style={[styles.retryButton, { backgroundColor: colors.tint }]}
             onPress={loadAllLendings}
