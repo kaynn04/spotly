@@ -16,7 +16,9 @@ export default function RootLayout() {
 
   // Initialize database on app startup
   useEffect(() => {
-    initializeDatabase();
+    initializeDatabase().catch(error => {
+      console.error('Failed to initialize database:', error);
+    });
   }, []);
 
   return (

@@ -130,11 +130,14 @@ export class LendingRepository {
    * @throws SQLite error if query fails
    */
   async hasActiveLending(itemId: string): Promise<boolean> {
+    console.log('[LendingRepository.hasActiveLending] Checking for item:', itemId);
     const result = await this.db.getFirstAsync(
       `SELECT 1 FROM lendings WHERE item_id = ? AND status = ?`,
       [itemId, LendingStatus.ACTIVE]
     );
-    return result !== null && result !== undefined;
+    const hasActive = result !== null && result !== undefined;
+    console.log('[LendingRepository.hasActiveLending] Result:', { hasActive, result });
+    return hasActive;
   }
 
   /**
@@ -161,7 +164,15 @@ export class LendingRepository {
     const id = uuidv4();
     const now = new Date().toISOString();
 
+    console.log('[LendingRepository.create] Starting with:', {
+      id,
+      item_id: input.item_id,
+      borrower_name: input.borrower_name,
+      timestamp: now,
+    });
+
     try {
+      console.log('[LendingRepository.create] Executing INSERT...');
       await this.db.runAsync(
         `INSERT INTO lendings (
           id, item_id, borrower_name, note, lent_at, returned_at, status, created_at, updated_at
@@ -178,20 +189,23 @@ export class LendingRepository {
           now,
         ]
       );
+      console.log('[LendingRepository.create] INSERT successful');
     } catch (error) {
-      console.error('LendingRepository.create INSERT error:', error);
+      console.error('[LendingRepository.create] INSERT error:', error);
       throw error;
     }
 
     // Return created lending
     try {
+      console.log('[LendingRepository.create] Fetching created record...');
       const created = await this.getById(id);
       if (!created) {
         throw new Error('Failed to retrieve created lending');
       }
+      console.log('[LendingRepository.create] Created lending:', created);
       return created;
     } catch (error) {
-      console.error('LendingRepository.create getById error:', error);
+      console.error('[LendingRepository.create] getById error:', error);
       throw error;
     }
   }

@@ -111,8 +111,14 @@ export class LendingService {
    * @throws ServiceError with code and message if validation fails
    */
   async createLending(input: LendingCreateInput): Promise<Lending> {
+    console.log('[LendingService.createLending] Starting with:', {
+      item_id: input.item_id,
+      borrower_name: input.borrower_name,
+    });
+
     // Validate borrower_name (BR-003)
     if (!input.borrower_name || !input.borrower_name.trim()) {
+      console.log('[LendingService.createLending] Validation failed: invalid borrower name');
       throw createServiceError(
         'INVALID_BORROWER_NAME',
         'Borrower name is required'
@@ -122,7 +128,9 @@ export class LendingService {
     // Validate item exists (BR-002)
     let item: any;
     try {
+      console.log('[LendingService.createLending] Checking if item exists:', input.item_id);
       item = await this.itemRepository.getById(input.item_id);
+      console.log('[LendingService.createLending] Item lookup result:', { item });
     } catch (error) {
       console.error('ItemRepository.getById error:', error);
       throw createServiceError(
@@ -132,14 +140,18 @@ export class LendingService {
     }
 
     if (!item) {
+      console.log('[LendingService.createLending] Item not found:', input.item_id);
       throw createServiceError('ITEM_NOT_FOUND', 'Item not found');
     }
 
     // Validate no ACTIVE lending already exists (BR-001)
     let hasActive: boolean;
     try {
+      console.log('[LendingService.createLending] Checking for active lendings...');
       hasActive = await this.lendingRepository.hasActiveLending(input.item_id);
+      console.log('[LendingService.createLending] Active lending check:', { hasActive });
     } catch (error) {
+      console.error('[LendingService.createLending] hasActiveLending error:', error);
       throw createServiceError(
         'DATABASE_ERROR',
         'Failed to check existing lendings'
@@ -147,6 +159,7 @@ export class LendingService {
     }
 
     if (hasActive) {
+      console.log('[LendingService.createLending] Item already has active lending');
       throw createServiceError(
         'DUPLICATE_ACTIVE_LENDING',
         'Item is already lent out'
@@ -156,11 +169,13 @@ export class LendingService {
     // All validations passed, create lending
     let lending: Lending;
     try {
+      console.log('[LendingService.createLending] All validations passed, calling repository.create()');
       lending = await this.lendingRepository.create({
         item_id: input.item_id,
         borrower_name: input.borrower_name.trim(),
         note: input.note ? input.note.trim() : undefined,
       });
+      console.log('[LendingService.createLending] Lending created successfully:', lending);
     } catch (error: any) {
       console.error('LendingService.createLending repository.create error:', error);
       // Handle unique constraint violation from repository

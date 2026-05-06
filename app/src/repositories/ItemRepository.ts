@@ -376,6 +376,7 @@ export class ItemRepository {
    * @throws Error if database query fails
    */
   async getById(id: string): Promise<Item | null> {
+    console.log('[ItemRepository.getById] Looking up item:', id);
     try {
       const db = getDatabase();
       const result = await db.getFirstAsync(`
@@ -394,10 +395,11 @@ export class ItemRepository {
       `, [id]);
 
       if (!result) {
+        console.log('[ItemRepository.getById] Item not found:', id);
         return null;
       }
 
-      return {
+      const item = {
         id: result.id,
         name: result.name,
         space_id: result.space_id,
@@ -406,6 +408,8 @@ export class ItemRepository {
         space: result.space,
         container: result.container,
       };
+      console.log('[ItemRepository.getById] Item found:', item);
+      return item;
     } catch (error) {
       console.error('[ItemRepository.getById] Database error:', error);
       throw error;
