@@ -6,15 +6,15 @@
  * Implementation: T005 - Create app/src/db/client.ts
  */
 
-import { openDatabaseSync } from 'expo-sqlite';
+import { openDatabaseSync, SQLiteDatabase } from 'expo-sqlite';
 
-let db: any = null;
+let db: SQLiteDatabase | null = null;
 
 /**
  * Get or create the database instance
  * Uses singleton pattern to ensure only one database connection
  */
-export function getDatabase() {
+export function getDatabase(): SQLiteDatabase {
   if (!db) {
     db = openDatabaseSync('spotly.db');
     // Enable foreign keys (optional, for future item relationships)

@@ -353,9 +353,9 @@ export class ItemRepository {
       return (result || []).map((row: any) => ({
         id: row.id,
         name: row.name,
-        space_id: row.space_id,
-        container_id: row.container_id,
-        created_at: row.created_at,
+        spaceId: row.space_id,
+        containerId: row.container_id,
+        createdAt: row.created_at,
         space: row.space ? { name: row.space } : null,
         container: row.container ? { name: row.container } : null,
       }));
@@ -402,9 +402,9 @@ export class ItemRepository {
       const item = {
         id: result.id,
         name: result.name,
-        space_id: result.space_id,
-        container_id: result.container_id,
-        created_at: result.created_at,
+        spaceId: result.space_id,
+        containerId: result.container_id,
+        createdAt: result.created_at,
         space: result.space ? { name: result.space } : null,
         container: result.container ? { name: result.container } : null,
       };
