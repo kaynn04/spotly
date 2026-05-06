@@ -268,7 +268,7 @@ export default function SessionDetailScreen() {
       </View>
 
       {/* Actions */}
-      <View style={styles.actionBar}>
+      <View style={[styles.actionBar, { paddingBottom: insets.bottom }]}>
         <TouchableOpacity
           style={[styles.addButton, { backgroundColor: colors.tint }]}
           onPress={handleAddItems}
