@@ -1,0 +1,191 @@
+/**
+ * ItemFormModal
+ *
+ * Bottom sheet -- add a new item to a space or container
+ */
+
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Modal,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Keyboard,
+  ActivityIndicator,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+
+const PRIMARY = '#6b7f99';
+
+interface ItemFormModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onSubmit: (name: string) => Promise<void>;
+  contextLabel?: string;
+}
+
+export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel }: ItemFormModalProps) {
+  const colorScheme = useColorScheme();
+  const insets = useSafeAreaInsets();
+  const isDark = colorScheme === 'dark';
+
+  const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const cardBg = isDark ? '#1c1c1e' : '#ffffff';
+  const inputBg = isDark ? '#2c2c2e' : '#f8f9fa';
+  const textColor = isDark ? '#ffffff' : '#2c3e50';
+  const subtleText = isDark ? '#8e8e93' : '#a0aec0';
+  const borderColor = isDark ? '#3a3a3c' : '#e2e6ea';
+
+  const isValid = name.trim().length > 0;
+
+  const handleCancel = () => {
+    Keyboard.dismiss();
+    setName('');
+    setError(null);
+    onClose();
+  };
+
+  const handleSubmit = async () => {
+    if (!name.trim()) { setError('Please enter an item name'); return; }
+    setLoading(true);
+    setError(null);
+    try {
+      await onSubmit(name.trim());
+      setName('');
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Failed to add item');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      statusBarTranslucent
+      onRequestClose={handleCancel}
+    >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+        <TouchableWithoutFeedback onPress={handleCancel}>
+          <View style={styles.overlay}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+                {/* Handle */}
+                <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+
+                {/* Title */}
+                <Text style={[styles.sheetTitle, { color: textColor }]}>Add Item</Text>
+                {contextLabel && (
+                  <View style={[styles.contextPill, { backgroundColor: inputBg, borderColor }]}>
+                    <Text style={[styles.contextPillText, { color: subtleText }]}>In: </Text>
+                    <Text style={[styles.contextPillName, { color: textColor }]} numberOfLines={1}>
+                      {contextLabel}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Input */}
+                <Text style={[styles.fieldLabel, { color: subtleText }]}>Item Name *</Text>
+                <View style={[styles.inputWrapper, { backgroundColor: inputBg, borderColor: error ? '#d32f2f' : borderColor }]}>
+                  <TextInput
+                    style={[styles.input, { color: textColor }]}
+                    placeholder="e.g., Passport, Charger, Keys"
+                    placeholderTextColor={subtleText}
+                    value={name}
+                    onChangeText={(t) => { setName(t); setError(null); }}
+                    maxLength={100}
+                    editable={!loading}
+                    autoFocus
+                    returnKeyType="done"
+                    onSubmitEditing={handleSubmit}
+                  />
+                </View>
+
+                <View style={styles.inputMeta}>
+                  {error ? (
+                    <Text style={styles.errorText}>{error}</Text>
+                  ) : (
+                    <Text style={[styles.hint, { color: subtleText }]}>Tap the item row to move, lend, or delete</Text>
+                  )}
+                  <Text style={[styles.charCount, { color: subtleText }]}>{name.length}/100</Text>
+                </View>
+
+                {/* Buttons */}
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity
+                    style={[styles.cancelBtn, { borderColor }]}
+                    onPress={handleCancel}
+                    disabled={loading}
+                  >
+                    <Text style={[styles.cancelBtnText, { color: subtleText }]}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.createBtn,
+                      { backgroundColor: isValid ? PRIMARY : (isDark ? '#3a3a3c' : '#e2e6ea') },
+                    ]}
+                    onPress={handleSubmit}
+                    disabled={loading || !isValid}
+                  >
+                    {loading ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={[styles.createBtnText, { color: isValid ? '#fff' : subtleText }]}>Add Item</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12 },
+  handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
+  sheetTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.3, marginBottom: 12 },
+  contextPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  contextPillText: { fontSize: 13 },
+  contextPillName: { fontSize: 13, fontWeight: '600', flex: 1 },
+  fieldLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3, marginBottom: 6 },
+  inputWrapper: { borderRadius: 12, borderWidth: 1.5, paddingHorizontal: 14, paddingVertical: 2 },
+  input: { fontSize: 16, paddingVertical: 12 },
+  inputMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  errorText: { fontSize: 12, color: '#d32f2f', flex: 1 },
+  hint: { fontSize: 12, flex: 1 },
+  charCount: { fontSize: 11 },
+  buttonRow: { flexDirection: 'row', gap: 10 },
+  cancelBtn: { flex: 1, borderWidth: 1.5, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  cancelBtnText: { fontSize: 15, fontWeight: '600' },
+  createBtn: { flex: 2, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  createBtnText: { fontSize: 15, fontWeight: '700' },
+});

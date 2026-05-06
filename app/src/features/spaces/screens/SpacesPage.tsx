@@ -1,274 +1,254 @@
 /**
- * Spaces Tab Screen
+ * SpacesPage
  *
- * Integrates existing space management functionality into the Spaces tab.
- * Displays list of spaces and allows creating new spaces.
- * Clicking a space navigates to space detail screen.
- *
- * Feature: 008 - Dashboard Navigation Structure
- * Task: T005 - Navigation Integration (Spaces Tab)
+ * Main Spaces tab -- minimalist redesign uniform with Outside feature
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
-  TextInput,
-  Button,
-  FlatList,
   Text,
   StyleSheet,
-  Alert,
+  TouchableOpacity,
+  FlatList,
   ActivityIndicator,
-  Pressable,
-  SafeAreaView,
 } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
 import type { Space } from '@/src/models/Space';
 import { SpaceService } from '@/src/services/SpaceService';
+import SpaceFormModal from './components/SpaceFormModal';
 
-/**
- * SpacesPage - Spaces feature component for tab navigation
- * Reuses space management logic from existing SpaceScreen
- */
+const PRIMARY = '#6b7f99';
+
 export default function SpacesPage() {
   const router = useRouter();
-  const [name, setName] = useState('');
-  const [spaces, setSpaces] = useState<Space[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const createTimeoutRef = useRef<number | null>(null);
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
+  const isDark = colorScheme === 'dark';
 
-  // Load spaces on screen mount and whenever screen comes into focus
+  const [spaces, setSpaces] = useState<Space[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [formVisible, setFormVisible] = useState(false);
+
+  const cardBg = isDark ? '#1c1c1e' : '#ffffff';
+  const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
+  const subtleText = isDark ? '#8e8e93' : '#a0aec0';
+
   useFocusEffect(
     useCallback(() => {
-      // Reset creation state when screen comes back into focus
-      setIsCreating(false);
-      setIsLoading(false);
       loadSpaces();
-
-      // Cleanup timeout on unmount
-      return () => {
-        if (createTimeoutRef.current) {
-          clearTimeout(createTimeoutRef.current);
-        }
-      };
     }, [])
   );
 
-  /**
-   * Fetch all spaces from service
-   */
-  async function loadSpaces() {
+  const loadSpaces = async () => {
+    setLoading(true);
     try {
-      setIsLoading(true);
       const result = await SpaceService.getAllSpaces();
       setSpaces(result);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to load spaces');
-      console.error('loadSpaces error:', error);
+    } catch (err) {
+      console.error('[SpacesPage] Error loading spaces:', err);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  }
+  };
 
-  /**
-   * Create new space and reload list
-   * Includes debouncing to prevent rapid submissions
-   */
-  async function handleCreateSpace() {
-    // Prevent multiple rapid submissions
-    if (isCreating) {
-      return;
-    }
+  const handleCreateSpace = async (name: string) => {
+    await SpaceService.createSpace(name);
+    await loadSpaces();
+  };
 
-    if (!name.trim()) {
-      Alert.alert('Validation Error', 'Please enter a space name');
-      return;
-    }
-
-    const trimmedName = name.trim();
-
-    try {
-      setIsCreating(true);
-      // Clear input IMMEDIATELY before async operations
-      setName('');
-
-      // Create space via service
-      await SpaceService.createSpace(trimmedName);
-
-      // Show brief success message
-      setSuccessMessage('Space created!');
-      if (createTimeoutRef.current) {
-        clearTimeout(createTimeoutRef.current);
-      }
-      createTimeoutRef.current = setTimeout(() => {
-        setSuccessMessage('');
-      }, 2000);
-
-      // Reload spaces from database
-      await loadSpaces();
-    } catch (error: any) {
-      // Extract error message from ServiceError
-      const message = error?.message || 'Failed to create space. Try again.';
-      Alert.alert('Creation Error', message);
-      console.error('createSpace error:', error);
-      // Restore the input text on error so user doesn't lose it
-      setName(trimmedName);
-    } finally {
-      setIsCreating(false);
-    }
-  }
-
-  /**
-   * Navigate to space detail screen
-   * Routes to /space/[id]
-   */
-  function handleSpacePress(spaceId: string) {
-    router.push({
-      pathname: '/space/[id]' as any,
-      params: { id: spaceId },
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
     });
-  }
 
-  /**
-   * Render individual space item
-   */
-  function renderSpaceItem({ item }: { item: Space }) {
-    return (
-      <Pressable onPress={() => handleSpacePress(item.id)}>
-        <View style={styles.spaceItem}>
-          <Text style={styles.spaceName}>{item.name}</Text>
-          <Text style={styles.spaceDate}>
-            {new Date(item.createdAt).toLocaleDateString()}
-          </Text>
-        </View>
-      </Pressable>
-    );
-  }
+  const renderSpace = ({ item, index }: { item: Space; index: number }) => (
+    <TouchableOpacity
+      style={[styles.spaceCard, { backgroundColor: cardBg, borderColor }]}
+      onPress={() =>
+        router.push({ pathname: '/space/[id]' as any, params: { id: item.id } })
+      }
+      activeOpacity={0.7}
+    >
+      <View style={[styles.spaceDot, { backgroundColor: PRIMARY }]} />
+      <View style={styles.spaceCardContent}>
+        <Text style={[styles.spaceName, { color: colors.text }]} numberOfLines={1}>
+          {item.name}
+        </Text>
+        <Text style={[styles.spaceDate, { color: subtleText }]}>
+          Created {formatDate(item.createdAt)}
+        </Text>
+      </View>
+      <Text style={[styles.chevron, { color: subtleText }]}>{'>'}</Text>
+    </TouchableOpacity>
+  );
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Input and Create Button Section */}
-      <View style={styles.inputSection}>
-        <TextInput
-          style={[styles.textInput, isCreating && styles.textInputDisabled]}
-          placeholder="Enter space name"
-          placeholderTextColor="#999"
-          value={name}
-          onChangeText={setName}
-          editable={!isCreating}
-          maxLength={100}
-        />
-
-        <View style={styles.createButtonContainer}>
-          <Button
-            title={isCreating ? 'Creating...' : 'Create'}
-            onPress={handleCreateSpace}
-            disabled={isCreating}
-          />
-          {isCreating && (
-            <ActivityIndicator
-              size="small"
-              color="#0000ff"
-              style={styles.spinner}
-            />
-          )}
-        </View>
-
-        {/* Success message */}
-        {successMessage ? (
-          <Text style={styles.successMessage}>{successMessage}</Text>
-        ) : null}
-      </View>
-
-      {/* Spaces List */}
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
       <FlatList
         data={spaces}
         keyExtractor={(item) => item.id}
-        renderItem={renderSpaceItem}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>
-            {isLoading ? 'Loading spaces...' : 'No spaces yet. Create one!'}
-          </Text>
+        renderItem={renderSpace}
+        contentContainerStyle={[styles.listContent, { paddingTop: insets.top + 8 }]}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <View>
+              <Text style={[styles.title, { color: colors.text }]}>Spaces</Text>
+              <Text style={[styles.subtitle, { color: subtleText }]}>
+                Organize your belongings
+              </Text>
+            </View>
+            {spaces.length > 0 && (
+              <View
+                style={[
+                  styles.countBadge,
+                  { backgroundColor: `${PRIMARY}18`, borderColor: `${PRIMARY}30` },
+                ]}
+              >
+                <Text style={[styles.countBadgeText, { color: PRIMARY }]}>
+                  {spaces.length}
+                </Text>
+              </View>
+            )}
+          </View>
         }
-        style={styles.list}
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.centerContainer}>
+              <ActivityIndicator size="large" color={PRIMARY} />
+            </View>
+          ) : (
+            <View style={[styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
+              <View style={[styles.emptyIconContainer, { backgroundColor: `${PRIMARY}12` }]}>
+                <Text style={styles.emptyIcon}>{'🗂\uFE0F'}</Text>
+              </View>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>No Spaces Yet</Text>
+              <Text style={[styles.emptySubtitle, { color: subtleText }]}>
+                Create a space to start organizing your belongings
+              </Text>
+              <TouchableOpacity
+                style={[styles.primaryButton, { backgroundColor: PRIMARY }]}
+                onPress={() => setFormVisible(true)}
+              >
+                <Text style={styles.primaryButtonText}>+ Create Space</Text>
+              </TouchableOpacity>
+            </View>
+          )
+        }
       />
-    </SafeAreaView>
+
+      {/* FAB -- only shown when spaces exist */}
+      {spaces.length > 0 && (
+        <TouchableOpacity
+          style={[styles.fab, { backgroundColor: PRIMARY, bottom: insets.bottom + 24 }]}
+          onPress={() => setFormVisible(true)}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.fabText}>+</Text>
+        </TouchableOpacity>
+      )}
+
+      <SpaceFormModal
+        visible={formVisible}
+        onClose={() => setFormVisible(false)}
+        onSubmit={handleCreateSpace}
+      />
+    </View>
   );
 }
 
-/**
- * Styles for Spaces Tab
- */
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: '#fff',
+  container: { flex: 1 },
+  listContent: { paddingHorizontal: 16, paddingBottom: 100 },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+    paddingTop: 4,
   },
-
-  inputSection: {
-    marginBottom: 16,
-    gap: 8,
-  },
-
-  textInput: {
+  title: { fontSize: 32, fontWeight: '700', letterSpacing: -0.5 },
+  subtitle: { fontSize: 14, marginTop: 4 },
+  countBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 4,
-    padding: 8,
-    fontSize: 16,
+    marginTop: 6,
   },
-
-  textInputDisabled: {
-    backgroundColor: '#f5f5f5',
-    color: '#999',
-  },
-
-  createButtonContainer: {
+  countBadgeText: { fontSize: 14, fontWeight: '600' },
+  spaceCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 10,
+    gap: 12,
   },
-
-  spinner: {
-    marginLeft: 8,
-  },
-
-  successMessage: {
-    color: '#28a745',
-    fontSize: 14,
-    fontWeight: '500',
-    marginTop: 4,
-  },
-
-  list: {
+  spaceDot: { width: 8, height: 8, borderRadius: 4 },
+  spaceCardContent: { flex: 1 },
+  spaceName: { fontSize: 16, fontWeight: '600', marginBottom: 2 },
+  spaceDate: { fontSize: 12 },
+  chevron: { fontSize: 16 },
+  centerContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 80,
   },
-
-  spaceItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+  emptyCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 32,
+    alignItems: 'center',
+    marginTop: 20,
   },
-
-  spaceName: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 4,
+  emptyIconContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
   },
-
-  spaceDate: {
-    fontSize: 12,
-    color: '#666',
-  },
-
-  emptyText: {
-    textAlign: 'center',
-    color: '#999',
-    marginTop: 24,
+  emptyIcon: { fontSize: 32 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
+  emptySubtitle: {
     fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
   },
+  primaryButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 12,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+  },
+  primaryButtonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  fab: {
+    position: 'absolute',
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  fabText: { color: '#fff', fontSize: 28, fontWeight: '300', lineHeight: 32 },
 });

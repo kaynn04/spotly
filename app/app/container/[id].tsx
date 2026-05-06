@@ -1,653 +1,298 @@
 /**
- * Container Detail Screen
+ * ContainerDetailScreen
  *
- * View details for a single container
+ * View and manage items inside a container -- minimalist redesign uniform with Outside feature
  * Accessed via /container/[id] dynamic route
- * 
- * Displays all items in the container with management options
+ *
+ * Design changes vs original:
+ *  - No 3-dot menu per item: tapping item row opens native ActionSheet (Alert)
+ *  - No FAB popup: single "+ Add Item" bottom action bar button
+ *  - Move modal replaced with bottom sheet
+ *  - Full dark mode support
  */
 
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Button, Alert, Pressable, FlatList, TextInput, Modal, StatusBar, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  Modal,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import type { Space } from '../../src/models/Space';
-import type { Item } from '../../src/models/Item';
-import type { Container } from '../../src/models/Container';
-import { SpaceService } from '../../src/services/SpaceService';
-import { ItemService } from '../../src/services/ItemService';
-import { ContainerService } from '../../src/services/ContainerService';
-import { Breadcrumb, type BreadcrumbItem } from '../../components/breadcrumb';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
+import type { Space } from '@/src/models/Space';
+import type { Item } from '@/src/models/Item';
+import type { Container } from '@/src/models/Container';
+import { SpaceService } from '@/src/services/SpaceService';
+import { ItemService } from '@/src/services/ItemService';
+import { ContainerService } from '@/src/services/ContainerService';
+import ItemFormModal from '@/src/features/spaces/screens/components/ItemFormModal';
+
+const PRIMARY = '#6b7f99';
 
 export default function ContainerDetailScreen() {
   const router = useRouter();
   const { id: containerId } = useLocalSearchParams<{ id: string }>();
-  
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
+  const isDark = colorScheme === 'dark';
+
   const [container, setContainer] = useState<Container | null>(null);
   const [space, setSpace] = useState<Space | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [allSpaces, setAllSpaces] = useState<Space[]>([]);
-  
-  const [itemName, setItemName] = useState<string>('');
-  const [showAddItemModal, setShowAddItemModal] = useState<boolean>(false);
-  const [showMoveModal, setShowMoveModal] = useState<boolean>(false);
+  const [loading, setLoading] = useState(true);
+
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [showMoveModal, setShowMoveModal] = useState(false);
   const [selectedMoveItemId, setSelectedMoveItemId] = useState<string | null>(null);
-  const [showItemMenu, setShowItemMenu] = useState<string | null>(null);
-  const [showFabMenu, setShowFabMenu] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Load container details on mount
-  useEffect(() => {
-    loadContainer();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [containerId]);
+  const cardBg = isDark ? '#1c1c1e' : '#ffffff';
+  const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
+  const subtleText = isDark ? '#8e8e93' : '#a0aec0';
 
-  // Refresh items when screen comes into focus
+  useEffect(() => { loadContainer(); }, [containerId]);
+
   useFocusEffect(
-    React.useCallback(() => {
-      if (container?.id) {
-        loadItems();
-        loadAllSpaces();
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+    useCallback(() => {
+      if (container?.id) { loadItems(); loadAllSpaces(); }
     }, [container?.id])
   );
 
   async function loadContainer() {
     if (!containerId) return;
-
+    setLoading(true);
     try {
-      setIsLoading(true);
       const result = await ContainerService.getContainerById(containerId);
       setContainer(result);
-      
       if (result?.spaceId) {
         const spaceResult = await SpaceService.getSpaceById(result.spaceId);
         setSpace(spaceResult);
-        await loadItems();
       }
-      await loadAllSpaces();
-    } catch (error) {
-      console.error('Failed to load container:', error);
-      Alert.alert('Error', 'Failed to load container. Please try again.');
-      setContainer(null);
+      await Promise.all([loadItems(), loadAllSpaces()]);
+    } catch (err) {
+      console.error('[ContainerDetailScreen] loadContainer:', err);
+      Alert.alert('Error', 'Failed to load container');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   }
 
   async function loadItems() {
     if (!containerId) return;
-
-    try {
-      const result = await ItemService.getItemsByContainerId(containerId);
-      setItems(result);
-    } catch (error) {
-      console.error('Failed to load items:', error);
-      setItems([]);
-    }
+    try { setItems(await ItemService.getItemsByContainerId(containerId)); } catch {}
   }
 
   async function loadAllSpaces() {
-    try {
-      const result = await SpaceService.getAllSpaces();
-      setAllSpaces(result);
-    } catch (error) {
-      console.error('Failed to load spaces:', error);
-      setAllSpaces([]);
-    }
+    try { setAllSpaces(await SpaceService.getAllSpaces()); } catch {}
   }
 
-  function handleMovePress(itemId: string) {
-    setSelectedMoveItemId(itemId);
-    setShowMoveModal(true);
+  function handleItemPress(item: Item) {
+    Alert.alert(item.name, 'What do you want to do?', [
+      { text: 'Move', onPress: () => { setSelectedMoveItemId(item.id); setShowMoveModal(true); } },
+      { text: 'Delete', style: 'destructive', onPress: () => confirmDeleteItem(item.id, item.name) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   }
 
-  async function handleSelectTargetSpace(targetSpaceId: string) {
-    if (!selectedMoveItemId || !space) return;
-
-    try {
-      await ItemService.moveItem(selectedMoveItemId, space.id, targetSpaceId);
-      setShowMoveModal(false);
-      setSelectedMoveItemId(null);
-      // Refresh items from container
-      await loadItems();
-    } catch (error) {
-      console.error('Failed to move item:', error);
-      Alert.alert('Error', 'Failed to move item. Please try again.');
-    }
+  function confirmDeleteItem(itemId: string, itemName: string) {
+    Alert.alert('Delete Item', `Delete "${itemName}"? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: async () => {
+          try { await ItemService.deleteItem(itemId); await loadItems(); }
+          catch { Alert.alert('Error', 'Failed to delete item'); }
+        },
+      },
+    ]);
   }
 
   async function handleMoveToRootSpace() {
     if (!selectedMoveItemId || !space) return;
-
     try {
-      // Move item to root space (remove from container)
       await ItemService.moveItemToContainer(selectedMoveItemId, space.id, '');
       setShowMoveModal(false);
       setSelectedMoveItemId(null);
-      // Refresh items from container
       await loadItems();
-    } catch (error) {
-      console.error('Failed to move item to root space:', error);
-      Alert.alert('Error', 'Failed to move item. Please try again.');
-    }
+    } catch { Alert.alert('Error', 'Failed to move item'); }
   }
 
-  function handleDeleteItemPress(itemId: string, itemName: string) {
-    Alert.alert(
-      'Delete Item',
-      `Delete '${itemName}'? This cannot be undone.`,
-      [
-        { text: 'Cancel', onPress: () => {}, style: 'cancel' },
-        {
-          text: 'Delete',
-          onPress: async () => await deleteItem(itemId),
-          style: 'destructive',
-        },
-      ]
-    );
-  }
-
-  async function deleteItem(itemId: string) {
+  async function handleMoveToSpace(targetSpaceId: string) {
+    if (!selectedMoveItemId || !space) return;
     try {
-      await ItemService.deleteItem(itemId);
+      await ItemService.moveItem(selectedMoveItemId, space.id, targetSpaceId);
+      setShowMoveModal(false);
+      setSelectedMoveItemId(null);
       await loadItems();
-    } catch (error) {
-      console.error('Failed to delete item:', error);
-      Alert.alert('Error', 'Failed to delete item. Please try again.');
-    }
+    } catch { Alert.alert('Error', 'Failed to move item'); }
   }
 
-  async function handleAddItem() {
-    if (!containerId || !itemName.trim()) {
-      Alert.alert('Error', 'Item name cannot be empty.');
-      return;
-    }
-
-    try {
-      // Create item in this container
-      if (!space) return;
-      await ItemService.createItem(space.id, itemName, containerId);
-      setItemName('');
-      setShowAddItemModal(false);
-      await loadItems();
-    } catch (error) {
-      console.error('Failed to add item:', error);
-      Alert.alert('Error', 'Failed to add item. Please try again.');
-    }
+  async function handleAddItem(name: string) {
+    if (!space || !containerId) return;
+    await ItemService.createItem(space.id, name, containerId);
+    await loadItems();
   }
-
-  // Build breadcrumb items
-  const breadcrumbItems: BreadcrumbItem[] = [
-    {
-      label: '🏠',
-      onPress: () => {
-        if (space?.id) {
-          router.back();
-        }
-      },
-    },
-    {
-      label: container?.name || 'Loading...',
-      isActive: true,
-    },
-  ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} />
-
-      {/* Main Content */}
-      {container && space ? (
-        <View style={styles.contentWrapper}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Button title="Back" onPress={() => router.back()} />
-            <Text style={styles.title}>Container Details</Text>
-            <Text style={styles.itemCount}>
-              {items.length} {items.length === 1 ? 'item' : 'items'}
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+      {/* Header */}
+      <View style={[styles.headerBar, { borderBottomColor: borderColor, paddingTop: insets.top, backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Text style={[styles.backBtnText, { color: PRIMARY }]}>{'< Back'}</Text>
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          {space && (
+            <Text style={[styles.breadcrumb, { color: subtleText }]} numberOfLines={1}>
+              {space.name}
             </Text>
-          </View>
-
-          {/* Breadcrumb Navigation */}
-          <Breadcrumb items={breadcrumbItems} />
-
-          {/* Items List */}
-          <FlatList
-            style={styles.itemsList}
-            contentContainerStyle={styles.itemsListContent}
-            data={items}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <View style={styles.itemCard}>
-                <View style={styles.itemHeader}>
-                  <View style={styles.itemInfo}>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                  </View>
-                  <Pressable
-                    style={styles.itemMenu}
-                    onPress={() => setShowItemMenu(showItemMenu === item.id ? null : item.id)}
-                  >
-                    <Text style={styles.itemMenuText}>⋯</Text>
-                  </Pressable>
-                </View>
-                {showItemMenu === item.id && (
-                  <View style={styles.itemMenuDropdown}>
-                    <Pressable
-                      style={[
-                        styles.itemMenuOption,
-                        allSpaces.length < 2 && styles.itemMenuOptionDisabled,
-                      ]}
-                      onPress={() => {
-                        setShowItemMenu(null);
-                        handleMovePress(item.id);
-                      }}
-                      disabled={allSpaces.length < 2}
-                    >
-                      <Text style={styles.itemMenuOptionText}>Move</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.itemMenuOption, styles.itemMenuOptionDelete]}
-                      onPress={() => {
-                        setShowItemMenu(null);
-                        handleDeleteItemPress(item.id, item.name);
-                      }}
-                    >
-                      <Text style={styles.itemMenuOptionDeleteText}>Delete</Text>
-                    </Pressable>
-                  </View>
-                )}
-              </View>
-            )}
-            ListEmptyComponent={
-              <View style={styles.emptyStateContainer}>
-                <Text style={styles.emptyState}>No items in this container</Text>
-                <Pressable
-                  style={styles.emptyStateButton}
-                  onPress={() => setShowAddItemModal(true)}
-                >
-                  <Text style={styles.emptyStateButtonText}>+ Add Item</Text>
-                </Pressable>
-              </View>
-            }
-            scrollEnabled={true}
-          />
-
-          {/* Floating Action Button (FAB) */}
-          <Pressable
-            style={styles.fab}
-            onPress={() => setShowFabMenu(!showFabMenu)}
-          >
-            <Text style={styles.fabText}>+</Text>
-          </Pressable>
-
-          {/* FAB Menu */}
-          {showFabMenu && (
-            <View style={styles.fabMenu}>
-              <Pressable
-                style={styles.fabMenuItem}
-                onPress={() => {
-                  setShowFabMenu(false);
-                  setShowAddItemModal(true);
-                }}
-              >
-                <Text style={styles.fabMenuItemText}>Add Item</Text>
-              </Pressable>
-            </View>
           )}
+          <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+            {container?.name ?? 'Container'}
+          </Text>
+        </View>
+        <View style={styles.itemCountBadge}>
+          <Text style={[styles.itemCountText, { color: PRIMARY }]}>
+            {items.length}
+          </Text>
+        </View>
+      </View>
 
-          {/* Modal for Adding Item */}
-          <Modal
-            visible={showAddItemModal}
-            transparent={true}
-            animationType="slide"
-            onRequestClose={() => setShowAddItemModal(false)}
-          >
-            <View style={styles.modalOverlay}>
-              <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Add Item to {container.name}</Text>
-
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="Item name"
-                  placeholderTextColor="#999"
-                  value={itemName}
-                  onChangeText={setItemName}
-                  maxLength={100}
-                />
-
-                <View style={styles.modalButtons}>
-                  <Pressable
-                    style={[styles.button, styles.primaryButton]}
-                    onPress={handleAddItem}
-                  >
-                    <Text style={styles.primaryButtonText}>Add Item</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.button, styles.cancelButton]}
-                    onPress={() => {
-                      setShowAddItemModal(false);
-                      setItemName('');
-                    }}
-                  >
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-          </Modal>
-
-          {/* Modal for Moving Items */}
-          <Modal
-            visible={showMoveModal}
-            transparent={true}
-            animationType="fade"
-            onRequestClose={() => setShowMoveModal(false)}
-          >
-            <View style={styles.modalOverlay}>
-              <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Move item</Text>
-
-                <ScrollView>
-                  {/* Move to Root Space Section */}
-                  <Text style={styles.sectionTitle}>In this space:</Text>
-                  <Pressable
-                    style={styles.spaceOption}
-                    onPress={handleMoveToRootSpace}
-                  >
-                    <Text style={styles.spaceOptionText}>📍 Root space</Text>
-                  </Pressable>
-
-                  {/* Move to Other Spaces Section */}
-                  {allSpaces.filter((s) => s.id !== space?.id).length > 0 && (
-                    <>
-                      <Text style={styles.sectionTitle}>Move to another space:</Text>
-                      {allSpaces.filter((s) => s.id !== space?.id).map((targetSpace) => (
-                        <Pressable
-                          key={targetSpace.id}
-                          style={styles.spaceOption}
-                          onPress={() => handleSelectTargetSpace(targetSpace.id)}
-                        >
-                          <Text style={styles.spaceOptionText}>{targetSpace.name}</Text>
-                        </Pressable>
-                      ))}
-                    </>
-                  )}
-                </ScrollView>
-
-                <Pressable
-                  style={[styles.button, styles.cancelButton]}
-                  onPress={() => setShowMoveModal(false)}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </Pressable>
-              </View>
-            </View>
-          </Modal>
+      {loading ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={PRIMARY} />
         </View>
       ) : (
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading container...</Text>
-        </View>
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 80 }]}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            items.length > 0 ? (
+              <Text style={[styles.sectionLabel, { color: subtleText }]}>
+                {items.length} item{items.length !== 1 ? 's' : ''} {'\u00B7'} Tap to manage
+              </Text>
+            ) : null
+          }
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[styles.itemCard, { backgroundColor: cardBg, borderColor }]}
+              onPress={() => handleItemPress(item)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.itemDot, { backgroundColor: isDark ? '#48484a' : '#c7c7cc' }]} />
+              <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={1}>
+                {item.name}
+              </Text>
+              <Text style={[styles.itemMoreDots, { color: subtleText }]}>{'...'}</Text>
+            </TouchableOpacity>
+          )}
+          ListEmptyComponent={
+            <View style={[styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
+              <Text style={[styles.emptyText, { color: subtleText }]}>
+                {'No items in this container yet.\nTap the button below to add one.'}
+              </Text>
+            </View>
+          }
+        />
       )}
-    </SafeAreaView>
+
+      {/* Bottom Action Bar */}
+      <View style={[styles.actionBar, { backgroundColor: cardBg, borderTopColor: borderColor, paddingBottom: insets.bottom + 8 }]}>
+        <TouchableOpacity
+          style={[styles.actionBarBtn, { backgroundColor: PRIMARY }]}
+          onPress={() => setShowAddItemModal(true)}
+        >
+          <Text style={[styles.actionBarBtnText, { color: '#fff' }]}>+ Add Item</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Move Bottom Sheet */}
+      <Modal visible={showMoveModal} transparent animationType="slide" onRequestClose={() => setShowMoveModal(false)}>
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.moveSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+            <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move Item</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {space && (
+                <>
+                  <Text style={[styles.moveSectionLabel, { color: subtleText }]}>IN THIS SPACE</Text>
+                  <TouchableOpacity style={[styles.moveOption, { borderColor }]} onPress={handleMoveToRootSpace}>
+                    <Text style={styles.moveOptionIcon}>{'\u{1F4CD}'}</Text>
+                    <Text style={[styles.moveOptionText, { color: colors.text }]}>
+                      Root of {space.name}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+              {allSpaces.filter((s) => s.id !== space?.id).length > 0 && (
+                <>
+                  <Text style={[styles.moveSectionLabel, { color: subtleText }]}>MOVE TO ANOTHER SPACE</Text>
+                  {allSpaces.filter((s) => s.id !== space?.id).map((s) => (
+                    <TouchableOpacity key={s.id} style={[styles.moveOption, { borderColor }]} onPress={() => handleMoveToSpace(s.id)}>
+                      <Text style={styles.moveOptionIcon}>{'\u{1F4CD}'}</Text>
+                      <Text style={[styles.moveOptionText, { color: colors.text }]}>{s.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
+            </ScrollView>
+            <TouchableOpacity style={[styles.moveCancelBtn, { borderColor }]} onPress={() => setShowMoveModal(false)}>
+              <Text style={[styles.moveCancelText, { color: subtleText }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <ItemFormModal
+        visible={showAddItemModal}
+        onClose={() => setShowAddItemModal(false)}
+        onSubmit={handleAddItem}
+        contextLabel={container?.name}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  contentWrapper: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    backgroundColor: '#f8f8f8',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-    flex: 1,
-    marginHorizontal: 12,
-  },
-  itemCount: {
-    fontSize: 12,
-    color: '#999',
-    marginLeft: 8,
-  },
-  itemsList: {
-    flex: 1,
-  },
-  itemsListContent: {
-    paddingVertical: 8,
-  },
-  itemCard: {
-    marginVertical: 4,
-    marginHorizontal: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#0a84ff',
-  },
-  itemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  itemInfo: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  itemMenu: {
-    padding: 8,
-    marginRight: -8,
-  },
-  itemMenuText: {
-    fontSize: 18,
-    color: '#999',
-  },
-  itemMenuDropdown: {
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    paddingTop: 8,
-  },
-  itemMenuOption: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    backgroundColor: '#e3f2fd',
-    marginBottom: 6,
-  },
-  itemMenuOptionDelete: {
-    backgroundColor: '#ffebee',
-  },
-  itemMenuOptionText: {
-    color: '#0a84ff',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  itemMenuOptionDeleteText: {
-    color: '#d32f2f',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  itemMenuOptionDisabled: {
-    opacity: 0.5,
-  },
-  itemActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  button: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  emptyStateContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyState: {
-    fontSize: 16,
-    color: '#999',
-    marginBottom: 16,
-  },
-  emptyStateButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#0a84ff',
-    borderRadius: 8,
-  },
-  emptyStateButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#0a84ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  fabText: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '300',
-  },
-  fabMenu: {
-    position: 'absolute',
-    bottom: 80,
-    right: 20,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    overflow: 'hidden',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  fabMenuItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  fabMenuItemText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
-    color: '#333',
-  },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 16,
-    fontSize: 16,
-    color: '#333',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  primaryButton: {
-    flex: 1,
-    backgroundColor: '#0a84ff',
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: '#e0e0e0',
-  },
-  cancelButtonText: {
-    color: '#333',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: '#f5f5f5',
-    marginTop: 12,
-  },
-  spaceOption: {
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  spaceOptionText: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#999',
-  },
+  container: { flex: 1 },
+  headerBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1 },
+  backBtn: { paddingRight: 12, paddingVertical: 8 },
+  backBtnText: { fontSize: 16, fontWeight: '500' },
+  headerCenter: { flex: 1, alignItems: 'center' },
+  breadcrumb: { fontSize: 11, fontWeight: '500', letterSpacing: 0.2, marginBottom: 1 },
+  headerTitle: { fontSize: 17, fontWeight: '600' },
+  itemCountBadge: { paddingLeft: 12, paddingVertical: 8 },
+  itemCountText: { fontSize: 14, fontWeight: '700' },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  listContent: { paddingHorizontal: 16, paddingTop: 12 },
+  sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3, marginBottom: 12 },
+  itemCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingVertical: 14, paddingHorizontal: 14, marginBottom: 6, gap: 10 },
+  itemDot: { width: 6, height: 6, borderRadius: 3 },
+  itemName: { flex: 1, fontSize: 15, fontWeight: '500' },
+  itemMoreDots: { fontSize: 14, letterSpacing: 1 },
+  emptyCard: { borderRadius: 14, borderWidth: 1, padding: 28, alignItems: 'center', marginTop: 20 },
+  emptyText: { fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  actionBar: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1, gap: 10 },
+  actionBarBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  actionBarBtnText: { fontSize: 15, fontWeight: '600' },
+  sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  moveSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '70%' },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
+  moveSheetTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.3, marginBottom: 16 },
+  moveSectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8, marginTop: 8 },
+  moveOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, marginBottom: 6, gap: 12 },
+  moveOptionIcon: { fontSize: 16 },
+  moveOptionText: { fontSize: 15, fontWeight: '500' },
+  moveCancelBtn: { marginTop: 12, borderWidth: 1.5, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  moveCancelText: { fontSize: 15, fontWeight: '600' },
 });
