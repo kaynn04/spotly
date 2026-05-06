@@ -126,38 +126,39 @@ export default function SessionHistoryScreen() {
         <View style={{ width: 60 }} />
       </View>
 
-      {/* Sessions List */}
-      {sessions.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={[styles.emptyText, { color: colors.icon }]}>No completed sessions yet</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={sessions}
-          renderItem={({ item }) => (
-            <View
-              key={item.id}
-              style={[styles.sessionItem, { backgroundColor: colors.background, borderBottomColor: '#e0e0e0' }]}
-            >
-              <View style={styles.sessionInfo}>
-                <Text style={[styles.sessionTitle, { color: colors.text }]}>{item.title}</Text>
-                <Text style={[styles.sessionDate, { color: colors.icon }]}>
-                  {item.completed_at ? formatDate(item.completed_at) : 'N/A'}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() => handleDeleteSession(item.id, item.title)}
+      {/* Sessions List - Flex Container */}
+      <View style={styles.sessionsList}>
+        {sessions.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: colors.icon }]}>No completed sessions yet</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={sessions}
+            renderItem={({ item }) => (
+              <View
+                key={item.id}
+                style={[styles.sessionItem, { backgroundColor: colors.background, borderBottomColor: '#e0e0e0' }]}
               >
-                <Text style={{ color: '#d32f2f', fontSize: 20 }}>✕</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          keyExtractor={item => item.id}
-          scrollEnabled={true}
-          contentContainerStyle={{ paddingBottom: 80 }}
-        />
-      )}
+                <View style={styles.sessionInfo}>
+                  <Text style={[styles.sessionTitle, { color: colors.text }]}>{item.title}</Text>
+                  <Text style={[styles.sessionDate, { color: colors.icon }]}>
+                    {item.completed_at ? formatDate(item.completed_at) : 'N/A'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => handleDeleteSession(item.id, item.title)}
+                >
+                  <Text style={{ color: '#d32f2f', fontSize: 20 }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            keyExtractor={item => item.id}
+            scrollEnabled={true}
+          />
+        )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -183,6 +184,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  sessionsList: {
+    flex: 1,
   },
   centerContainer: {
     flex: 1,

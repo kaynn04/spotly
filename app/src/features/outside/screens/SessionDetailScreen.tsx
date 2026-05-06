@@ -250,20 +250,21 @@ export default function SessionDetailScreen() {
         </Text>
       </View>
 
-      {/* Items List */}
-      {items.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={[styles.emptyText, { color: colors.icon }]}>No items in this session</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={items}
-          renderItem={renderItemComponent}
-          keyExtractor={(item) => item.id}
-          scrollEnabled={true}
-          contentContainerStyle={{ paddingBottom: 80 }}
-        />
-      )}
+      {/* Items List - Flex Container */}
+      <View style={styles.itemsList}>
+        {items.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: colors.icon }]}>No items in this session</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={items}
+            renderItem={renderItemComponent}
+            keyExtractor={(item) => item.id}
+            scrollEnabled={true}
+          />
+        )}
+      </View>
 
       {/* Actions */}
       <View style={styles.actionBar}>
