@@ -104,7 +104,7 @@ export default function LendingPage() {
           {formatDate(item.lent_at)}
         </Text>
       </View>
-      <Text style={[styles.chevron, { color: subtleText }]}>â€º</Text>
+      <Text style={[styles.chevron, { color: subtleText }]}>{'>'}</Text>
     </TouchableOpacity>
   );
 
@@ -162,7 +162,7 @@ export default function LendingPage() {
         ) : (
           <View style={[styles.card, styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
             <View style={[styles.emptyIconContainer, { backgroundColor: `${PRIMARY}12` }]}>
-              <Text style={styles.emptyIcon}>ðŸ¤</Text>
+              <Text style={styles.emptyIcon}>🤝</Text>
             </View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No Active Lendings</Text>
             <Text style={[styles.emptySubtitle, { color: subtleText }]}>

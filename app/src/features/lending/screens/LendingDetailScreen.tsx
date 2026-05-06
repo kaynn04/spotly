@@ -97,7 +97,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
   const headerBar = (
     <View style={[styles.headerBar, { borderBottomColor: borderColor, paddingTop: insets.top }]}>
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Text style={[styles.backBtnText, { color: PRIMARY }]}>â€¹ Back</Text>
+        <Text style={[styles.backBtnText, { color: PRIMARY }]}>{'< Back'}</Text>
       </TouchableOpacity>
       <Text style={[styles.headerTitle, { color: colors.text }]}>Lending Details</Text>
       <View style={styles.headerSpacer} />

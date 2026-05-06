@@ -123,7 +123,7 @@ export default function LendingHistoryScreen() {
             <Text style={[styles.dateText, { color: subtleText }]}>{formatDate(item.lent_at)}</Text>
           </View>
         </View>
-        <Text style={[styles.chevron, { color: subtleText }]}>â€º</Text>
+        <Text style={[styles.chevron, { color: subtleText }]}>{'>'}</Text>
       </TouchableOpacity>
     );
   };
@@ -131,7 +131,7 @@ export default function LendingHistoryScreen() {
   const headerBar = (
     <View style={[styles.headerBar, { borderBottomColor: borderColor, paddingTop: insets.top }]}>
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Text style={[styles.backBtnText, { color: PRIMARY }]}>â€¹ Back</Text>
+        <Text style={[styles.backBtnText, { color: PRIMARY }]}>{'< Back'}</Text>
       </TouchableOpacity>
       <Text style={[styles.headerTitle, { color: colors.text }]}>History</Text>
       <View style={styles.headerSpacer} />
@@ -192,7 +192,7 @@ export default function LendingHistoryScreen() {
       {/* List */}
       {filteredLendings.length === 0 ? (
         <View style={styles.centerContainer}>
-          <Text style={styles.emptyIcon}>ðŸ•“</Text>
+          <Text style={styles.emptyIcon}>{'\u{1F550}'}</Text>
           <Text style={[styles.emptyTitle, { color: colors.text }]}>No records</Text>
           <Text style={[styles.emptySubtitle, { color: subtleText }]}>
             {selectedFilter === 'ACTIVE' ? 'No active lendings' : selectedFilter === 'RETURNED' ? 'No returned items yet' : 'No lending history yet'}
