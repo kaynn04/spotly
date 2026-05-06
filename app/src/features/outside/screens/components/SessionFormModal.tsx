@@ -82,13 +82,13 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
 
   return (
     <Modal visible={visible} transparent animationType="slide" statusBarTranslucent>
-      <TouchableWithoutFeedback onPress={handleCancel}>
-        <View style={styles.overlay}>
-          <TouchableWithoutFeedback>
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'position' : undefined}
-              keyboardVerticalOffset={0}
-            >
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <TouchableWithoutFeedback onPress={handleCancel}>
+          <View style={styles.overlay}>
+            <TouchableWithoutFeedback>
               <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
                 {/* Handle */}
                 <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
@@ -152,10 +152,10 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
                   </TouchableOpacity>
                 </View>
               </View>
-            </KeyboardAvoidingView>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
