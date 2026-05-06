@@ -286,7 +286,7 @@ export default function LendingHistoryScreen() {
   // Render Loading
   if (loading) {
     return (
-      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.header}>
           <Pressable onPress={() => router.back()}>
             <Text style={[styles.backButton, { color: colors.tint }]}>← Back</Text>

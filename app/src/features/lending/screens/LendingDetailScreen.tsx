@@ -195,7 +195,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
   // Render Loading
   if (loading) {
     return (
-      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.tint} />
           <Text style={[styles.loadingText, { color: colors.text }]}>Loading details...</Text>
@@ -207,7 +207,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
   // Render Error
   if (error || !lending) {
     return (
-      <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.header}>
           <Pressable onPress={() => router.back()}>
             <Text style={[styles.backButton, { color: colors.tint }]}>← Back</Text>
@@ -234,8 +234,8 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
   const statusColor = isActive ? '#4caf50' : '#9e9e9e';
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header with Back Button */}
+    <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Header with Back Button */}}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()}>
           <Text style={[styles.backButton, { color: colors.tint }]}>← Back</Text>
