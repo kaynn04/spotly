@@ -22,6 +22,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { LendingService } from '../services/LendingService';
@@ -171,13 +172,13 @@ export default function LendingPage() {
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyTitle}>No active lendings</Text>
       <Text style={styles.emptyMessage}>
-        Select an item and tap "Lend" to lend something to a friend
+        Select an item and tap &quot;Lend&quot; to lend something to a friend
       </Text>
     </View>
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Header with actions */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Lendings</Text>
@@ -216,7 +217,7 @@ export default function LendingPage() {
           />
         </>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
