@@ -26,7 +26,7 @@ import {
   TextInput,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faChevronLeft, faEllipsisVertical } from '@fortawesome/free-solid-svg-icons';
+import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faChevronLeft, faEllipsisVertical, faBox, faHandshake, faCheck, faTrash, faMapPin } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -45,8 +45,6 @@ import ItemFormModal from '@/src/features/spaces/screens/components/ItemFormModa
 import ContainerFormModal from '@/src/features/spaces/screens/components/ContainerFormModal';
 import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
 import ItemActionSheet from '@/src/features/spaces/screens/components/ItemActionSheet';
-import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faBox, faHandshake, faCheck, faTrash, faMapPin, faFolder, faMagnifyingGlass, faTimes, faChevronRight, faChevronLeft, faEllipsisVertical } from '@fortawesome/free-solid-svg-icons';
 
 const PRIMARY = '#6b7f99';
 
