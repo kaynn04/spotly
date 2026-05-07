@@ -81,14 +81,12 @@ export default function ContainerDetailScreen() {
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
   const subtleText = isDark ? '#8e8e93' : '#a0aec0';
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { loadContainer(); }, [containerId]);
+  useEffect(() => { loadContainer(); }, [containerId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useFocusEffect(
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     useCallback(() => {
       if (container?.id) { loadItems(); loadAllSpaces(); loadActiveLendings(); }
-    }, [container?.id])
+    }, [container?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   async function loadContainer() {
@@ -305,6 +303,17 @@ export default function ContainerDetailScreen() {
             <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
             <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move Item</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Current location */}
+              <Text style={[styles.moveSectionLabel, { color: subtleText }]}>CURRENT LOCATION</Text>
+              <View style={[styles.moveOption, styles.moveOptionDisabled, { borderColor }]}>
+                <FontAwesomeIcon icon={faBox} size={16} color={subtleText} />
+                <Text style={[styles.moveOptionText, { color: subtleText }]}>{container?.name ?? 'Container'}</Text>
+                <View style={[styles.currentBadge, { backgroundColor: `${PRIMARY}18` }]}>
+                  <Text style={[styles.currentBadgeText, { color: PRIMARY }]}>Here</Text>
+                </View>
+              </View>
+
+              {/* Move within same space */}
               {space && (
                 <>
                   <Text style={[styles.moveSectionLabel, { color: subtleText }]}>IN THIS SPACE</Text>
@@ -316,6 +325,8 @@ export default function ContainerDetailScreen() {
                   </TouchableOpacity>
                 </>
               )}
+
+              {/* Move to another space */}
               {allSpaces.filter((s) => s.id !== space?.id).length > 0 && (
                 <>
                   <Text style={[styles.moveSectionLabel, { color: subtleText }]}>MOVE TO ANOTHER SPACE</Text>
@@ -428,8 +439,11 @@ const styles = StyleSheet.create({
   moveSheetTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.3, marginBottom: 16 },
   moveSectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8, marginTop: 8 },
   moveOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, marginBottom: 6, gap: 12 },
+  moveOptionDisabled: { opacity: 0.6 },
   moveOptionIcon: { fontSize: 16 },
-  moveOptionText: { fontSize: 15, fontWeight: '500' },
+  moveOptionText: { fontSize: 15, fontWeight: '500', flex: 1 },
+  currentBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
+  currentBadgeText: { fontSize: 11, fontWeight: '600' },
   moveCancelBtn: { marginTop: 12, borderWidth: 1.5, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   moveCancelText: { fontSize: 15, fontWeight: '600' },
 });

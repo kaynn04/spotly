@@ -493,23 +493,56 @@ export default function SpaceDetailScreen() {
             <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
             <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move Item</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {containers.length > 0 && (
-                <>
-                  <Text style={[styles.moveSectionLabel, { color: subtleText }]}>CONTAINERS IN THIS SPACE</Text>
-                  {containers.map((c) => (
-                    <TouchableOpacity key={c.id} style={[styles.moveOption, { borderColor }]} onPress={() => handleMoveToContainer(c.id)}>
-                      <FontAwesomeIcon icon={faFolder} size={16} color={PRIMARY} />
-                      <Text style={[styles.moveOptionText, { color: colors.text }]}>{c.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </>
-              )}
+              {/* Current location indicator */}
+              {(() => {
+                const item = items.find(i => i.id === selectedMoveItemId);
+                const currentContainer = item?.containerId ? containers.find(c => c.id === item.containerId) : null;
+                const currentLabel = currentContainer ? currentContainer.name : `Root of ${space?.name ?? 'space'}`;
+                return (
+                  <View style={styles.currentLocationSection}>
+                    <Text style={[styles.moveSectionLabel, { color: subtleText }]}>CURRENT LOCATION</Text>
+                    <View style={[styles.moveOption, styles.moveOptionDisabled, { borderColor }]}>
+                      <FontAwesomeIcon icon={currentContainer ? faFolder : faMapPin} size={16} color={subtleText} />
+                      <Text style={[styles.moveOptionText, { color: subtleText }]}>{currentLabel}</Text>
+                      <View style={[styles.currentBadge, { backgroundColor: `${PRIMARY}18` }]}>
+                        <Text style={[styles.currentBadgeText, { color: PRIMARY }]}>Here</Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })()}
+
+              {/* Containers in this space (excluding current) */}
+              {(() => {
+                const item = items.find(i => i.id === selectedMoveItemId);
+                const availableContainers = containers.filter(c => c.id !== item?.containerId);
+                const showRootOption = !!item?.containerId; // Only show root if item is in a container
+                if (availableContainers.length === 0 && !showRootOption) return null;
+                return (
+                  <>
+                    <Text style={[styles.moveSectionLabel, { color: subtleText }]}>IN THIS SPACE</Text>
+                    {showRootOption && (
+                      <TouchableOpacity style={[styles.moveOption, { borderColor }]} onPress={() => handleMoveToContainer('')}>
+                        <FontAwesomeIcon icon={faMapPin} size={16} color={PRIMARY} />
+                        <Text style={[styles.moveOptionText, { color: colors.text }]}>Root of {space?.name}</Text>
+                      </TouchableOpacity>
+                    )}
+                    {availableContainers.map((c) => (
+                      <TouchableOpacity key={c.id} style={[styles.moveOption, { borderColor }]} onPress={() => handleMoveToContainer(c.id)}>
+                        <FontAwesomeIcon icon={faFolder} size={16} color={PRIMARY} />
+                        <Text style={[styles.moveOptionText, { color: colors.text }]}>{c.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </>
+                );
+              })()}
+
               {allSpaces.filter((s) => s.id !== id).length > 0 && (
                 <>
                   <Text style={[styles.moveSectionLabel, { color: subtleText }]}>MOVE TO ANOTHER SPACE</Text>
                   {allSpaces.filter((s) => s.id !== id).map((s) => (
                     <TouchableOpacity key={s.id} style={[styles.moveOption, { borderColor }]} onPress={() => handleMoveToSpace(s.id)}>
-                      <Text style={styles.moveOptionIcon}>{'\u{1F4CD}'}</Text>
+                      <FontAwesomeIcon icon={faMapPin} size={16} color={PRIMARY} />
                       <Text style={[styles.moveOptionText, { color: colors.text }]}>{s.name}</Text>
                     </TouchableOpacity>
                   ))}
@@ -671,8 +704,12 @@ const styles = StyleSheet.create({
   moveEmptyText: { fontSize: 14, textAlign: 'center', paddingVertical: 20 },
   moveSectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8, marginTop: 8 },
   moveOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, marginBottom: 6, gap: 12 },
+  moveOptionDisabled: { opacity: 0.6 },
   moveOptionIcon: { fontSize: 16 },
-  moveOptionText: { fontSize: 15, fontWeight: '500' },
+  moveOptionText: { fontSize: 15, fontWeight: '500', flex: 1 },
+  currentLocationSection: { marginBottom: 4 },
+  currentBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
+  currentBadgeText: { fontSize: 11, fontWeight: '600' },
   moveCancelBtn: { marginTop: 12, borderWidth: 1.5, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   moveCancelText: { fontSize: 15, fontWeight: '600' },
   
