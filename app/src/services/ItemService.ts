@@ -31,7 +31,9 @@ export class ItemService {
   static async createItem(
     spaceId: string,
     name: string,
-    containerId?: string | null
+    containerId?: string | null,
+    description?: string | null,
+    quantity?: number
   ): Promise<Item> {
     try {
       // Trim input
@@ -47,7 +49,7 @@ export class ItemService {
       }
 
       // Create item in database via repository
-      const item = await ItemRepository.createItem(trimmedName, spaceId, containerId);
+      const item = await ItemRepository.createItem(trimmedName, spaceId, containerId, description, quantity);
 
       return item;
     } catch (error) {
@@ -202,5 +204,27 @@ export class ItemService {
       console.error('[ItemService.deleteItem] Unexpected error:', error);
       throw serviceError;
     }
+  }
+
+  /**
+   * Get a single item by ID with full context (space/container names)
+   */
+  static async getItemById(itemId: string): Promise<Item | null> {
+    return ItemRepository.getItemById(itemId);
+  }
+
+  /**
+   * Update item fields (name, description, quantity)
+   */
+  static async updateItem(itemId: string, updates: { name?: string; description?: string | null; quantity?: number }): Promise<void> {
+    if (updates.name !== undefined) {
+      const trimmed = updates.name.trim();
+      if (trimmed.length === 0) {
+        const error: ServiceError = { code: 'VALIDATION_ERROR', message: 'Item name cannot be empty.' };
+        throw error;
+      }
+      updates.name = trimmed;
+    }
+    return ItemRepository.updateItem(itemId, updates);
   }
 }

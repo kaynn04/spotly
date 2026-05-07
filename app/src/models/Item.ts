@@ -14,6 +14,8 @@
 export interface Item {
   id: string;                    // UUID, unique identifier
   name: string;                  // User-provided item name
+  description?: string | null;   // Optional description/notes
+  quantity: number;              // Quantity (default 1)
   spaceId: string;               // Foreign key reference to space
   containerId?: string | null;   // Optional: FK reference to container (null = space-level item)
   createdAt: string;             // ISO 8601 timestamp, immutable
@@ -29,6 +31,8 @@ export interface Item {
 export interface ItemRow {
   id: string;
   name: string;
+  description?: string | null;
+  quantity: number;
   space_id: string;
   container_id?: string | null;  // Optional container reference
   created_at: string;

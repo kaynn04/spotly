@@ -25,7 +25,7 @@ const PRIMARY = '#6b7f99';
 interface ItemFormModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (name: string) => Promise<void>;
+  onSubmit: (name: string, description?: string, quantity?: number) => Promise<void>;
   contextLabel?: string;
 }
 
@@ -35,6 +35,8 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
   const isDark = colorScheme === 'dark';
 
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [quantity, setQuantity] = useState('1');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,6 +51,8 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
   const handleCancel = () => {
     Keyboard.dismiss();
     setName('');
+    setDescription('');
+    setQuantity('1');
     setError(null);
     onClose();
   };
@@ -58,8 +62,11 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
     setLoading(true);
     setError(null);
     try {
-      await onSubmit(name.trim());
+      const qty = Math.max(1, parseInt(quantity) || 1);
+      await onSubmit(name.trim(), description.trim() || undefined, qty);
       setName('');
+      setDescription('');
+      setQuantity('1');
       onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to add item');
@@ -107,18 +114,59 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
                     maxLength={100}
                     editable={!loading}
                     autoFocus
-                    returnKeyType="done"
-                    onSubmitEditing={handleSubmit}
+                    returnKeyType="next"
                   />
+                </View>
+
+                {/* Description */}
+                <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 14 }]}>Description (optional)</Text>
+                <View style={[styles.inputWrapper, { backgroundColor: inputBg, borderColor }]}>
+                  <TextInput
+                    style={[styles.input, { color: textColor, minHeight: 60 }]}
+                    placeholder="Notes, serial number, details..."
+                    placeholderTextColor={subtleText}
+                    value={description}
+                    onChangeText={setDescription}
+                    maxLength={500}
+                    editable={!loading}
+                    multiline
+                    textAlignVertical="top"
+                  />
+                </View>
+
+                {/* Quantity */}
+                <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 14 }]}>Quantity</Text>
+                <View style={styles.quantityRow}>
+                  <TouchableOpacity
+                    style={[styles.quantityBtn, { backgroundColor: inputBg, borderColor }]}
+                    onPress={() => setQuantity(String(Math.max(1, (parseInt(quantity) || 1) - 1)))}
+                  >
+                    <Text style={[styles.quantityBtnText, { color: textColor }]}>−</Text>
+                  </TouchableOpacity>
+                  <View style={[styles.quantityInputWrap, { backgroundColor: inputBg, borderColor }]}>
+                    <TextInput
+                      style={[styles.quantityInput, { color: textColor }]}
+                      value={quantity}
+                      onChangeText={(t) => setQuantity(t.replace(/[^0-9]/g, ''))}
+                      keyboardType="number-pad"
+                      maxLength={4}
+                      editable={!loading}
+                    />
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.quantityBtn, { backgroundColor: inputBg, borderColor }]}
+                    onPress={() => setQuantity(String((parseInt(quantity) || 1) + 1))}
+                  >
+                    <Text style={[styles.quantityBtnText, { color: textColor }]}>+</Text>
+                  </TouchableOpacity>
                 </View>
 
                 <View style={styles.inputMeta}>
                   {error ? (
                     <Text style={styles.errorText}>{error}</Text>
                   ) : (
-                    <Text style={[styles.hint, { color: subtleText }]}>Tap the item row to move, lend, or delete</Text>
+                    <Text style={[styles.hint, { color: subtleText }]}>Long-press items later to manage</Text>
                   )}
-                  <Text style={[styles.charCount, { color: subtleText }]}>{name.length}/100</Text>
                 </View>
 
                 {/* Buttons */}
@@ -183,6 +231,11 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 12, color: '#d32f2f', flex: 1 },
   hint: { fontSize: 12, flex: 1 },
   charCount: { fontSize: 11 },
+  quantityRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  quantityBtn: { width: 40, height: 40, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  quantityBtnText: { fontSize: 20, fontWeight: '600' },
+  quantityInputWrap: { width: 60, height: 40, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  quantityInput: { fontSize: 16, fontWeight: '600', textAlign: 'center', width: '100%', paddingVertical: 0 },
   buttonRow: { flexDirection: 'row', gap: 10 },
   cancelBtn: { flex: 1, borderWidth: 1.5, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   cancelBtnText: { fontSize: 15, fontWeight: '600' },

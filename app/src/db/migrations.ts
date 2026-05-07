@@ -103,6 +103,14 @@ export async function initializeDatabase() {
       ON items(container_id);
     `);
 
+    // Add description and quantity columns if they don't exist
+    const itemsCols = await db.getAllAsync<any>("PRAGMA table_info(items);");
+    if (!itemsCols.some((col: any) => col.name === 'description')) {
+      await db.execAsync(`ALTER TABLE items ADD COLUMN description TEXT;`);
+      await db.execAsync(`ALTER TABLE items ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1;`);
+      console.log('✓ Added description and quantity columns to items');
+    }
+
     // Create lendings table (Migration 003)
     await createLendingsTable(db);
 

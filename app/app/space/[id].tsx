@@ -270,8 +270,8 @@ export default function SpaceDetailScreen() {
     ]);
   }
 
-  async function handleAddItem(name: string) {
-    await ItemService.createItem(id!, name, null);
+  async function handleAddItem(name: string, description?: string, quantity?: number) {
+    await ItemService.createItem(id!, name, null, description, quantity);
     await loadItems();
   }
 
@@ -424,6 +424,7 @@ export default function SpaceDetailScreen() {
             return (
               <TouchableOpacity
                 style={[styles.itemCard, { backgroundColor: cardBg, borderColor: isLent ? `${PRIMARY}40` : borderColor }]}
+                onPress={() => router.push({ pathname: '../item/[id]' as any, params: { id: item.id } })}
                 onLongPress={() => handleItemPress(item)}
                 activeOpacity={0.7}
               >

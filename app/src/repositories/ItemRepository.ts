@@ -32,7 +32,9 @@ export class ItemRepository {
   static async createItem(
     name: string,
     spaceId: string,
-    containerId?: string | null
+    containerId?: string | null,
+    description?: string | null,
+    quantity?: number
   ): Promise<Item> {
     try {
       const db = getDatabase();
@@ -40,17 +42,20 @@ export class ItemRepository {
       // Generate UUID and current ISO 8601 timestamp
       const id = generateUUID();
       const now = new Date().toISOString();
+      const qty = quantity ?? 1;
 
       // Execute parameterized INSERT query (handle optional containerId)
       await db.runAsync(
-        'INSERT INTO items (id, name, space_id, container_id, created_at) VALUES (?, ?, ?, ?, ?)',
-        [id, name, spaceId, containerId ?? null, now]
+        'INSERT INTO items (id, name, space_id, container_id, description, quantity, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [id, name, spaceId, containerId ?? null, description ?? null, qty, now]
       );
 
       // Return the created Item object
       return {
         id,
         name,
+        description: description ?? null,
+        quantity: qty,
         spaceId,
         containerId,
         createdAt: now,
@@ -95,6 +100,8 @@ export class ItemRepository {
       return (result as any[]).map((row: ItemRow) => ({
         id: row.id,
         name: row.name,
+        description: row.description ?? null,
+        quantity: row.quantity ?? 1,
         spaceId: row.space_id,
         containerId: row.container_id,
         createdAt: row.created_at,
@@ -134,6 +141,8 @@ export class ItemRepository {
       return (result as any[]).map((row: ItemRow) => ({
         id: row.id,
         name: row.name,
+        description: row.description ?? null,
+        quantity: row.quantity ?? 1,
         spaceId: row.space_id,
         createdAt: row.created_at,
         containerId: row.container_id,
@@ -355,6 +364,8 @@ export class ItemRepository {
       return (result as any[]).map((row: any) => ({
         id: row.id,
         name: row.name,
+        description: row.description ?? null,
+        quantity: row.quantity ?? 1,
         spaceId: row.space_id,
         containerId: row.container_id,
         createdAt: row.created_at,
@@ -385,6 +396,8 @@ export class ItemRepository {
         SELECT 
           i.id,
           i.name,
+          i.description,
+          i.quantity,
           i.space_id,
           i.container_id,
           i.created_at,
@@ -404,6 +417,8 @@ export class ItemRepository {
       const item: Item = {
         id: result.id,
         name: result.name,
+        description: result.description ?? null,
+        quantity: result.quantity ?? 1,
         spaceId: result.space_id,
         containerId: result.container_id,
         createdAt: result.created_at,
@@ -415,6 +430,38 @@ export class ItemRepository {
     } catch (error) {
       console.error('[ItemRepository.getById] Database error:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Static: Get item by ID with space/container info
+   */
+  static async getItemById(id: string): Promise<Item | null> {
+    const repo = new ItemRepository();
+    return repo.getById(id);
+  }
+
+  /**
+   * Update item fields (name, description, quantity)
+   */
+  static async updateItem(id: string, updates: { name?: string; description?: string | null; quantity?: number }): Promise<void> {
+    try {
+      const db = getDatabase();
+      const fields: string[] = [];
+      const values: any[] = [];
+
+      if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name); }
+      if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description); }
+      if (updates.quantity !== undefined) { fields.push('quantity = ?'); values.push(updates.quantity); }
+
+      if (fields.length === 0) return;
+      values.push(id);
+
+      await db.runAsync(`UPDATE items SET ${fields.join(', ')} WHERE id = ?`, values);
+    } catch (error) {
+      console.error('[ItemRepository.updateItem] Database error:', error);
+      const serviceError: ServiceError = { code: 'DB_ERROR', message: 'Failed to update item.' };
+      throw serviceError;
     }
   }
 }

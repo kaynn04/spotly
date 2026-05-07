@@ -196,9 +196,9 @@ export default function ContainerDetailScreen() {
     } catch { Alert.alert('Error', 'Failed to move item'); }
   }
 
-  async function handleAddItem(name: string) {
+  async function handleAddItem(name: string, description?: string, quantity?: number) {
     if (!space || !containerId) return;
-    await ItemService.createItem(space.id, name, containerId);
+    await ItemService.createItem(space.id, name, containerId, description, quantity);
     await loadItems();
   }
 
@@ -249,6 +249,7 @@ export default function ContainerDetailScreen() {
             return (
               <TouchableOpacity
                 style={[styles.itemCard, { backgroundColor: cardBg, borderColor: isLent ? `${PRIMARY}40` : borderColor }]}
+                onPress={() => router.push({ pathname: '../item/[id]' as any, params: { id: item.id } })}
                 onLongPress={() => handleItemPress(item)}
                 activeOpacity={0.7}
               >
