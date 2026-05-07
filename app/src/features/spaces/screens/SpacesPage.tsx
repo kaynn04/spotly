@@ -39,6 +39,11 @@ interface SearchResult {
   containerId: string | null;
 }
 
+type SectionedSearchItem =
+  | { kind: 'section'; title: string }
+  | { kind: 'space'; data: Space }
+  | { kind: 'result'; data: SearchResult };
+
 const PRIMARY = '#6b7f99';
 
 export default function SpacesPage() {
@@ -54,9 +59,13 @@ export default function SpacesPage() {
   const [loading, setLoading] = useState(false);
   const [formVisible, setFormVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchResults, setSearchResults] = useState<SectionedSearchItem[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const isSearching = searchText.trim().length > 0;
+  const totalSearchResults = useMemo(
+    () => searchResults.filter((i) => i.kind !== 'section').length,
+    [searchResults]
+  );
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
@@ -94,6 +103,9 @@ export default function SpacesPage() {
       const spaceMap = Object.fromEntries(allSpaces.map((s) => [s.id, s.name]));
       const lower = trimmed.toLowerCase();
 
+      // Match spaces
+      const spaceMatches = allSpaces.filter((s) => s.name.toLowerCase().includes(lower));
+
       // Match items
       const itemMatches: SearchResult[] = allItems
         .filter((i: any) => i.name.toLowerCase().includes(lower))
@@ -107,7 +119,7 @@ export default function SpacesPage() {
           containerId: i.containerId ?? null,
         }));
 
-      // Match containers (by fetching each space's containers - use cached spaces)
+      // Match containers
       const containerRows = await Promise.all(
         allSpaces.map((s) =>
           ContainerRepository.getContainersBySpaceId(s.id).then((cs) =>
@@ -128,7 +140,21 @@ export default function SpacesPage() {
           containerId: null,
         }));
 
-      setSearchResults([...containerMatches, ...itemMatches]);
+      // Build sectioned list
+      const sections: SectionedSearchItem[] = [];
+      if (spaceMatches.length > 0) {
+        sections.push({ kind: 'section', title: 'Spaces' });
+        spaceMatches.forEach((s) => sections.push({ kind: 'space', data: s }));
+      }
+      if (containerMatches.length > 0) {
+        sections.push({ kind: 'section', title: 'Containers' });
+        containerMatches.forEach((c) => sections.push({ kind: 'result', data: c }));
+      }
+      if (itemMatches.length > 0) {
+        sections.push({ kind: 'section', title: 'Items' });
+        itemMatches.forEach((i) => sections.push({ kind: 'result', data: i }));
+      }
+      setSearchResults(sections);
     } catch (err) {
       console.error('[SpacesPage] Search error:', err);
       setSearchResults([]);
@@ -174,9 +200,26 @@ export default function SpacesPage() {
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
       <FlatList
         data={isSearching ? searchResults : spaces}
-        keyExtractor={(item) => (isSearching ? `sr-${(item as SearchResult).type}-${(item as SearchResult).id}` : (item as Space).id)}
+        keyExtractor={(item) => {
+          if (isSearching) {
+            const si = item as SectionedSearchItem;
+            if (si.kind === 'section') return `section-${si.title}`;
+            if (si.kind === 'space') return `space-${si.data.id}`;
+            return `result-${si.data.type}-${si.data.id}`;
+          }
+          return (item as Space).id;
+        }}
         renderItem={isSearching ? ({ item }) => {
-          const result = item as SearchResult;
+          const si = item as SectionedSearchItem;
+          if (si.kind === 'section') {
+            return (
+              <Text style={[styles.sectionHeader, { color: PRIMARY }]}>{si.title}</Text>
+            );
+          }
+          if (si.kind === 'space') {
+            return renderSpace({ item: si.data, index: 0 });
+          }
+          const result = si.data;
           const isContainer = result.type === 'container';
           return (
             <TouchableOpacity
@@ -250,7 +293,7 @@ export default function SpacesPage() {
                   <ActivityIndicator size="small" color={PRIMARY} style={{ marginRight: 8 }} />
                 ) : null}
                 <Text style={[styles.sectionLabel, { color: subtleText }]}>
-                  {searchLoading ? 'Searching...' : `${searchResults.length} result${searchResults.length !== 1 ? 's' : ''} for "${searchText.trim()}"`}
+                  {searchLoading ? 'Searching...' : `${totalSearchResults} result${totalSearchResults !== 1 ? 's' : ''} for "${searchText.trim()}"`}
                 </Text>
               </View>
             ) : spaces.length > 0 ? (
@@ -348,6 +391,7 @@ const styles = StyleSheet.create({
   clearBtnText: { fontSize: 16 },
   resultHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5, marginBottom: 10 },
+  sectionHeader: { fontSize: 12, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', paddingTop: 12, paddingBottom: 6 },
 
   // Search results
   resultCard: {

@@ -77,7 +77,7 @@ export default function SpaceDetailScreen() {
 
   const [actionSheetItem, setActionSheetItem] = useState<Item | null>(null);
   const [searchText, setSearchText] = useState('');
-  const [filterSegment, setFilterSegment] = useState<'all' | 'containers' | 'items'>('all');
+  const [filterSegment, setFilterSegment] = useState<'all' | 'containers' | 'items' | 'lent'>('all');
   // Map of item_id → active Lending (null = not lent)
   const [activeLendingMap, setActiveLendingMap] = useState<Record<string, Lending>>({});
 
@@ -251,7 +251,10 @@ export default function SpaceDetailScreen() {
     // Apply segment filter
     if (filterSegment === 'containers' && entry.type !== 'container') return false;
     if (filterSegment === 'items' && entry.type !== 'item') return false;
-    
+    if (filterSegment === 'lent') {
+      if (entry.type !== 'item') return false;
+      if (!activeLendingMap[(entry.data as Item).id]) return false;
+    }
     // Apply search filter
     if (searchText.trim()) {
       const name = entry.data.name.toLowerCase();
@@ -303,13 +306,8 @@ export default function SpaceDetailScreen() {
           {/* Segment Control */}
           <View style={[styles.segmentContainer, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
             <View style={[styles.segmentTrack, { backgroundColor: isDark ? '#1c1c1e' : '#eef0f3' }]}>
-              {(['all', 'containers', 'items'] as const).map((segment) => {
+              {(['all', 'containers', 'items', 'lent'] as const).map((segment) => {
                 const isActive = filterSegment === segment;
-                const count = segment === 'all'
-                  ? containers.length + spaceLevelItems.length
-                  : segment === 'containers'
-                    ? containers.length
-                    : spaceLevelItems.length;
                 return (
                   <TouchableOpacity
                     key={segment}
@@ -324,19 +322,8 @@ export default function SpaceDetailScreen() {
                       styles.segmentBtnText,
                       { color: isActive ? (isDark ? '#ffffff' : '#1c1c1e') : subtleText },
                     ]}>
-                      {segment === 'all' ? 'All' : segment === 'containers' ? 'Containers' : 'Items'}
+                      {segment === 'all' ? 'All' : segment === 'containers' ? 'Containers' : segment === 'items' ? 'Items' : 'Lent'}
                     </Text>
-                    <View style={[
-                      styles.segmentBadge,
-                      { backgroundColor: isActive ? `${PRIMARY}20` : 'transparent' },
-                    ]}>
-                      <Text style={[
-                        styles.segmentBadgeText,
-                        { color: isActive ? PRIMARY : subtleText },
-                      ]}>
-                        {count}
-                      </Text>
-                    </View>
                   </TouchableOpacity>
                 );
               })}
@@ -354,9 +341,13 @@ export default function SpaceDetailScreen() {
             ListHeaderComponent={
               filteredData.length > 0 ? (
                 <Text style={[styles.sectionLabel, { color: subtleText }]}>
-                  {filterSegment === 'all' && `${filteredData.filter(e => e.type === 'container').length} container${filteredData.filter(e => e.type === 'container').length !== 1 ? 's' : ''} ${'\u00B7'} ${filteredData.filter(e => e.type === 'item').length} item${filteredData.filter(e => e.type === 'item').length !== 1 ? 's' : ''}`}
-                  {filterSegment === 'containers' && `${filteredData.length} container${filteredData.length !== 1 ? 's' : ''}`}
-                  {filterSegment === 'items' && `${filteredData.length} item${filteredData.length !== 1 ? 's' : ''}`}
+                  {filterSegment === 'all'
+                    ? `${filteredData.filter(e => e.type === 'container').length} container${filteredData.filter(e => e.type === 'container').length !== 1 ? 's' : ''} \u00B7 ${filteredData.filter(e => e.type === 'item').length} item${filteredData.filter(e => e.type === 'item').length !== 1 ? 's' : ''}`
+                    : filterSegment === 'containers'
+                    ? `${filteredData.length} container${filteredData.length !== 1 ? 's' : ''}`
+                    : filterSegment === 'items'
+                    ? `${filteredData.length} item${filteredData.length !== 1 ? 's' : ''}`
+                    : `${filteredData.length} lent item${filteredData.length !== 1 ? 's' : ''}`}
                 </Text>
               ) : null
             }
@@ -420,6 +411,8 @@ export default function SpaceDetailScreen() {
                   'No containers yet'
                 ) : filterSegment === 'items' ? (
                   'No items yet'
+                ) : filterSegment === 'lent' ? (
+                  'No items are currently lent out'
                 ) : (
                   'No items or containers yet.\nUse the buttons below to get started.'
                 )}
@@ -592,12 +585,10 @@ const styles = StyleSheet.create({
   clearBtnText: { fontSize: 18, fontWeight: '300' },
   
   segmentContainer: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12 },
-  segmentTrack: { flexDirection: 'row', borderRadius: 12, padding: 3, gap: 2 },
-  segmentBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, borderRadius: 10, gap: 6 },
+  segmentTrack: { flexDirection: 'row', borderRadius: 10, padding: 3, gap: 2 },
+  segmentBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8, borderRadius: 8 },
   segmentBtnActive: { shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
   segmentBtnText: { fontSize: 13, fontWeight: '600' },
-  segmentBadge: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8, minWidth: 20, alignItems: 'center' },
-  segmentBadgeText: { fontSize: 11, fontWeight: '700' },
   
   emptyStateContainer: { padding: 20, alignItems: 'center', justifyContent: 'center' },
   emptyStateText: { fontSize: 14, textAlign: 'center' },

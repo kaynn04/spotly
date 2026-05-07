@@ -15,6 +15,7 @@ import {
   ScrollView,
   FlatList,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -52,6 +53,7 @@ export default function LendingPage() {
   const [lendings, setLendings] = useState<(Lending & { itemName?: string })[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchText, setSearchText] = useState('');
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
@@ -81,6 +83,16 @@ export default function LendingPage() {
   }, [lendingService, repositories.itemRepository]);
 
   useFocusEffect(useCallback(() => { loadLendings(); }, [loadLendings]));
+
+  const filteredLendings = useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    if (!q) return lendings;
+    return lendings.filter(
+      (l) =>
+        (l.itemName ?? '').toLowerCase().includes(q) ||
+        l.borrower_name.toLowerCase().includes(q)
+    );
+  }, [lendings, searchText]);
 
   const formatDate = (date: Date | null): string => {
     if (!date) return '';
@@ -150,21 +162,49 @@ export default function LendingPage() {
             </TouchableOpacity>
           </View>
         ) : lendings.length > 0 ? (
-          <View style={[styles.card, { backgroundColor: cardBg, borderColor, padding: 0, overflow: 'hidden' }]}>
-            <View style={[styles.cardHeaderRow, { borderBottomColor: borderColor }]}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Active</Text>
-              <View style={[styles.countBadge, { backgroundColor: `${PRIMARY}18` }]}>
-                <Text style={[styles.countBadgeText, { color: PRIMARY }]}>{lendings.length}</Text>
+          <>
+            {/* Search Bar */}
+            <View style={[styles.searchContainer, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+              <View style={[styles.searchInputWrapper, { backgroundColor: isDark ? '#2c2c2e' : '#ffffff', borderColor }]}>
+                <Text style={styles.searchIcon}>🔍</Text>
+                <TextInput
+                  style={[styles.searchInput, { color: isDark ? '#ffffff' : '#2c3e50' }]}
+                  placeholder="Search items or borrowers..."
+                  placeholderTextColor={isDark ? '#8e8e93' : '#a0aec0'}
+                  value={searchText}
+                  onChangeText={setSearchText}
+                />
+                {searchText.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchText('')} style={styles.clearBtn}>
+                    <Text style={styles.clearBtnText}>✕</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
-            <FlatList
-              data={lendings}
-              renderItem={renderLendingItem}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-              contentContainerStyle={{ paddingHorizontal: 16 }}
-            />
-          </View>
+
+            {filteredLendings.length > 0 ? (
+              <View style={[styles.card, { backgroundColor: cardBg, borderColor, padding: 0, overflow: 'hidden' }]}>
+                <View style={[styles.cardHeaderRow, { borderBottomColor: borderColor }]}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>Active</Text>
+                  <View style={[styles.countBadge, { backgroundColor: `${PRIMARY}18` }]}>
+                    <Text style={[styles.countBadgeText, { color: PRIMARY }]}>{filteredLendings.length}</Text>
+                  </View>
+                </View>
+                <FlatList
+                  data={filteredLendings}
+                  renderItem={renderLendingItem}
+                  keyExtractor={(item) => item.id}
+                  scrollEnabled={false}
+                  contentContainerStyle={{ paddingHorizontal: 16 }}
+                />
+              </View>
+            ) : (
+              <View style={[styles.card, styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>No results found</Text>
+                <Text style={[styles.emptySubtitle, { color: subtleText }]}>Try a different item or borrower name</Text>
+              </View>
+            )}
+          </>
         ) : (
           <View style={[styles.card, styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
             <View style={[styles.emptyIconContainer, { backgroundColor: `${PRIMARY}12` }]}>
@@ -184,6 +224,13 @@ export default function LendingPage() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { padding: 16 },
+
+  searchContainer: { paddingHorizontal: 0, paddingBottom: 12 },
+  searchInputWrapper: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, height: 44, gap: 8 },
+  searchIcon: { fontSize: 14 },
+  searchInput: { flex: 1, fontSize: 15 },
+  clearBtn: { padding: 4 },
+  clearBtnText: { fontSize: 13, color: '#8e8e93' },
 
   header: {
     flexDirection: 'row',
