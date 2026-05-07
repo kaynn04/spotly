@@ -24,6 +24,7 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -113,6 +114,9 @@ export default function OnboardingScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [name, setName] = useState('');
   const [nameError, setNameError] = useState<string | null>(null);
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
+  // Height available for each slide (full screen minus bottom bar ~130px)
+  const slideHeight = SCREEN_HEIGHT - insets.bottom - 16 - 130;
 
   const bg = isDark ? '#000000' : '#f8f9fa';
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
@@ -153,10 +157,10 @@ export default function OnboardingScreen() {
 
   const renderSlide = ({ item }: { item: Slide }) => (
     <KeyboardAvoidingView
-      style={{ width: SCREEN_WIDTH }}
+      style={{ width: SCREEN_WIDTH, height: slideHeight }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={[styles.slide, { paddingTop: insets.top + 40 }]}>
+      <View style={[styles.slide, { paddingTop: insets.top + 20, height: slideHeight }]}>
         {/* Icon bubble */}
         <View style={[styles.iconBubble, { backgroundColor: `${item.iconColor}18` }]}>
           <FontAwesomeIcon icon={item.icon} size={48} color={item.iconColor} />
@@ -260,8 +264,8 @@ const styles = StyleSheet.create({
 
   slide: {
     width: SCREEN_WIDTH,
-    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 32,
     paddingBottom: 20,
   },
