@@ -14,7 +14,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faSuitcase } from '@fortawesome/free-solid-svg-icons';
+import { faSuitcase, faChevronRight, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -89,19 +89,8 @@ export default function OutsidePage() {
     }
   };
 
-  const handleToggleItem = async (itemId: string) => {
-    if (!activeSessionId) return;
-    try {
-      await outsideService.checkItem(activeSessionId, itemId);
-      await loadActiveSession();
-    } catch (err) {
-      console.error('Error toggling item:', err);
-    }
-  };
-
   const handleViewHistory = () => router.push('/outside/history');
   const handleOpenSession = () => activeSessionId && router.push(`/outside/${activeSessionId}`);
-  const handleAddItems = () => activeSessionId && router.push(`/outside/${activeSessionId}`);
   const handleCompleteSession = () => activeSessionId && router.push(`/outside/${activeSessionId}`);
   const handleCreateSession = () => setFormVisible(true);
 
@@ -112,7 +101,6 @@ export default function OutsidePage() {
       : 0;
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
-  const sectionBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
   const subtleText = isDark ? '#8e8e93' : '#a0aec0';
 
@@ -150,25 +138,34 @@ export default function OutsidePage() {
         ) : activeSessionId ? (
           <View style={styles.activeSection}>
 
-            {/* Session Status Card */}
-            <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+            {/* Main Session Card — tappable, opens detail */}
+            <TouchableOpacity
+              style={[styles.card, { backgroundColor: cardBg, borderColor }]}
+              onPress={handleOpenSession}
+              activeOpacity={0.7}
+            >
               {/* Session name row */}
               <View style={styles.sessionHeaderRow}>
-                <View style={[styles.sessionDot, { backgroundColor: PRIMARY }]} />
+                <View style={[styles.sessionDot, { backgroundColor: progressPercent === 100 ? '#6b9e7a' : PRIMARY }]} />
                 <Text style={[styles.sessionCardTitle, { color: colors.text }]} numberOfLines={1}>
                   {activeSessionTitle}
                 </Text>
-                <View style={[styles.activeBadge, { backgroundColor: `${PRIMARY}18` }]}>
-                  <Text style={[styles.activeBadgeText, { color: PRIMARY }]}>Active</Text>
+                <View style={[styles.activeBadge, { backgroundColor: progressPercent === 100 ? '#6b9e7a18' : `${PRIMARY}18` }]}>
+                  <Text style={[styles.activeBadgeText, { color: progressPercent === 100 ? '#6b9e7a' : PRIMARY }]}>
+                    {progressPercent === 100 ? 'Ready' : 'Active'}
+                  </Text>
                 </View>
+                <FontAwesomeIcon icon={faChevronRight} size={14} color={subtleText} />
               </View>
 
               {/* Progress row */}
               <View style={styles.progressSection}>
                 <View style={styles.progressLabelRow}>
-                  <Text style={[styles.progressLabel, { color: subtleText }]}>Progress</Text>
-                  <Text style={[styles.progressValue, { color: colors.text }]}>
-                    {sessionCard.checkedCount}/{sessionCard.itemCount} items
+                  <Text style={[styles.progressLabel, { color: subtleText }]}>
+                    {sessionCard.checkedCount}/{sessionCard.itemCount} checked
+                  </Text>
+                  <Text style={[styles.progressPercent, { color: progressPercent === 100 ? '#6b9e7a' : PRIMARY }]}>
+                    {progressPercent}%
                   </Text>
                 </View>
                 <View style={[styles.progressTrack, { backgroundColor: isDark ? '#2c2c2e' : '#e8e8ed' }]}>
@@ -182,87 +179,51 @@ export default function OutsidePage() {
                     ]}
                   />
                 </View>
-                <Text style={[styles.progressPercent, { color: progressPercent === 100 ? '#6b9e7a' : PRIMARY }]}>
-                  {progressPercent}% complete
-                </Text>
               </View>
-            </View>
 
-            {/* Items Preview Card */}
-            {previewItems.length > 0 && (
-              <View style={[styles.card, { backgroundColor: sectionBg, borderColor }]}>
-                <View style={styles.cardHeader}>
-                  <Text style={[styles.cardHeaderTitle, { color: colors.text }]}>Items</Text>
-                  <Text style={[styles.cardHeaderCount, { color: subtleText }]}>{sessionCard.itemCount} total</Text>
-                </View>
-
-                {previewItems.map((item, index) => {
-                  const checked = Boolean(item.is_checked);
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={[
-                        styles.itemRow,
-                        index < previewItems.length - 1 && { borderBottomWidth: 1, borderBottomColor: borderColor },
-                      ]}
-                      onPress={() => handleToggleItem(item.item_id)}
-                      activeOpacity={0.6}
-                    >
-                      {/* Custom checkbox */}
-                      <View style={[styles.checkCircle, checked ? { backgroundColor: PRIMARY, borderColor: PRIMARY } : { borderColor: isDark ? '#48484a' : '#c7c7cc' }]}>
-                        {checked && <Text style={styles.checkMark}>✓</Text>}
-                      </View>
-
-                      <View style={styles.itemTextGroup}>
+              {/* Items quick preview — just names, no interactions */}
+              {previewItems.length > 0 && (
+                <View style={styles.previewList}>
+                  {previewItems.slice(0, 3).map((item) => {
+                    const checked = Boolean(item.is_checked);
+                    return (
+                      <View key={item.id} style={styles.previewItem}>
+                        <View style={[styles.previewDot, { backgroundColor: checked ? '#6b9e7a' : isDark ? '#48484a' : '#c7c7cc' }]} />
                         <Text
-                          style={[
-                            styles.itemNameText,
-                            {
-                              color: checked ? subtleText : colors.text,
-                              textDecorationLine: checked ? 'line-through' : 'none',
-                            },
-                          ]}
+                          style={[styles.previewItemText, { color: checked ? subtleText : colors.text }]}
                           numberOfLines={1}
                         >
                           {item.item_name}
                         </Text>
-                        {item.space_name && item.space_name !== 'Unknown Space' && (
-                          <Text style={[styles.itemLocationText, { color: subtleText }]}>
-                            {item.space_name}
-                          </Text>
-                        )}
                       </View>
-                    </TouchableOpacity>
-                  );
-                })}
-
-                {sessionCard.itemCount > 5 && (
-                  <TouchableOpacity style={styles.viewAllRow} onPress={handleOpenSession}>
-                    <Text style={[styles.viewAllText, { color: PRIMARY }]}>
-                      See all {sessionCard.itemCount} items
+                    );
+                  })}
+                  {sessionCard.itemCount > 3 && (
+                    <Text style={[styles.previewMore, { color: subtleText }]}>
+                      +{sessionCard.itemCount - 3} more
                     </Text>
-                    <Text style={{ color: PRIMARY, fontSize: 14 }}>›</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
+                  )}
+                </View>
+              )}
 
-            {/* Actions */}
-            <View style={styles.actionsRow}>
+              {/* Tap hint */}
+              <View style={styles.tapHintRow}>
+                <Text style={[styles.tapHintText, { color: PRIMARY }]}>
+                  Tap to manage session
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Quick Action: Complete (only shown when 100%) */}
+            {progressPercent === 100 && (
               <TouchableOpacity
-                style={[styles.outlineButton, { borderColor: PRIMARY, backgroundColor: cardBg }]}
-                onPress={handleAddItems}
-              >
-                <Text style={[styles.outlineButtonText, { color: PRIMARY }]}>+ Add Items</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.primaryButton, { backgroundColor: PRIMARY, flex: 1 }]}
+                style={[styles.completeButton, { backgroundColor: '#6b9e7a' }]}
                 onPress={handleCompleteSession}
               >
-                <Text style={styles.primaryButtonText}>Complete</Text>
+                <FontAwesomeIcon icon={faCheckCircle} size={18} color="#fff" />
+                <Text style={styles.completeButtonText}>Complete Session</Text>
               </TouchableOpacity>
-            </View>
-
+            )}
           </View>
         ) : (
           /* Empty State */
@@ -334,48 +295,40 @@ const styles = StyleSheet.create({
   activeBadgeText: { fontSize: 11, fontWeight: '600' },
 
   /* Progress */
-  progressSection: { gap: 6 },
+  progressSection: { gap: 6, marginBottom: 14 },
   progressLabelRow: { flexDirection: 'row', justifyContent: 'space-between' },
   progressLabel: { fontSize: 13 },
-  progressValue: { fontSize: 13, fontWeight: '600' },
+  progressPercent: { fontSize: 13, fontWeight: '600' },
   progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 3 },
-  progressPercent: { fontSize: 12, fontWeight: '600', textAlign: 'right' },
+
+  /* Preview list */
+  previewList: { gap: 6, marginBottom: 12 },
+  previewItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  previewDot: { width: 6, height: 6, borderRadius: 3 },
+  previewItemText: { fontSize: 14, fontWeight: '400' },
+  previewMore: { fontSize: 13, marginLeft: 14, fontStyle: 'italic' },
+
+  /* Tap hint */
+  tapHintRow: { alignItems: 'center', paddingTop: 6, borderTopWidth: 1, borderTopColor: 'transparent' },
+  tapHintText: { fontSize: 13, fontWeight: '600' },
+
+  /* Complete button */
+  completeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 10,
+  },
+  completeButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
 
   /* Card header */
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   cardHeaderTitle: { fontSize: 16, fontWeight: '600' },
   cardHeaderCount: { fontSize: 13 },
-
-  /* Item row */
-  itemRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 12 },
-  checkCircle: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
-  checkMark: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  itemTextGroup: { flex: 1 },
-  itemNameText: { fontSize: 15, fontWeight: '500' },
-  itemLocationText: { fontSize: 12, marginTop: 1 },
-
-  viewAllRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, marginTop: 4, borderTopWidth: 1, borderTopColor: 'transparent' },
-  viewAllText: { fontSize: 14, fontWeight: '600' },
-
-  /* Action buttons */
-  actionsRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  primaryButton: {
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  outlineButton: {
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  outlineButtonText: { fontSize: 15, fontWeight: '600' },
 
   /* Empty state */
   emptyCard: { alignItems: 'center', paddingVertical: 36, gap: 12, marginTop: 24 },
@@ -383,4 +336,8 @@ const styles = StyleSheet.create({
   emptyIconText: { fontSize: 36 },
   emptyTitle: { fontSize: 20, fontWeight: '700' },
   emptySubtitle: { fontSize: 14, textAlign: 'center', lineHeight: 20, paddingHorizontal: 16, marginBottom: 8 },
+
+  /* Shared button */
+  primaryButton: { paddingVertical: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  primaryButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
 });
