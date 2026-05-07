@@ -9,7 +9,7 @@
  * background bleeds through.
  */
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   Animated,
   View,
@@ -61,34 +61,84 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
         const focused = state.index === idx;
         const icon = TAB_ICONS[route.name];
 
-        const onPress = () => {
-          if (Platform.OS === 'ios') {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          }
-          const event = navigation.emit({
-            type: 'tabPress',
-            target: route.key,
-            canPreventDefault: true,
-          });
-          if (!focused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
-          }
-        };
-
         return (
-          <Pressable key={route.key} onPress={onPress} style={styles.tab}>
-            <View style={[styles.iconBg, focused && styles.iconBgActive]}>
-              <FontAwesomeIcon 
-                icon={icon} 
-                size={18} 
-                color={focused ? PRIMARY : '#999'}
-              />
-            </View>
-            <View style={[styles.dot, { opacity: focused ? 1 : 0 }]} />
-          </Pressable>
+          <TabItem
+            key={route.key}
+            icon={icon}
+            focused={focused}
+            onPress={() => {
+              if (Platform.OS === 'ios') {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }
+              const event = navigation.emit({
+                type: 'tabPress',
+                target: route.key,
+                canPreventDefault: true,
+              });
+              if (!focused && !event.defaultPrevented) {
+                navigation.navigate(route.name);
+              }
+            }}
+          />
         );
       })}
     </Animated.View>
+  );
+}
+
+/** Animated tab item with smooth scale + opacity transitions */
+function TabItem({ icon, focused, onPress }: { icon: any; focused: boolean; onPress: () => void }) {
+  const anim = useRef(new Animated.Value(focused ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(anim, {
+      toValue: focused ? 1 : 0,
+      useNativeDriver: true,
+      tension: 80,
+      friction: 10,
+    }).start();
+  }, [focused]);
+
+  const scale = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.85, 1],
+  });
+
+  const iconColor = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#999999', PRIMARY],
+  });
+
+  return (
+    <Pressable onPress={onPress} style={styles.tab}>
+      <Animated.View
+        style={[
+          styles.iconBg,
+          {
+            transform: [{ scale }],
+            backgroundColor: anim.interpolate({
+              inputRange: [0, 1],
+              outputRange: ['transparent', `${PRIMARY}15`],
+            }),
+          },
+        ]}
+      >
+        <FontAwesomeIcon
+          icon={icon}
+          size={18}
+          color={focused ? PRIMARY : '#999'}
+        />
+      </Animated.View>
+      <Animated.View
+        style={[
+          styles.dot,
+          {
+            opacity: anim,
+            transform: [{ scale: anim }],
+          },
+        ]}
+      />
+    </Pressable>
   );
 }
 
