@@ -487,41 +487,57 @@ export default function SessionDetailScreen() {
             }
             renderItem={({ item: space }) => {
               const isCurrentSpace = space.id === currentItemSpaceId;
-              const containers = (spaceContainers[space.id] ?? []).filter(
-                (c) => c.id !== currentItemContainerId
-              );
-              // In current space: only show root if item is inside a container
-              // In other spaces: always show root
-              const showRoot = isCurrentSpace ? !!currentItemContainerId : true;
-              if (!showRoot && containers.length === 0) return null;
+              const containers = spaceContainers[space.id] ?? [];
+              // Root is "current" if item is in this space at root level (no container)
+              const isRootCurrent = isCurrentSpace && !currentItemContainerId;
               return (
                 <View>
                   {!isCurrentSpace && (
                     <Text style={[styles.moveSectionLabel, { color: subtleText }]}>{space.name.toUpperCase()}</Text>
                   )}
-                  {showRoot && (
-                    <TouchableOpacity
-                      style={[styles.moveOption, { borderColor }]}
-                      onPress={() => handleMoveToSpace(space.id)}
-                      activeOpacity={0.7}
-                    >
-                      <FontAwesomeIcon icon={faMapPin} size={16} color={PRIMARY} />
-                      <Text style={[styles.moveOptionText, { color: colors.text }]}>
-                        {isCurrentSpace ? `Root of ${space.name}` : `${space.name} (root)`}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                  {containers.map((c) => (
-                    <TouchableOpacity
-                      key={c.id}
-                      style={[styles.moveOption, isCurrentSpace && styles.moveOptionNested, { borderColor }]}
-                      onPress={() => handleMoveToContainer(space.id, c.id)}
-                      activeOpacity={0.7}
-                    >
-                      <FontAwesomeIcon icon={faFolder} size={16} color={PRIMARY} />
-                      <Text style={[styles.moveOptionText, { color: colors.text }]}>{c.name}</Text>
-                    </TouchableOpacity>
-                  ))}
+                  {/* Space root row — disabled if item is already here */}
+                  <TouchableOpacity
+                    style={[styles.moveOption, isRootCurrent && styles.moveOptionDisabled, { borderColor }]}
+                    onPress={isRootCurrent ? undefined : () => handleMoveToSpace(space.id)}
+                    activeOpacity={isRootCurrent ? 1 : 0.7}
+                  >
+                    <FontAwesomeIcon icon={faMapPin} size={16} color={isRootCurrent ? subtleText : PRIMARY} />
+                    <Text style={[styles.moveOptionText, { color: isRootCurrent ? subtleText : colors.text }]}>
+                      {isCurrentSpace ? `Root of ${space.name}` : `${space.name} (root)`}
+                    </Text>
+                    {isRootCurrent && (
+                      <View style={[styles.currentBadge, { backgroundColor: `${PRIMARY}18` }]}>
+                        <Text style={[styles.currentBadgeText, { color: PRIMARY }]}>Here</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                  {/* Container rows — disabled if item is already in that container */}
+                  {containers.map((c) => {
+                    const isContainerCurrent = c.id === currentItemContainerId;
+                    return (
+                      <TouchableOpacity
+                        key={c.id}
+                        style={[
+                          styles.moveOption,
+                          isCurrentSpace && styles.moveOptionNested,
+                          isContainerCurrent && styles.moveOptionDisabled,
+                          { borderColor },
+                        ]}
+                        onPress={isContainerCurrent ? undefined : () => handleMoveToContainer(space.id, c.id)}
+                        activeOpacity={isContainerCurrent ? 1 : 0.7}
+                      >
+                        <FontAwesomeIcon icon={faFolder} size={16} color={isContainerCurrent ? subtleText : PRIMARY} />
+                        <Text style={[styles.moveOptionText, { color: isContainerCurrent ? subtleText : colors.text }]}>
+                          {c.name}
+                        </Text>
+                        {isContainerCurrent && (
+                          <View style={[styles.currentBadge, { backgroundColor: `${PRIMARY}18` }]}>
+                            <Text style={[styles.currentBadgeText, { color: PRIMARY }]}>Here</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               );
             }}

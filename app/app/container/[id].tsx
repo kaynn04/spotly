@@ -313,7 +313,7 @@ export default function ContainerDetailScreen() {
                 </View>
               </View>
 
-              {/* Move within same space */}
+              {/* Move within same space — root disabled since item is in a container here */}
               {space && (
                 <>
                   <Text style={[styles.moveSectionLabel, { color: subtleText }]}>IN THIS SPACE</Text>
