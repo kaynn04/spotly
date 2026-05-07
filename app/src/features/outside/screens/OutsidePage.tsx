@@ -14,7 +14,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faSuitcase, faChevronRight, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
+import { faSuitcase, faChevronRight, faCheckCircle, faClockRotateLeft } from '@fortawesome/free-solid-svg-icons';
+import { OutsideSession } from '../models/OutsideSession';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -34,6 +35,17 @@ interface SessionCardState {
 }
 
 const PRIMARY = '#6b7f99';
+
+function formatRelativeDate(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 
 export default function OutsidePage() {
   const router = useRouter();
@@ -55,10 +67,12 @@ export default function OutsidePage() {
   const [activeSessionTitle, setActiveSessionTitle] = useState<string>('');
   const [sessionItems, setSessionItems] = useState<OutsideSessionItemWithContext[]>([]);
   const [formVisible, setFormVisible] = useState(false);
+  const [recentSessions, setRecentSessions] = useState<OutsideSession[]>([]);
 
   useFocusEffect(
     useCallback(() => {
       loadActiveSession();
+      loadRecentSessions();
     }, [])
   );
 
@@ -86,6 +100,15 @@ export default function OutsidePage() {
     } catch (err) {
       console.error('Error loading active session:', err);
       setSessionCard({ loading: false, error: 'Failed to load session', itemCount: 0, checkedCount: 0 });
+    }
+  };
+
+  const loadRecentSessions = async () => {
+    try {
+      const completed = await outsideService.getCompletedSessions();
+      setRecentSessions(completed.slice(0, 5));
+    } catch {
+      // Non-critical, silently skip
     }
   };
 
@@ -243,6 +266,44 @@ export default function OutsidePage() {
             </TouchableOpacity>
           </View>
         )}
+
+        {/* Recent Sessions — shown regardless of active session state */}
+        {recentSessions.length > 0 && (
+          <View style={styles.recentSection}>
+            <View style={styles.recentHeader}>
+              <FontAwesomeIcon icon={faClockRotateLeft} size={13} color={subtleText} />
+              <Text style={[styles.recentTitle, { color: subtleText }]}>Recent Sessions</Text>
+              <TouchableOpacity onPress={handleViewHistory}>
+                <Text style={[styles.recentSeeAll, { color: PRIMARY }]}>See all</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.card, { backgroundColor: cardBg, borderColor, padding: 0, overflow: 'hidden' }]}>
+              {recentSessions.map((session, index) => {
+                const date = new Date(session.completed_at ?? session.created_at);
+                const label = formatRelativeDate(date);
+                return (
+                  <TouchableOpacity
+                    key={session.id}
+                    style={[
+                      styles.recentRow,
+                      index < recentSessions.length - 1 && { borderBottomWidth: 1, borderBottomColor: borderColor },
+                    ]}
+                    onPress={() => router.push(`/outside/${session.id}`)}
+                    activeOpacity={0.6}
+                  >
+                    <View style={[styles.recentDot, { backgroundColor: '#6b9e7a' }]} />
+                    <Text style={[styles.recentSessionName, { color: colors.text }]} numberOfLines={1}>
+                      {session.title}
+                    </Text>
+                    <Text style={[styles.recentDate, { color: subtleText }]}>{label}</Text>
+                    <FontAwesomeIcon icon={faChevronRight} size={11} color={subtleText} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
       </ScrollView>
 
       <SessionFormModal
@@ -250,6 +311,7 @@ export default function OutsidePage() {
         onClose={() => {
           setFormVisible(false);
           loadActiveSession();
+          loadRecentSessions();
         }}
       />
     </View>
@@ -340,4 +402,20 @@ const styles = StyleSheet.create({
   /* Shared button */
   primaryButton: { paddingVertical: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   primaryButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+
+  /* Recent sessions */
+  recentSection: { marginTop: 24 },
+  recentHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  recentTitle: { fontSize: 13, fontWeight: '600', flex: 1, textTransform: 'uppercase', letterSpacing: 0.5 },
+  recentSeeAll: { fontSize: 13, fontWeight: '600' },
+  recentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 10,
+  },
+  recentDot: { width: 7, height: 7, borderRadius: 4 },
+  recentSessionName: { fontSize: 15, fontWeight: '500', flex: 1 },
+  recentDate: { fontSize: 13 },
 });
