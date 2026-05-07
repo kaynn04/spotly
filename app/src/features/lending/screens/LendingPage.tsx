@@ -14,11 +14,13 @@ import {
   TouchableOpacity,
   ScrollView,
   FlatList,
+  Modal,
   ActivityIndicator,
+  Alert,
   TextInput,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faMagnifyingGlass, faTimes, faChevronRight, faHandshake } from '@fortawesome/free-solid-svg-icons';
+import { faMagnifyingGlass, faTimes, faChevronRight, faHandshake, faPlus, faMapPin, faFolder } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -30,6 +32,8 @@ import { LendingService } from '../services/LendingService';
 import { LendingRepository } from '../repositories/LendingRepository';
 import { ItemRepository } from '../../../repositories/ItemRepository';
 import { Lending } from '../models/Lending';
+import type { Item } from '../../../models/Item';
+import LendingFormModal from './components/LendingFormModal';
 
 const PRIMARY = '#6b7f99';
 
@@ -56,6 +60,17 @@ export default function LendingPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
+
+  // Lend from here — item picker + form
+  const [showItemPicker, setShowItemPicker] = useState(false);
+  const [allItems, setAllItems] = useState<Item[]>([]);
+  const [itemPickerSearch, setItemPickerSearch] = useState('');
+  const [itemPickerLoading, setItemPickerLoading] = useState(false);
+  const [selectedLendItem, setSelectedLendItem] = useState<Item | null>(null);
+  const [showLendForm, setShowLendForm] = useState(false);
+  const [borrowerName, setBorrowerName] = useState('');
+  const [lendNote, setLendNote] = useState('');
+  const [lendLoading, setLendLoading] = useState(false);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
@@ -85,6 +100,64 @@ export default function LendingPage() {
   }, [lendingService, repositories.itemRepository]);
 
   useFocusEffect(useCallback(() => { loadLendings(); }, [loadLendings]));
+
+  const openItemPicker = async () => {
+    setItemPickerLoading(true);
+    setItemPickerSearch('');
+    setShowItemPicker(true);
+    try {
+      const items = await repositories.itemRepository.getAll();
+      const activeLentIds = new Set(lendings.map((l) => l.item_id));
+      setAllItems(items.filter((i) => !activeLentIds.has(i.id)));
+    } catch {
+      Alert.alert('Error', 'Failed to load items');
+      setShowItemPicker(false);
+    } finally {
+      setItemPickerLoading(false);
+    }
+  };
+
+  const handleSelectItem = (item: Item) => {
+    setSelectedLendItem(item);
+    setShowItemPicker(false);
+    setBorrowerName('');
+    setLendNote('');
+    setShowLendForm(true);
+  };
+
+  const handleLendSubmit = async () => {
+    if (!selectedLendItem || !borrowerName.trim()) return;
+    setLendLoading(true);
+    try {
+      await lendingService.createLending({
+        item_id: selectedLendItem.id,
+        borrower_name: borrowerName.trim(),
+        note: lendNote.trim() || undefined,
+      });
+      setShowLendForm(false);
+      setSelectedLendItem(null);
+      setBorrowerName('');
+      setLendNote('');
+      await loadLendings();
+    } catch (err: any) {
+      Alert.alert('Error', err.code === 'DUPLICATE_ACTIVE_LENDING'
+        ? 'This item is already lent out'
+        : err.message || 'Failed to lend item');
+    } finally {
+      setLendLoading(false);
+    }
+  };
+
+  const filteredPickerItems = useMemo(() => {
+    const q = itemPickerSearch.trim().toLowerCase();
+    if (!q) return allItems;
+    return allItems.filter(
+      (i) =>
+        i.name.toLowerCase().includes(q) ||
+        (i as any).space?.name?.toLowerCase().includes(q) ||
+        (i as any).container?.name?.toLowerCase().includes(q)
+    );
+  }, [allItems, itemPickerSearch]);
 
   const filteredLendings = useMemo(() => {
     const q = searchText.trim().toLowerCase();
@@ -219,6 +292,102 @@ export default function LendingPage() {
           </View>
         )}
       </ScrollView>
+      {/* FAB */}
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: PRIMARY, bottom: insets.bottom + 84 }]}
+        onPress={openItemPicker}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
+
+      {/* Item Picker Modal */}
+      <Modal visible={showItemPicker} transparent animationType="slide" onRequestClose={() => setShowItemPicker(false)}>
+        <View style={styles.pickerOverlay}>
+          <View style={[styles.pickerSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+            <Text style={[styles.pickerTitle, { color: colors.text }]}>Choose an Item to Lend</Text>
+            {/* Search */}
+            <View style={[styles.pickerSearchWrapper, { backgroundColor: isDark ? '#2c2c2e' : '#f8f9fa', borderColor }]}>
+              <FontAwesomeIcon icon={faMagnifyingGlass} size={13} color={subtleText} />
+              <TextInput
+                style={[styles.pickerSearchInput, { color: colors.text }]}
+                placeholder="Search items..."
+                placeholderTextColor={subtleText}
+                value={itemPickerSearch}
+                onChangeText={setItemPickerSearch}
+                autoFocus
+              />
+              {itemPickerSearch.length > 0 && (
+                <TouchableOpacity onPress={() => setItemPickerSearch('')}>
+                  <FontAwesomeIcon icon={faTimes} size={13} color={subtleText} />
+                </TouchableOpacity>
+              )}
+            </View>
+            {itemPickerLoading ? (
+              <ActivityIndicator size="large" color={PRIMARY} style={{ marginTop: 32 }} />
+            ) : filteredPickerItems.length === 0 ? (
+              <View style={styles.pickerEmpty}>
+                <Text style={[styles.pickerEmptyText, { color: subtleText }]}>
+                  {allItems.length === 0 ? 'No available items to lend' : 'No items match your search'}
+                </Text>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} style={styles.pickerList}>
+                {filteredPickerItems.map((item) => {
+                  const spaceName = (item as any).space?.name;
+                  const containerName = (item as any).container?.name;
+                  const locationLine = containerName ? `${spaceName} › ${containerName}` : spaceName;
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[styles.pickerRow, { borderColor }]}
+                      onPress={() => handleSelectItem(item)}
+                      activeOpacity={0.7}
+                    >
+                      <FontAwesomeIcon
+                        icon={containerName ? faFolder : faMapPin}
+                        size={15}
+                        color={PRIMARY}
+                      />
+                      <View style={styles.pickerRowText}>
+                        <Text style={[styles.pickerItemName, { color: colors.text }]} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        {locationLine && (
+                          <Text style={[styles.pickerItemLocation, { color: subtleText }]} numberOfLines={1}>
+                            {locationLine}
+                          </Text>
+                        )}
+                      </View>
+                      <FontAwesomeIcon icon={faChevronRight} size={13} color={subtleText} />
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
+            <TouchableOpacity
+              style={[styles.pickerCancel, { borderColor }]}
+              onPress={() => setShowItemPicker(false)}
+            >
+              <Text style={[styles.pickerCancelText, { color: subtleText }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Lend Form Modal */}
+      <LendingFormModal
+        visible={showLendForm}
+        item={selectedLendItem}
+        borrowerName={borrowerName}
+        onBorrowerNameChange={setBorrowerName}
+        note={lendNote}
+        onNoteChange={setLendNote}
+        onSubmit={handleLendSubmit}
+        onCancel={() => { setShowLendForm(false); setSelectedLendItem(null); setBorrowerName(''); setLendNote(''); }}
+        loading={lendLoading}
+      />
     </View>
   );
 }
@@ -299,5 +468,39 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 36 },
   emptyTitle: { fontSize: 20, fontWeight: '700' },
   emptySubtitle: { fontSize: 14, textAlign: 'center', lineHeight: 20, paddingHorizontal: 16 },
+
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+
+  fab: {
+    position: 'absolute',
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  fabText: { color: '#fff', fontSize: 28, fontWeight: '300', lineHeight: 32 },
+
+  pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  pickerSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '80%' },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  pickerTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.3, marginBottom: 14 },
+  pickerSearchWrapper: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, height: 40, gap: 8, marginBottom: 12 },
+  pickerSearchInput: { flex: 1, fontSize: 15 },
+  pickerList: { marginBottom: 8 },
+  pickerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, gap: 12 },
+  pickerRowText: { flex: 1 },
+  pickerItemName: { fontSize: 15, fontWeight: '500' },
+  pickerItemLocation: { fontSize: 12, marginTop: 2 },
+  pickerEmpty: { paddingVertical: 32, alignItems: 'center' },
+  pickerEmptyText: { fontSize: 15 },
+  pickerCancel: { marginTop: 8, borderWidth: 1.5, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  pickerCancelText: { fontSize: 15, fontWeight: '600' },
 });
 

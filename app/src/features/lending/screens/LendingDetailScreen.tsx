@@ -164,7 +164,20 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
           <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
             <Text style={[styles.sectionLabel, { color: subtleText }]}>ITEM</Text>
             {item ? (
-              <Text style={[styles.sectionValue, { color: colors.text }]}>{item.name}</Text>
+              <>
+                <Text style={[styles.sectionValue, { color: colors.text }]}>{item.name}</Text>
+                {(item.space || item.container) && (
+                  <>
+                    <View style={[styles.divider, { backgroundColor: borderColor }]} />
+                    <Text style={[styles.sectionLabel, { color: subtleText }]}>LOCATION</Text>
+                    <Text style={[styles.sectionValue, { color: colors.text }]}>
+                      {item.container
+                        ? `${item.space?.name ?? 'Unknown Space'} › ${item.container}`
+                        : item.space?.name ?? 'Unknown Space'}
+                    </Text>
+                  </>
+                )}
+              </>
             ) : (
               <Text style={[styles.sectionValueMuted, { color: subtleText }]}>Item was deleted</Text>
             )}
