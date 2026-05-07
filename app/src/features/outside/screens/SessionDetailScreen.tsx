@@ -17,7 +17,7 @@ import {
   Modal,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faCheck, faTimes, faHome, faBox, faFolder, faChevronLeft } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faTimes, faHome, faBox, faFolder, faChevronLeft, faMapPin } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -55,6 +55,8 @@ export default function SessionDetailScreen() {
   const [showMoveSheet, setShowMoveSheet] = useState(false);
   const [allSpaces, setAllSpaces] = useState<Space[]>([]);
   const [spaceContainers, setSpaceContainers] = useState<Record<string, Container[]>>({});
+  const [currentItemSpaceId, setCurrentItemSpaceId] = useState<string | null>(null);
+  const [currentItemContainerId, setCurrentItemContainerId] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -111,10 +113,15 @@ export default function SessionDetailScreen() {
 
   const handlePutAwayMove = async () => {
     setShowPutAwaySheet(false);
-    // Load all spaces and their containers for the picker
+    // Load all spaces, containers, and the item's current location IDs
     try {
-      const spaces = await SpaceService.getAllSpaces();
+      const [spaces, currentItem] = await Promise.all([
+        SpaceService.getAllSpaces(),
+        ItemService.getItemById(putAwayItem!.item_id),
+      ]);
       setAllSpaces(spaces);
+      setCurrentItemSpaceId(currentItem?.spaceId ?? null);
+      setCurrentItemContainerId(currentItem?.containerId ?? null);
       const containersMap: Record<string, Container[]> = {};
       await Promise.all(
         spaces.map(async (s) => {
@@ -450,35 +457,68 @@ export default function SessionDetailScreen() {
         </TouchableWithoutFeedback>
         <View style={[styles.sheet, styles.moveSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
           <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
-          <Text style={[styles.sheetTitle, { color: colors.text }]}>Move Item</Text>
-          <Text style={[styles.sheetSubtitle, { color: subtleText }]}>
-            Choose where to place "{putAwayItem?.item_name}"
-          </Text>
+          <Text style={[styles.sheetTitle, { color: colors.text }]}>Move to a Different Location</Text>
           <FlatList
             data={allSpaces}
             keyExtractor={(s) => s.id}
             style={styles.moveList}
+            ListHeaderComponent={
+              putAwayItem ? (
+                <View style={styles.moveCurrentSection}>
+                  <Text style={[styles.moveSectionLabel, { color: subtleText }]}>CURRENT LOCATION</Text>
+                  <View style={[styles.moveOption, styles.moveOptionDisabled, { borderColor }]}>
+                    <FontAwesomeIcon
+                      icon={putAwayItem.container_name ? faFolder : faMapPin}
+                      size={16}
+                      color={subtleText}
+                    />
+                    <Text style={[styles.moveOptionText, { color: subtleText }]} numberOfLines={1}>
+                      {putAwayItem.container_name
+                        ? `${putAwayItem.container_name} · ${putAwayItem.space_name}`
+                        : putAwayItem.space_name ?? 'Unknown'}
+                    </Text>
+                    <View style={[styles.currentBadge, { backgroundColor: `${PRIMARY}18` }]}>
+                      <Text style={[styles.currentBadgeText, { color: PRIMARY }]}>Here</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.moveSectionLabel, { color: subtleText, marginTop: 12 }]}>MOVE TO</Text>
+                </View>
+              ) : null
+            }
             renderItem={({ item: space }) => {
-              const containers = spaceContainers[space.id] ?? [];
+              const isCurrentSpace = space.id === currentItemSpaceId;
+              const containers = (spaceContainers[space.id] ?? []).filter(
+                (c) => c.id !== currentItemContainerId
+              );
+              // In current space: only show root if item is inside a container
+              // In other spaces: always show root
+              const showRoot = isCurrentSpace ? !!currentItemContainerId : true;
+              if (!showRoot && containers.length === 0) return null;
               return (
                 <View>
-                  <TouchableOpacity
-                    style={[styles.moveOption, { borderColor }]}
-                    onPress={() => handleMoveToSpace(space.id)}
-                    activeOpacity={0.7}
-                  >
-                    <FontAwesomeIcon icon={faFolder} size={16} color={PRIMARY} />
-                    <Text style={[styles.moveOptionText, { color: colors.text }]}>{space.name}</Text>
-                    <Text style={[styles.moveOptionHint, { color: subtleText }]}>space root</Text>
-                  </TouchableOpacity>
+                  {!isCurrentSpace && (
+                    <Text style={[styles.moveSectionLabel, { color: subtleText }]}>{space.name.toUpperCase()}</Text>
+                  )}
+                  {showRoot && (
+                    <TouchableOpacity
+                      style={[styles.moveOption, { borderColor }]}
+                      onPress={() => handleMoveToSpace(space.id)}
+                      activeOpacity={0.7}
+                    >
+                      <FontAwesomeIcon icon={faMapPin} size={16} color={PRIMARY} />
+                      <Text style={[styles.moveOptionText, { color: colors.text }]}>
+                        {isCurrentSpace ? `Root of ${space.name}` : `${space.name} (root)`}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                   {containers.map((c) => (
                     <TouchableOpacity
                       key={c.id}
-                      style={[styles.moveOption, styles.moveOptionNested, { borderColor }]}
+                      style={[styles.moveOption, isCurrentSpace && styles.moveOptionNested, { borderColor }]}
                       onPress={() => handleMoveToContainer(space.id, c.id)}
                       activeOpacity={0.7}
                     >
-                        <FontAwesomeIcon icon={faFolder} size={16} color={PRIMARY} />
+                      <FontAwesomeIcon icon={faFolder} size={16} color={PRIMARY} />
                       <Text style={[styles.moveOptionText, { color: colors.text }]}>{c.name}</Text>
                     </TouchableOpacity>
                   ))}
@@ -616,6 +656,8 @@ const styles = StyleSheet.create({
   // Move sheet
   moveSheet: { maxHeight: '70%' },
   moveList: { marginBottom: 12 },
+  moveCurrentSection: { marginBottom: 4 },
+  moveSectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8 },
   moveOption: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -626,8 +668,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     gap: 12,
   },
+  moveOptionDisabled: { opacity: 0.6 },
   moveOptionNested: { marginLeft: 24 },
   moveOptionIcon: { fontSize: 16 },
   moveOptionText: { flex: 1, fontSize: 15, fontWeight: '500' },
   moveOptionHint: { fontSize: 11 },
+  currentBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
+  currentBadgeText: { fontSize: 11, fontWeight: '600' },
 });
