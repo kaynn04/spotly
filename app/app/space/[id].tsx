@@ -70,6 +70,7 @@ export default function SpaceDetailScreen() {
   const [showAddContainerModal, setShowAddContainerModal] = useState(false);
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [selectedMoveItemId, setSelectedMoveItemId] = useState<string | null>(null);
+  const [spaceContainers, setSpaceContainers] = useState<Record<string, Container[]>>({});
 
   const [showLendModal, setShowLendModal] = useState(false);
   const [selectedLendItem, setSelectedLendItem] = useState<Item | null>(null);
@@ -214,10 +215,29 @@ export default function SpaceDetailScreen() {
     ]);
   }
 
-  async function handleMoveToContainer(containerId: string) {
-    if (!selectedMoveItemId || !id) return;
+  async function openMoveModalForItem(itemId: string) {
+    setSelectedMoveItemId(itemId);
     try {
-      await ItemService.moveItemToContainer(selectedMoveItemId, id, containerId);
+      const spaces = await SpaceService.getAllSpaces();
+      setAllSpaces(spaces);
+      const containersMap: Record<string, Container[]> = {};
+      await Promise.all(
+        spaces.map(async (s) => {
+          const cs = await ContainerService.getContainersBySpaceId(String(s.id));
+          containersMap[String(s.id)] = cs;
+        })
+      );
+      setSpaceContainers(containersMap);
+      setShowMoveModal(true);
+    } catch {
+      Alert.alert('Error', 'Failed to load spaces');
+    }
+  }
+
+  async function handleMoveToContainer(targetSpaceId: string, containerId: string) {
+    if (!selectedMoveItemId) return;
+    try {
+      await ItemService.moveItemToContainer(selectedMoveItemId, targetSpaceId, containerId);
       setShowMoveModal(false);
       setSelectedMoveItemId(null);
       await loadItems();
@@ -227,7 +247,11 @@ export default function SpaceDetailScreen() {
   async function handleMoveToSpace(targetSpaceId: string) {
     if (!selectedMoveItemId || !id) return;
     try {
-      await ItemService.moveItem(selectedMoveItemId, id, targetSpaceId);
+      if (targetSpaceId === id) {
+        await ItemService.moveItemToContainer(selectedMoveItemId, id, '');
+      } else {
+        await ItemService.moveItem(selectedMoveItemId, id, targetSpaceId);
+      }
       setShowMoveModal(false);
       setSelectedMoveItemId(null);
       await loadItems();
@@ -387,11 +411,11 @@ export default function SpaceDetailScreen() {
               filteredData.length > 0 ? (
                 <Text style={[styles.sectionLabel, { color: subtleText }]}>
                   {filterSegment === 'all'
-                    ? `${filteredData.filter(e => e.type === 'container').length} container${filteredData.filter(e => e.type === 'container').length !== 1 ? 's' : ''} \u00B7 ${filteredData.filter(e => e.type === 'item').length} item${filteredData.filter(e => e.type === 'item').length !== 1 ? 's' : ''}`
+                    ? `${filteredData.filter(e => e.type === 'container').length} container${filteredData.filter(e => e.type === 'container').length !== 1 ? 's' : ''} \u00B7 ${filteredData.filter(e => e.type === 'item').length} item${filteredData.filter(e => e.type === 'item').length !== 1 ? 's' : ''} \u00B7 Hold to manage`
                     : filterSegment === 'containers'
-                    ? `${filteredData.length} container${filteredData.length !== 1 ? 's' : ''}`
+                    ? `${filteredData.length} container${filteredData.length !== 1 ? 's' : ''} \u00B7 Hold to manage`
                     : filterSegment === 'items'
-                    ? `${filteredData.length} item${filteredData.length !== 1 ? 's' : ''}`
+                    ? `${filteredData.length} item${filteredData.length !== 1 ? 's' : ''} \u00B7 Hold to manage`
                     : `${filteredData.length} lent item${filteredData.length !== 1 ? 's' : ''}`}
                 </Text>
               ) : null
@@ -439,12 +463,10 @@ export default function SpaceDetailScreen() {
                     </Text>
                   )}
                 </View>
-                {isLent ? (
+                {isLent && (
                   <View style={[styles.lentBadge, { backgroundColor: `${PRIMARY}15` }]}>
                     <Text style={[styles.lentBadgeText, { color: PRIMARY }]}>Lent</Text>
                   </View>
-                ) : (
-                  <FontAwesomeIcon icon={faEllipsisVertical} size={14} color={subtleText} />
                 )}
               </TouchableOpacity>
             );
@@ -493,37 +515,49 @@ export default function SpaceDetailScreen() {
             <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
             <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move Item</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Containers in this space — current one shown disabled */}
-              {(() => {
-                const item = items.find(i => i.id === selectedMoveItemId);
-                const isRootCurrent = !item?.containerId;
+              {allSpaces.map((s) => {
+                const movingItem = items.find(i => i.id === selectedMoveItemId);
+                const isCurrentSpace = s.id === id;
+                const spaceContainerList = spaceContainers[s.id] ?? [];
+                const isRootCurrent = isCurrentSpace && !movingItem?.containerId;
                 return (
-                  <>
-                    <Text style={[styles.moveSectionLabel, { color: subtleText }]}>IN THIS SPACE</Text>
+                  <View key={s.id}>
+                    <Text style={[styles.moveSectionLabel, { color: subtleText }]}>
+                      {isCurrentSpace ? 'IN THIS SPACE' : s.name.toUpperCase()}
+                    </Text>
                     <TouchableOpacity
                       style={[styles.moveOption, isRootCurrent && styles.moveOptionDisabled, { borderColor }]}
-                      onPress={isRootCurrent ? undefined : () => handleMoveToContainer('')}
+                      onPress={isRootCurrent ? undefined : () => handleMoveToSpace(s.id)}
                       activeOpacity={isRootCurrent ? 1 : 0.7}
                     >
                       <FontAwesomeIcon icon={faMapPin} size={16} color={isRootCurrent ? subtleText : PRIMARY} />
-                      <Text style={[styles.moveOptionText, { color: isRootCurrent ? subtleText : colors.text }]}>Root of {space?.name}</Text>
+                      <Text style={[styles.moveOptionText, { color: isRootCurrent ? subtleText : colors.text }]}>
+                        {isCurrentSpace ? `Root of ${s.name}` : `${s.name} (root)`}
+                      </Text>
                       {isRootCurrent && (
                         <View style={[styles.currentBadge, { backgroundColor: `${PRIMARY}18` }]}>
                           <Text style={[styles.currentBadgeText, { color: PRIMARY }]}>Here</Text>
                         </View>
                       )}
                     </TouchableOpacity>
-                    {containers.map((c) => {
-                      const isContainerCurrent = c.id === item?.containerId;
+                    {spaceContainerList.map((c) => {
+                      const isContainerCurrent = c.id === movingItem?.containerId;
                       return (
                         <TouchableOpacity
                           key={c.id}
-                          style={[styles.moveOption, isContainerCurrent && styles.moveOptionDisabled, { borderColor }]}
-                          onPress={isContainerCurrent ? undefined : () => handleMoveToContainer(c.id)}
+                          style={[
+                            styles.moveOption,
+                            !isCurrentSpace && styles.moveOptionIndented,
+                            isContainerCurrent && styles.moveOptionDisabled,
+                            { borderColor },
+                          ]}
+                          onPress={isContainerCurrent ? undefined : () => handleMoveToContainer(s.id, c.id)}
                           activeOpacity={isContainerCurrent ? 1 : 0.7}
                         >
                           <FontAwesomeIcon icon={faFolder} size={16} color={isContainerCurrent ? subtleText : PRIMARY} />
-                          <Text style={[styles.moveOptionText, { color: isContainerCurrent ? subtleText : colors.text }]}>{c.name}</Text>
+                          <Text style={[styles.moveOptionText, { color: isContainerCurrent ? subtleText : colors.text }]}>
+                            {c.name}
+                          </Text>
                           {isContainerCurrent && (
                             <View style={[styles.currentBadge, { backgroundColor: `${PRIMARY}18` }]}>
                               <Text style={[styles.currentBadgeText, { color: PRIMARY }]}>Here</Text>
@@ -532,21 +566,9 @@ export default function SpaceDetailScreen() {
                         </TouchableOpacity>
                       );
                     })}
-                  </>
+                  </View>
                 );
-              })()}
-
-              {allSpaces.filter((s) => s.id !== id).length > 0 && (
-                <>
-                  <Text style={[styles.moveSectionLabel, { color: subtleText }]}>MOVE TO ANOTHER SPACE</Text>
-                  {allSpaces.filter((s) => s.id !== id).map((s) => (
-                    <TouchableOpacity key={s.id} style={[styles.moveOption, { borderColor }]} onPress={() => handleMoveToSpace(s.id)}>
-                      <FontAwesomeIcon icon={faMapPin} size={16} color={PRIMARY} />
-                      <Text style={[styles.moveOptionText, { color: colors.text }]}>{s.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </>
-              )}
+              })}
             </ScrollView>
             <TouchableOpacity style={[styles.moveCancelBtn, { borderColor }]} onPress={() => setShowMoveModal(false)}>
               <Text style={[styles.moveCancelText, { color: subtleText }]}>Cancel</Text>
@@ -583,7 +605,7 @@ export default function SpaceDetailScreen() {
               icon: faBox,
               label: 'Move',
               description: 'Move to another space or container',
-              onPress: () => { setSelectedMoveItemId(item.id); setShowMoveModal(true); },
+              onPress: () => openMoveModalForItem(item.id),
             },
             isLent
               ? {
@@ -704,6 +726,7 @@ const styles = StyleSheet.create({
   moveSectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8, marginTop: 8 },
   moveOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, marginBottom: 6, gap: 12 },
   moveOptionDisabled: { opacity: 0.6 },
+  moveOptionIndented: { marginLeft: 24 },
   moveOptionIcon: { fontSize: 16 },
   moveOptionText: { fontSize: 15, fontWeight: '500', flex: 1 },
   currentLocationSection: { marginBottom: 4 },

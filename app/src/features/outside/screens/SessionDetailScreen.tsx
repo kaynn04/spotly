@@ -9,6 +9,7 @@ import {
   View,
   Text,
   StyleSheet,
+  ScrollView,
   TouchableOpacity,
   TouchableWithoutFeedback,
   FlatList,
@@ -53,6 +54,8 @@ export default function SessionDetailScreen() {
   const [putAwayItem, setPutAwayItem] = useState<OutsideSessionItemWithContext | null>(null);
   const [showPutAwaySheet, setShowPutAwaySheet] = useState(false);
   const [showMoveSheet, setShowMoveSheet] = useState(false);
+  const [showUncheckSheet, setShowUncheckSheet] = useState(false);
+  const [uncheckItem, setUncheckItem] = useState<OutsideSessionItemWithContext | null>(null);
   const [allSpaces, setAllSpaces] = useState<Space[]>([]);
   const [spaceContainers, setSpaceContainers] = useState<Record<string, Container[]>>({});
   const [currentItemSpaceId, setCurrentItemSpaceId] = useState<string | null>(null);
@@ -83,19 +86,26 @@ export default function SessionDetailScreen() {
   const handleToggleItem = async (item: OutsideSessionItemWithContext) => {
     const checked = Boolean(item.is_checked);
     if (checked) {
-      // Item is already checked (dealt with) — uncheck to undo
-      try {
-        await outsideService.checkItem(id!, item.item_id);
-        await loadSession();
-      } catch (err) {
-        console.error('Error toggling item:', err);
-        Alert.alert('Error', 'Failed to update item');
-      }
+      // Show confirmation before unchecking
+      setUncheckItem(item);
+      setShowUncheckSheet(true);
     } else {
       // Item is unchecked — show "Put Away" sheet to decide where it goes
       setPutAwayItem(item);
       setShowPutAwaySheet(true);
     }
+  };
+
+  const handleConfirmUncheck = async () => {
+    if (!uncheckItem) return;
+    setShowUncheckSheet(false);
+    try {
+      await outsideService.checkItem(id!, uncheckItem.item_id);
+      await loadSession();
+    } catch {
+      Alert.alert('Error', 'Failed to uncheck item');
+    }
+    setUncheckItem(null);
   };
 
   const handlePutAwayOriginal = async () => {
@@ -119,7 +129,11 @@ export default function SessionDetailScreen() {
         SpaceService.getAllSpaces(),
         ItemService.getItemById(putAwayItem!.item_id),
       ]);
-      setAllSpaces(spaces);
+      setAllSpaces([...spaces].sort((a, b) => {
+        if (a.id === currentItem?.spaceId) return -1;
+        if (b.id === currentItem?.spaceId) return 1;
+        return 0;
+      }));
       setCurrentItemSpaceId(currentItem?.spaceId ?? null);
       setCurrentItemContainerId(currentItem?.containerId ?? null);
       const containersMap: Record<string, Container[]> = {};
@@ -141,7 +155,7 @@ export default function SessionDetailScreen() {
     if (!putAwayItem) return;
     setShowMoveSheet(false);
     try {
-      await ItemService.moveItem(putAwayItem.item_id, '', spaceId);
+      await ItemService.moveItem(putAwayItem.item_id, currentItemSpaceId ?? '', spaceId);
       const spaceName = allSpaces.find(s => s.id === spaceId)?.name ?? 'Unknown';
       await outsideService.recordItemMove(id!, putAwayItem.item_id, spaceName, null);
       await outsideService.checkItem(id!, putAwayItem.item_id); // check as dealt with
@@ -256,16 +270,22 @@ export default function SessionDetailScreen() {
 
   const renderItem = ({ item, index }: { item: OutsideSessionItemWithContext; index: number }) => {
     const checked = Boolean(item.is_checked);
+    const wasMoved = checked && !!item.moved_to_space_name;
     const spaceName = item.space_name && item.space_name !== 'Unknown Space' ? item.space_name : null;
     const containerName = item.container_name ?? null;
-    const location = containerName ? `${spaceName ?? ''} › ${containerName}` : spaceName;
+    const originalLocation = containerName ? `${spaceName ?? ''} › ${containerName}` : spaceName;
+    const movedLocation = item.moved_to_container_name
+      ? `${item.moved_to_space_name} › ${item.moved_to_container_name}`
+      : item.moved_to_space_name;
+    const locationLine = wasMoved ? `→ ${movedLocation}` : originalLocation;
+    const checkColor = wasMoved ? '#6b9e7a' : PRIMARY;
 
     return (
       <TouchableOpacity
         style={[
           styles.itemRow,
           index < items.length - 1 && { borderBottomWidth: 1, borderBottomColor: borderColor },
-          checked && { opacity: 0.7 },
+          checked && { opacity: 0.65 },
         ]}
         onPress={() => handleToggleItem(item)}
         activeOpacity={0.6}
@@ -275,7 +295,7 @@ export default function SessionDetailScreen() {
           style={[
             styles.checkCircle,
             checked
-              ? { backgroundColor: PRIMARY, borderColor: PRIMARY }
+              ? { backgroundColor: checkColor, borderColor: checkColor }
               : { borderColor: isDark ? '#48484a' : '#c7c7cc' },
           ]}
         >
@@ -287,18 +307,18 @@ export default function SessionDetailScreen() {
           <Text
             style={[
               styles.itemName,
-              {
-                color: colors.text,
-                textDecorationLine: checked ? 'line-through' : 'none',
-              },
+              { color: colors.text, textDecorationLine: checked ? 'line-through' : 'none' },
             ]}
             numberOfLines={1}
           >
             {item.item_name}
           </Text>
-          {location && (
-            <Text style={[styles.itemLocation, { color: subtleText }]} numberOfLines={1}>
-              {location}
+          {locationLine && (
+            <Text
+              style={[styles.itemLocation, { color: wasMoved ? '#6b9e7a' : subtleText }]}
+              numberOfLines={1}
+            >
+              {locationLine}
             </Text>
           )}
         </View>
@@ -402,6 +422,41 @@ export default function SessionDetailScreen() {
         />
       )}
 
+      {/* Uncheck Confirmation Sheet */}
+      <Modal visible={showUncheckSheet} transparent animationType="slide" onRequestClose={() => { setShowUncheckSheet(false); setUncheckItem(null); }}>
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.uncheckSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+            <Text style={[styles.sheetTitle, { color: colors.text }]}>Uncheck item?</Text>
+            {uncheckItem?.moved_to_space_name ? (
+              <Text style={[styles.sheetSubtitle, { color: subtleText }]}>
+                {`"${uncheckItem.item_name}" was moved to ${uncheckItem.moved_to_container_name ? `${uncheckItem.moved_to_space_name} › ${uncheckItem.moved_to_container_name}` : uncheckItem.moved_to_space_name}. Unchecking won't move it back.`}
+              </Text>
+            ) : (
+              <Text style={[styles.sheetSubtitle, { color: subtleText }]}>
+                {`Mark "${uncheckItem?.item_name}" as not yet dealt with?`}
+              </Text>
+            )}
+            <TouchableOpacity
+              style={[styles.sheetOption, { backgroundColor: isDark ? '#2c2c2e' : '#f8f9fa', borderColor }]}
+              onPress={handleConfirmUncheck}
+              activeOpacity={0.7}
+            >
+              <View style={styles.sheetOptionText}>
+                <Text style={[styles.sheetOptionLabel, { color: colors.text }]}>Uncheck</Text>
+                <Text style={[styles.sheetOptionDesc, { color: subtleText }]}>Mark as not yet dealt with</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sheetCancel, { backgroundColor: isDark ? '#2c2c2e' : '#f2f2f7', marginTop: 10 }]}
+              onPress={() => { setShowUncheckSheet(false); setUncheckItem(null); }}
+            >
+              <Text style={[styles.sheetCancelText, { color: PRIMARY }]}>Keep checked</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Put Away Bottom Sheet */}
       <Modal visible={showPutAwaySheet} transparent animationType="slide" onRequestClose={() => { setShowPutAwaySheet(false); setPutAwayItem(null); }}>
         <TouchableWithoutFeedback onPress={() => { setShowPutAwaySheet(false); setPutAwayItem(null); }}>
@@ -452,28 +507,20 @@ export default function SessionDetailScreen() {
 
       {/* Move Picker Modal */}
       <Modal visible={showMoveSheet} transparent animationType="slide" onRequestClose={() => { setShowMoveSheet(false); setPutAwayItem(null); }}>
-        <TouchableWithoutFeedback onPress={() => { setShowMoveSheet(false); setPutAwayItem(null); }}>
-          <View style={styles.sheetBackdrop} />
-        </TouchableWithoutFeedback>
-        <View style={[styles.sheet, styles.moveSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.moveSheetContainer, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
           <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
           <Text style={[styles.sheetTitle, { color: colors.text }]}>Move to a Different Location</Text>
-          <FlatList
-            data={allSpaces}
-            keyExtractor={(s) => s.id}
-            style={styles.moveList}
-            ListHeaderComponent={null}
-            renderItem={({ item: space }) => {
+          <ScrollView style={styles.moveList} showsVerticalScrollIndicator={false}>
+            {allSpaces.map((space) => {
               const isCurrentSpace = space.id === currentItemSpaceId;
               const containers = spaceContainers[space.id] ?? [];
-              // Root is "current" if item is in this space at root level (no container)
               const isRootCurrent = isCurrentSpace && !currentItemContainerId;
               return (
-                <View>
-                  {!isCurrentSpace && (
-                    <Text style={[styles.moveSectionLabel, { color: subtleText }]}>{space.name.toUpperCase()}</Text>
-                  )}
-                  {/* Space root row — disabled if item is already here */}
+                <View key={space.id}>
+                  <Text style={[styles.moveSectionLabel, { color: subtleText }]}>
+                    {isCurrentSpace ? 'IN THIS SPACE' : space.name.toUpperCase()}
+                  </Text>
                   <TouchableOpacity
                     style={[styles.moveOption, isRootCurrent && styles.moveOptionDisabled, { borderColor }]}
                     onPress={isRootCurrent ? undefined : () => handleMoveToSpace(space.id)}
@@ -489,7 +536,6 @@ export default function SessionDetailScreen() {
                       </View>
                     )}
                   </TouchableOpacity>
-                  {/* Container rows — disabled if item is already in that container */}
                   {containers.map((c) => {
                     const isContainerCurrent = c.id === currentItemContainerId;
                     return (
@@ -497,7 +543,7 @@ export default function SessionDetailScreen() {
                         key={c.id}
                         style={[
                           styles.moveOption,
-                          isCurrentSpace && styles.moveOptionNested,
+                          !isCurrentSpace && styles.moveOptionNested,
                           isContainerCurrent && styles.moveOptionDisabled,
                           { borderColor },
                         ]}
@@ -518,14 +564,15 @@ export default function SessionDetailScreen() {
                   })}
                 </View>
               );
-            }}
-          />
+            })}
+          </ScrollView>
           <TouchableOpacity
             style={[styles.sheetCancel, { backgroundColor: isDark ? '#2c2c2e' : '#f2f2f7' }]}
             onPress={() => { setShowMoveSheet(false); setPutAwayItem(null); }}
           >
             <Text style={[styles.sheetCancelText, { color: PRIMARY }]}>Cancel</Text>
           </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </View>
@@ -614,6 +661,7 @@ const styles = StyleSheet.create({
 
   // Put Away / Move sheets
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet: {
     position: 'absolute',
     bottom: 0,
@@ -649,6 +697,19 @@ const styles = StyleSheet.create({
 
   // Move sheet
   moveSheet: { maxHeight: '70%' },
+  uncheckSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  moveSheetContainer: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    maxHeight: '70%',
+  },
   moveList: { marginBottom: 12 },
   moveCurrentSection: { marginBottom: 4 },
   moveSectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8 },

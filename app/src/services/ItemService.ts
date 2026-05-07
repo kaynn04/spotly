@@ -157,8 +157,8 @@ export class ItemService {
     containerId: string
   ): Promise<void> {
     try {
-      // Move item to container in database via repository
-      await ItemRepository.updateContainerId(itemId, containerId);
+      // Move item to container in database via repository — updates both space_id and container_id
+      await ItemRepository.updateSpaceAndContainer(itemId, spaceId, containerId);
     } catch (error) {
       // If already a ServiceError, re-throw it
       if (error && typeof error === 'object' && 'code' in error) {

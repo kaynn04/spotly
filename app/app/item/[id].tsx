@@ -138,8 +138,8 @@ export default function ItemDetailScreen() {
       const containersMap: Record<string, Container[]> = {};
       await Promise.all(
         spaces.map(async (s) => {
-          const cs = await ContainerService.getContainersBySpaceId(s.id);
-          containersMap[s.id] = cs;
+          const cs = await ContainerService.getContainersBySpaceId(String(s.id));
+          containersMap[String(s.id)] = cs;
         })
       );
       setSpaceContainers(containersMap);
@@ -153,7 +153,13 @@ export default function ItemDetailScreen() {
     if (!item) return;
     setShowMoveModal(false);
     try {
-      await ItemService.moveItem(item.id, item.spaceId, spaceId);
+      if (spaceId === item.spaceId) {
+        // Moving to root of the same space — just clear the container
+        await ItemService.moveItemToContainer(item.id, spaceId, '');
+      } else {
+        // Moving to a different space — update space_id and clear container
+        await ItemService.moveItem(item.id, item.spaceId, spaceId);
+      }
       router.back();
     } catch {
       Alert.alert('Error', 'Failed to move item');
@@ -457,7 +463,7 @@ export default function ItemDetailScreen() {
                           key={c.id}
                           style={[
                             styles.moveOption,
-                            isCurrentSpace && styles.moveOptionIndented,
+                            !isCurrentSpace && styles.moveOptionIndented,
                             isContainerCurrent && styles.moveOptionDisabled,
                             { borderColor },
                           ]}

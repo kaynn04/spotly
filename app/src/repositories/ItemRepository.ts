@@ -236,6 +236,31 @@ export class ItemRepository {
   }
 
   /**
+   * Update an item's space_id and container_id atomically
+   * Used when moving an item to a container in a (possibly different) space
+   *
+   * @param itemId - The item id to move
+   * @param newSpaceId - The destination space id
+   * @param newContainerId - The destination container id (empty string to place at root)
+   */
+  static async updateSpaceAndContainer(itemId: string, newSpaceId: string, newContainerId: string): Promise<void> {
+    try {
+      const db = getDatabase();
+      await db.runAsync(
+        'UPDATE items SET space_id = ?, container_id = ? WHERE id = ?',
+        [newSpaceId, newContainerId || null, itemId]
+      );
+    } catch (error) {
+      const serviceError: ServiceError = {
+        code: 'DB_ERROR',
+        message: 'Failed to move item. Try again.',
+      };
+      console.error('[ItemRepository.updateSpaceAndContainer] Database error:', error);
+      throw serviceError;
+    }
+  }
+
+  /**
    * Delete an item from the database (permanent deletion)
    *
    * @param itemId - The item id to delete

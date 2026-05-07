@@ -24,7 +24,7 @@ import {
   Modal,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faChevronLeft, faMapPin, faEllipsisVertical, faBox, faHandshake, faCheck, faTrash, faFolder } from '@fortawesome/free-solid-svg-icons';
+import { faChevronLeft, faMapPin, faEllipsisVertical, faBox, faHandshake, faCheck, faTrash, faFolder, faRightLeft } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -63,6 +63,8 @@ export default function ContainerDetailScreen() {
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [selectedMoveItemId, setSelectedMoveItemId] = useState<string | null>(null);
   const [actionSheetItem, setActionSheetItem] = useState<Item | null>(null);
+  const [showContainerMenu, setShowContainerMenu] = useState(false);
+  const [showMoveContainerModal, setShowMoveContainerModal] = useState(false);
   const [spaceContainers, setSpaceContainers] = useState<Record<string, Container[]>>({});
 
   // Lending state
@@ -120,8 +122,8 @@ export default function ContainerDetailScreen() {
       setAllSpaces(spaces);
       const entries = await Promise.all(
         spaces.map(async (s) => {
-          const cs = await ContainerService.getContainersBySpaceId(s.id);
-          return [s.id, cs] as [string, Container[]];
+          const cs = await ContainerService.getContainersBySpaceId(String(s.id));
+          return [String(s.id), cs] as [string, Container[]];
         })
       );
       setSpaceContainers(Object.fromEntries(entries));
@@ -174,6 +176,40 @@ export default function ContainerDetailScreen() {
 
   function handleItemPress(item: Item) {
     setActionSheetItem(item);
+  }
+
+  function handleContainerMenuPress() {
+    setShowContainerMenu(true);
+  }
+
+  async function handleMoveContainerToSpace(targetSpaceId: string) {
+    if (!containerId) return;
+    try {
+      await ContainerService.moveContainer(containerId, targetSpaceId);
+      setShowMoveContainerModal(false);
+      router.back();
+    } catch { Alert.alert('Error', 'Failed to move container'); }
+  }
+
+  function confirmDeleteContainer() {
+    Alert.alert(
+      'Delete Container',
+      `Delete "${container?.name ?? 'this container'}" and all its items? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive',
+          onPress: async () => {
+            try {
+              await ContainerService.deleteContainer(containerId!);
+              router.back();
+            } catch {
+              Alert.alert('Error', 'Failed to delete container');
+            }
+          },
+        },
+      ]
+    );
   }
 
   function confirmDeleteItem(itemId: string, itemName: string) {
@@ -242,11 +278,9 @@ export default function ContainerDetailScreen() {
             {container?.name ?? 'Container'}
           </Text>
         </View>
-        <View style={styles.itemCountBadge}>
-          <Text style={[styles.itemCountText, { color: PRIMARY }]}>
-            {items.length}
-          </Text>
-        </View>
+        <TouchableOpacity style={styles.headerMenuBtn} onPress={handleContainerMenuPress}>
+          <FontAwesomeIcon icon={faEllipsisVertical} size={18} color={PRIMARY} />
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -262,7 +296,7 @@ export default function ContainerDetailScreen() {
           ListHeaderComponent={
             items.length > 0 ? (
               <Text style={[styles.sectionLabel, { color: subtleText }]}>
-                {items.length} item{items.length !== 1 ? 's' : ''} {'\u00B7'} Tap to manage
+                {items.length} item{items.length !== 1 ? 's' : ''} {'·'} Hold to manage
               </Text>
             ) : null
           }
@@ -287,12 +321,10 @@ export default function ContainerDetailScreen() {
                     </Text>
                   )}
                 </View>
-                {isLent ? (
+                {isLent && (
                   <View style={[styles.lentBadge, { backgroundColor: `${PRIMARY}15` }]}>
                     <Text style={[styles.lentBadgeText, { color: PRIMARY }]}>Lent</Text>
                   </View>
-                ) : (
-                  <FontAwesomeIcon icon={faEllipsisVertical} size={14} color={subtleText} />
                 )}
               </TouchableOpacity>
             );
@@ -382,12 +414,65 @@ export default function ContainerDetailScreen() {
         </View>
       </Modal>
 
+      {/* Move Container Modal */}
+      <Modal visible={showMoveContainerModal} transparent animationType="slide" onRequestClose={() => setShowMoveContainerModal(false)}>
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.moveSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+            <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move Container to</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {allSpaces.filter((s) => s.id !== space?.id).length === 0 ? (
+                <Text style={[styles.moveOptionText, { color: subtleText, paddingVertical: 12 }]}>No other spaces available.</Text>
+              ) : (
+                allSpaces.filter((s) => s.id !== space?.id).map((s) => (
+                  <TouchableOpacity
+                    key={s.id}
+                    style={[styles.moveOption, { borderColor }]}
+                    onPress={() => handleMoveContainerToSpace(s.id)}
+                  >
+                    <FontAwesomeIcon icon={faMapPin} size={16} color={PRIMARY} />
+                    <Text style={[styles.moveOptionText, { color: colors.text }]}>{s.name}</Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+            <TouchableOpacity style={[styles.moveCancelBtn, { borderColor }]} onPress={() => setShowMoveContainerModal(false)}>
+              <Text style={[styles.moveCancelText, { color: subtleText }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <ItemFormModal
         visible={showAddItemModal}
         onClose={() => setShowAddItemModal(false)}
         onSubmit={handleAddItem}
         contextLabel={container?.name}
       />
+
+      {/* Container action menu */}
+      <Modal visible={showContainerMenu} transparent animationType="fade" onRequestClose={() => setShowContainerMenu(false)}>
+        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowContainerMenu(false)}>
+          <View style={[styles.menuSheet, { backgroundColor: cardBg, borderColor }]}>
+            <Text style={[styles.menuTitle, { color: subtleText }]}>{container?.name ?? 'Container'}</Text>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => { setShowContainerMenu(false); setShowMoveContainerModal(true); }}
+            >
+              <FontAwesomeIcon icon={faRightLeft} size={16} color={PRIMARY} />
+              <Text style={[styles.menuItemText, { color: colors.text }]}>Move to</Text>
+            </TouchableOpacity>
+            <View style={[styles.menuDivider, { backgroundColor: borderColor }]} />
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => { setShowContainerMenu(false); confirmDeleteContainer(); }}
+            >
+              <FontAwesomeIcon icon={faTrash} size={16} color="#e53e3e" />
+              <Text style={[styles.menuItemText, { color: '#e53e3e' }]}>Delete Container</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
       <LendingFormModal
         visible={showLendModal}
         item={selectedLendItem}
@@ -451,8 +536,13 @@ const styles = StyleSheet.create({
   headerCenter: { flex: 1, alignItems: 'center' },
   breadcrumb: { fontSize: 11, fontWeight: '500', letterSpacing: 0.2, marginBottom: 1 },
   headerTitle: { fontSize: 17, fontWeight: '600' },
-  itemCountBadge: { paddingLeft: 12, paddingVertical: 8 },
-  itemCountText: { fontSize: 14, fontWeight: '700' },
+  headerMenuBtn: { paddingLeft: 12, paddingVertical: 8 },
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-start', alignItems: 'flex-end', paddingTop: 60, paddingRight: 16 },
+  menuSheet: { borderRadius: 14, borderWidth: 1, minWidth: 200, overflow: 'hidden' },
+  menuTitle: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
+  menuItemText: { fontSize: 15, fontWeight: '500' },
+  menuDivider: { height: 1, marginHorizontal: 16 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   listContent: { paddingHorizontal: 16, paddingTop: 12 },
   sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3, marginBottom: 12 },

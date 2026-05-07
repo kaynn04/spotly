@@ -78,7 +78,7 @@ export class SpaceRepository {
       );
 
 return (result as any[]).map((row: SpaceRow) => ({
-        id: row.id,
+        id: String(row.id),
         name: row.name,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
