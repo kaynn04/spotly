@@ -24,7 +24,7 @@ import { Colors } from '@/constants/theme';
 import { ItemRepository } from '../../../../repositories/ItemRepository';
 import { LendingService } from '../../../lending/services/LendingService';
 import { LendingRepository } from '../../../lending/repositories/LendingRepository';
-import { useOutsideService } from '../../services/OutsideService';
+import { OutsideService } from '../../services/OutsideService';
 
 interface ItemPickerModalProps {
   sessionId: string;
@@ -51,7 +51,6 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
   const [searchText, setSearchText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lentItemIds, setLentItemIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadItems();
@@ -69,10 +68,14 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
       const lendingService = new LendingService(new LendingRepository(), itemRepository);
       const activeLendings = await lendingService.getActiveLendings();
       const lentIds = new Set(activeLendings.map(l => l.item_id));
-      setLentItemIds(lentIds);
+
+      // Load items already in this session to filter them out
+      const outsideService = new OutsideService();
+      const existingSessionItems = await outsideService.getSessionItems(sessionId);
+      const existingItemIds = new Set(existingSessionItems.map(i => i.item_id));
       
-      // Filter out lent items
-      const availableItems = items.filter(item => !lentIds.has(item.id));
+      // Filter out lent items AND already-added items
+      const availableItems = items.filter(item => !lentIds.has(item.id) && !existingItemIds.has(item.id));
       const pickerItems: PickerItem[] = availableItems.map(item => ({
         id: item.id,
         name: item.name,
