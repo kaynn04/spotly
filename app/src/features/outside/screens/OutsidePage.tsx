@@ -18,6 +18,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
+import { useScrollHide } from '@/hooks/use-scroll-hide';
+import { useTabBarPadding } from '@/hooks/use-tab-bar-padding';
 import { useOutsideService } from '../services/OutsideService';
 import { OutsideSessionItemWithContext } from '../models/OutsideSessionItem';
 import SessionFormModal from './components/SessionFormModal';
@@ -38,6 +40,8 @@ export default function OutsidePage() {
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
   const isDark = colorScheme === 'dark';
+  const { handleScroll } = useScrollHide();
+  const tabBarPadding = useTabBarPadding();
 
   const [sessionCard, setSessionCard] = useState<SessionCardState>({
     loading: false,
@@ -113,8 +117,10 @@ export default function OutsidePage() {
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8, paddingBottom: tabBarPadding }]}
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
         {/* Header */}
         <View style={styles.header}>
@@ -289,7 +295,7 @@ export default function OutsidePage() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 40 },
+  scrollContent: { padding: 16 },
 
   header: {
     flexDirection: 'row',

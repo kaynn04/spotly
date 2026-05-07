@@ -18,6 +18,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
+import { useScrollHide } from '@/hooks/use-scroll-hide';
+import { useTabBarPadding } from '@/hooks/use-tab-bar-padding';
 import type { Space } from '@/src/models/Space';
 import { SpaceService } from '@/src/services/SpaceService';
 import SpaceFormModal from './components/SpaceFormModal';
@@ -30,6 +32,8 @@ export default function SpacesPage() {
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
   const isDark = colorScheme === 'dark';
+  const { handleScroll } = useScrollHide();
+  const tabBarPadding = useTabBarPadding();
 
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [loading, setLoading] = useState(false);
@@ -96,8 +100,10 @@ export default function SpacesPage() {
         data={spaces}
         keyExtractor={(item) => item.id}
         renderItem={renderSpace}
-        contentContainerStyle={[styles.listContent, { paddingTop: insets.top + 8 }]}
+        contentContainerStyle={[styles.listContent, { paddingTop: insets.top + 8, paddingBottom: tabBarPadding }]}
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         ListHeaderComponent={
           <View style={styles.header}>
             <View>
@@ -148,7 +154,7 @@ export default function SpacesPage() {
       {/* FAB -- only shown when spaces exist */}
       {spaces.length > 0 && (
         <TouchableOpacity
-          style={[styles.fab, { backgroundColor: PRIMARY, bottom: insets.bottom + 24 }]}
+          style={[styles.fab, { backgroundColor: PRIMARY, bottom: insets.bottom + 84 }]}
           onPress={() => setFormVisible(true)}
           activeOpacity={0.85}
         >
@@ -167,7 +173,7 @@ export default function SpacesPage() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  listContent: { paddingHorizontal: 16, paddingBottom: 100 },
+  listContent: { paddingHorizontal: 16 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

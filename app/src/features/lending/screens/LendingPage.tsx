@@ -21,6 +21,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
+import { useScrollHide } from '@/hooks/use-scroll-hide';
+import { useTabBarPadding } from '@/hooks/use-tab-bar-padding';
 import { LendingService } from '../services/LendingService';
 import { LendingRepository } from '../repositories/LendingRepository';
 import { ItemRepository } from '../../../repositories/ItemRepository';
@@ -34,6 +36,8 @@ export default function LendingPage() {
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
   const isDark = colorScheme === 'dark';
+  const { handleScroll } = useScrollHide();
+  const tabBarPadding = useTabBarPadding();
 
   const repositories = useMemo(() => ({
     lendingRepository: new LendingRepository(),
@@ -111,8 +115,10 @@ export default function LendingPage() {
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8, paddingBottom: tabBarPadding }]}
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
         {/* Header */}
         <View style={styles.header}>
@@ -177,7 +183,7 @@ export default function LendingPage() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 40 },
+  scrollContent: { padding: 16 },
 
   header: {
     flexDirection: 'row',

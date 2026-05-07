@@ -25,6 +25,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
+import { useScrollHide } from '@/hooks/use-scroll-hide';
+import { useTabBarPadding } from '@/hooks/use-tab-bar-padding';
 import { DashboardService } from '@/src/services/DashboardService';
 import { UserService } from '@/src/services/UserService';
 import { ItemRepository } from '@/src/repositories/ItemRepository';
@@ -67,6 +69,8 @@ export default function HomePage() {
   const insets = useSafeAreaInsets();
   const isDark = colorScheme === 'dark';
   const outsideService = useOutsideService();
+  const { handleScroll } = useScrollHide();
+  const tabBarPadding = useTabBarPadding();
 
   const lendingService = React.useMemo(
     () => new LendingService(new LendingRepository(), new ItemRepository()),
@@ -125,8 +129,10 @@ export default function HomePage() {
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8, paddingBottom: tabBarPadding }]}
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
         {/* ── Greeting header ────────────────────────────────── */}
         <View style={styles.header}>

@@ -1,0 +1,140 @@
+/**
+ * FloatingTabBar
+ *
+ * Floating pill bottom navbar — icon-only, centered, with active dot.
+ * Hides on scroll-down, reappears on scroll-up via spring animation.
+ *
+ * Rendered via the `tabBar` prop of <Tabs>. The navigator's wrapper is
+ * made transparent + absolute via tabBarStyle in _layout.tsx so no
+ * background bleeds through.
+ */
+
+import React from 'react';
+import {
+  Animated,
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  Platform,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useScrollHide } from '@/hooks/use-scroll-hide';
+import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+
+const PRIMARY = '#6b7f99';
+
+const TAB_ICONS: Record<string, string> = {
+  index: '🏠',
+  spaces: '📚',
+  lending: '🤝',
+  outside: '🧳',
+};
+
+export default function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const { translateY } = useScrollHide();
+
+  const bg = isDark ? '#1c1c1e' : '#ffffff';
+  const border = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+  const shadow = isDark ? '#000' : '#64748b';
+
+  return (
+    <Animated.View
+      style={[
+        styles.pill,
+        {
+          bottom: insets.bottom + 12,
+          backgroundColor: bg,
+          borderColor: border,
+          shadowColor: shadow,
+          transform: [{ translateY }],
+        },
+      ]}
+    >
+      {state.routes.map((route, idx) => {
+        const focused = state.index === idx;
+        const emoji = TAB_ICONS[route.name] ?? '●';
+
+        const onPress = () => {
+          if (Platform.OS === 'ios') {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }
+          const event = navigation.emit({
+            type: 'tabPress',
+            target: route.key,
+            canPreventDefault: true,
+          });
+          if (!focused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
+
+        return (
+          <Pressable key={route.key} onPress={onPress} style={styles.tab}>
+            <View style={[styles.iconBg, focused && styles.iconBgActive]}>
+              <Text style={[styles.icon, { opacity: focused ? 1 : 0.35 }]}>
+                {emoji}
+              </Text>
+            </View>
+            <View style={[styles.dot, { opacity: focused ? 1 : 0 }]} />
+          </Pressable>
+        );
+      })}
+    </Animated.View>
+  );
+}
+
+/** Height of the floating pill navbar */
+export const TAB_BAR_HEIGHT = 60;
+/** Gap between the pill and the device bottom safe area */
+export const TAB_BAR_OFFSET = 12;
+
+const styles = StyleSheet.create({
+  pill: {
+    position: 'absolute',
+    left: 24,
+    right: 24,
+    height: TAB_BAR_HEIGHT,
+    borderRadius: TAB_BAR_HEIGHT / 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    paddingHorizontal: 4,
+    // Shadow
+    elevation: 16,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    gap: 4,
+  },
+  iconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBgActive: {
+    backgroundColor: `${PRIMARY}15`,
+  },
+  icon: {
+    fontSize: 21,
+  },
+  dot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: PRIMARY,
+  },
+});
