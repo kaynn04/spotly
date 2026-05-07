@@ -23,6 +23,8 @@ import {
   ScrollView,
   Modal,
 } from 'react-native';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faChevronLeft, faFolder, faMapPin, faChevronRight, faEllipsisVertical, faBox, faHandshake, faCheck, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -207,7 +209,7 @@ export default function ContainerDetailScreen() {
       {/* Header */}
       <View style={[styles.headerBar, { borderBottomColor: borderColor, paddingTop: insets.top, backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={[styles.backBtnText, { color: PRIMARY }]}>{'< Back'}</Text>
+          <FontAwesomeIcon icon={faChevronLeft} size={16} color={PRIMARY} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           {space && (
@@ -269,7 +271,7 @@ export default function ContainerDetailScreen() {
                     <Text style={[styles.lentBadgeText, { color: PRIMARY }]}>Lent</Text>
                   </View>
                 ) : (
-                  <Text style={[styles.itemMoreDots, { color: subtleText }]}>{'...'}</Text>
+                  <FontAwesomeIcon icon={faEllipsisVertical} size={14} color={subtleText} />
                 )}
               </TouchableOpacity>
             );
@@ -305,7 +307,7 @@ export default function ContainerDetailScreen() {
                 <>
                   <Text style={[styles.moveSectionLabel, { color: subtleText }]}>IN THIS SPACE</Text>
                   <TouchableOpacity style={[styles.moveOption, { borderColor }]} onPress={handleMoveToRootSpace}>
-                    <Text style={styles.moveOptionIcon}>{'\u{1F4CD}'}</Text>
+                    <FontAwesomeIcon icon={faMapPin} size={16} color={PRIMARY} />
                     <Text style={[styles.moveOptionText, { color: colors.text }]}>
                       Root of {space.name}
                     </Text>
@@ -317,7 +319,7 @@ export default function ContainerDetailScreen() {
                   <Text style={[styles.moveSectionLabel, { color: subtleText }]}>MOVE TO ANOTHER SPACE</Text>
                   {allSpaces.filter((s) => s.id !== space?.id).map((s) => (
                     <TouchableOpacity key={s.id} style={[styles.moveOption, { borderColor }]} onPress={() => handleMoveToSpace(s.id)}>
-                      <Text style={styles.moveOptionIcon}>{'\u{1F4CD}'}</Text>
+                      <FontAwesomeIcon icon={faMapPin} size={16} color={PRIMARY} />
                       <Text style={[styles.moveOptionText, { color: colors.text }]}>{s.name}</Text>
                     </TouchableOpacity>
                   ))}
@@ -360,26 +362,26 @@ export default function ContainerDetailScreen() {
           const isLent = !!lending;
           return [
             {
-              icon: '📦',
+              icon: faBox,
               label: 'Move',
               description: 'Move to another space or container',
               onPress: () => { setSelectedMoveItemId(item.id); setShowMoveModal(true); },
             },
             isLent
               ? {
-                  icon: '✅',
+                  icon: faCheck,
                   label: 'Mark as Returned',
                   description: `${lending.borrower_name} returned this item`,
                   onPress: () => handleMarkReturned(lending.id, item),
                 }
               : {
-                  icon: '🤝',
+                  icon: faHandshake,
                   label: 'Lend',
                   description: 'Track who you lent this item to',
                   onPress: () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setShowLendModal(true); },
                 },
             {
-              icon: '🗑️',
+              icon: faTrash,
               label: 'Delete',
               description: isLent ? 'Item is currently lent out' : 'Permanently remove this item',
               destructive: true,

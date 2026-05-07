@@ -14,6 +14,8 @@ import {
   ActivityIndicator,
   TextInput,
 } from 'react-native';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faFileAlt, faFileArchive } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -192,7 +194,7 @@ export default function SpacesPage() {
           Created {formatDate(item.createdAt)}
         </Text>
       </View>
-      <Text style={[styles.chevron, { color: subtleText }]}>{'>'}</Text>
+      <FontAwesomeIcon icon={faChevronRight} size={16} color={subtleText} />
     </TouchableOpacity>
   );
 
@@ -234,7 +236,11 @@ export default function SpacesPage() {
               activeOpacity={0.7}
             >
               <View style={[styles.resultIcon, { backgroundColor: isContainer ? `${PRIMARY}15` : `${isDark ? '#48484a' : '#e2e6ea'}` }]}>
-                <Text style={styles.resultIconText}>{isContainer ? '📁' : '📄'}</Text>
+                {isContainer ? (
+                  <FontAwesomeIcon icon={faFolder} size={16} color={PRIMARY} />
+                ) : (
+                  <FontAwesomeIcon icon={faFileAlt} size={16} color={isDark ? '#8e8e93' : '#6b7f99'} />
+                )}
               </View>
               <View style={styles.resultContent}>
                 <Text style={[styles.resultName, { color: colors.text }]} numberOfLines={1}>{result.name}</Text>
@@ -242,7 +248,7 @@ export default function SpacesPage() {
                   {isContainer ? `Container in ${result.spaceName}` : result.containerName ? `${result.spaceName} › ${result.containerName}` : result.spaceName}
                 </Text>
               </View>
-              <Text style={[styles.chevron, { color: subtleText }]}>{'>'}</Text>
+              <FontAwesomeIcon icon={faChevronRight} size={16} color={subtleText} />
             </TouchableOpacity>
           );
         } : renderSpace}
@@ -270,7 +276,7 @@ export default function SpacesPage() {
 
             {/* Search bar */}
             <View style={[styles.searchWrapper, { backgroundColor: isDark ? '#1c1c1e' : '#ffffff', borderColor }]}>
-              <Text style={styles.searchIcon}>🔍</Text>
+              <FontAwesomeIcon icon={faMagnifyingGlass} size={16} color={isDark ? '#ffffff' : '#1c1c1e'} />
               <TextInput
                 style={[styles.searchInput, { color: isDark ? '#ffffff' : '#1c1c1e' }]}
                 placeholder="Search items & containers across all spaces..."
@@ -281,7 +287,7 @@ export default function SpacesPage() {
               />
               {isSearching && (
                 <TouchableOpacity onPress={() => { setSearchText(''); setSearchResults([]); }} style={styles.clearBtn}>
-                  <Text style={[styles.clearBtnText, { color: subtleText }]}>✕</Text>
+                  <FontAwesomeIcon icon={faTimes} size={16} color={subtleText} />
                 </TouchableOpacity>
               )}
             </View>
@@ -316,7 +322,7 @@ export default function SpacesPage() {
           ) : (
             <View style={[styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
               <View style={[styles.emptyIconContainer, { backgroundColor: `${PRIMARY}12` }]}>
-                <Text style={styles.emptyIcon}>{'🗂️'}</Text>
+                <FontAwesomeIcon icon={faFileArchive} size={40} color={PRIMARY} />
               </View>
               <Text style={[styles.emptyTitle, { color: colors.text }]}>No Spaces Yet</Text>
               <Text style={[styles.emptySubtitle, { color: subtleText }]}>

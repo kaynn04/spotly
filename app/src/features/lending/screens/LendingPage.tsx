@@ -17,6 +17,8 @@ import {
   ActivityIndicator,
   TextInput,
 } from 'react-native';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faMagnifyingGlass, faTimes, faChevronRight, faHandshake } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -120,7 +122,7 @@ export default function LendingPage() {
           {formatDate(item.lent_at)}
         </Text>
       </View>
-      <Text style={[styles.chevron, { color: subtleText }]}>{'>'}</Text>
+      <FontAwesomeIcon icon={faChevronRight} size={16} color={subtleText} />
     </TouchableOpacity>
   );
 
@@ -166,7 +168,7 @@ export default function LendingPage() {
             {/* Search Bar */}
             <View style={[styles.searchContainer, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
               <View style={[styles.searchInputWrapper, { backgroundColor: isDark ? '#2c2c2e' : '#ffffff', borderColor }]}>
-                <Text style={styles.searchIcon}>🔍</Text>
+                <FontAwesomeIcon icon={faMagnifyingGlass} size={14} color={isDark ? '#ffffff' : '#1c1c1e'} />
                 <TextInput
                   style={[styles.searchInput, { color: isDark ? '#ffffff' : '#2c3e50' }]}
                   placeholder="Search items or borrowers..."
@@ -176,7 +178,7 @@ export default function LendingPage() {
                 />
                 {searchText.length > 0 && (
                   <TouchableOpacity onPress={() => setSearchText('')} style={styles.clearBtn}>
-                    <Text style={styles.clearBtnText}>✕</Text>
+                    <FontAwesomeIcon icon={faTimes} size={13} color={isDark ? '#8e8e93' : '#8e8e93'} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -208,7 +210,7 @@ export default function LendingPage() {
         ) : (
           <View style={[styles.card, styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
             <View style={[styles.emptyIconContainer, { backgroundColor: `${PRIMARY}12` }]}>
-              <Text style={styles.emptyIcon}>🤝</Text>
+              <FontAwesomeIcon icon={faHandshake} size={36} color={PRIMARY} />
             </View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No Active Lendings</Text>
             <Text style={[styles.emptySubtitle, { color: subtleText }]}>

@@ -25,6 +25,8 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faChevronLeft, faEllipsisVertical } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -43,6 +45,8 @@ import ItemFormModal from '@/src/features/spaces/screens/components/ItemFormModa
 import ContainerFormModal from '@/src/features/spaces/screens/components/ContainerFormModal';
 import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
 import ItemActionSheet from '@/src/features/spaces/screens/components/ItemActionSheet';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faBox, faHandshake, faCheck, faTrash, faMapPin, faFolder, faMagnifyingGlass, faTimes, faChevronRight, faChevronLeft } from '@fortawesome/free-solid-svg-icons';
 
 const PRIMARY = '#6b7f99';
 
@@ -311,7 +315,7 @@ export default function SpaceDetailScreen() {
       {/* Header */}
       <View style={[styles.headerBar, { borderBottomColor: borderColor, paddingTop: insets.top, backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={[styles.backBtnText, { color: PRIMARY }]}>{'< Back'}</Text>
+          <FontAwesomeIcon icon={faChevronLeft} size={16} color={PRIMARY} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
           {space?.name ?? 'Space'}
@@ -330,7 +334,7 @@ export default function SpaceDetailScreen() {
           {/* Search Bar */}
           <View style={[styles.searchContainer, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
             <View style={[styles.searchInputWrapper, { backgroundColor: isDark ? '#2c2c2e' : '#ffffff', borderColor }]}>
-              <Text style={styles.searchIcon}>🔍</Text>
+              <FontAwesomeIcon icon={faMagnifyingGlass} size={14} color={isDark ? '#ffffff' : '#1c1c1e'} />
               <TextInput
                 style={[styles.searchInput, { color: isDark ? '#ffffff' : '#2c3e50' }]}
                 placeholder="Search containers & items..."
@@ -340,7 +344,7 @@ export default function SpaceDetailScreen() {
               />
               {searchText.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchText('')} style={styles.clearBtn}>
-                  <Text style={styles.clearBtnText}>✕</Text>
+                  <FontAwesomeIcon icon={faTimes} size={13} color={isDark ? '#8e8e93' : '#8e8e93'} />
                 </TouchableOpacity>
               )}
             </View>
@@ -406,7 +410,7 @@ export default function SpaceDetailScreen() {
                   activeOpacity={0.7}
                 >
                   <View style={[styles.containerIcon, { backgroundColor: `${PRIMARY}15` }]}>
-                    <Text style={styles.containerIconText}>{'\u{1F4C1}'}</Text>
+                    <FontAwesomeIcon icon={faFolder} size={16} color={PRIMARY} />
                   </View>
                   <View style={styles.containerContent}>
                     <Text style={[styles.containerName, { color: colors.text }]} numberOfLines={1}>{c.name}</Text>
@@ -414,7 +418,7 @@ export default function SpaceDetailScreen() {
                       {count} {count === 1 ? 'item' : 'items'}
                     </Text>
                   </View>
-                  <Text style={[styles.chevron, { color: subtleText }]}>{'>'}</Text>
+                  <FontAwesomeIcon icon={faChevronRight} size={16} color={subtleText} />
                 </TouchableOpacity>
               );
             }
@@ -442,7 +446,7 @@ export default function SpaceDetailScreen() {
                     <Text style={[styles.lentBadgeText, { color: PRIMARY }]}>Lent</Text>
                   </View>
                 ) : (
-                  <Text style={[styles.itemMoreDots, { color: subtleText }]}>{'...'}</Text>
+                  <FontAwesomeIcon icon={faEllipsisVertical} size={14} color={subtleText} />
                 )}
               </TouchableOpacity>
             );
@@ -496,7 +500,7 @@ export default function SpaceDetailScreen() {
                   <Text style={[styles.moveSectionLabel, { color: subtleText }]}>CONTAINERS IN THIS SPACE</Text>
                   {containers.map((c) => (
                     <TouchableOpacity key={c.id} style={[styles.moveOption, { borderColor }]} onPress={() => handleMoveToContainer(c.id)}>
-                      <Text style={styles.moveOptionIcon}>{'\u{1F4C1}'}</Text>
+                      <FontAwesomeIcon icon={faFolder} size={16} color={PRIMARY} />
                       <Text style={[styles.moveOptionText, { color: colors.text }]}>{c.name}</Text>
                     </TouchableOpacity>
                   ))}

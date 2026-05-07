@@ -32,6 +32,8 @@ import { LendingRepository } from '@/src/features/lending/repositories/LendingRe
 import { ItemRepository } from '@/src/repositories/ItemRepository';
 import { Lending } from '@/src/features/lending/models/Lending';
 import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faBox, faHandshake, faCheck, faTrash, faMapPin, faFolder, faEllipsisVertical, faChevronLeft } from '@fortawesome/free-solid-svg-icons';
 
 const PRIMARY = '#6b7f99';
 
@@ -58,6 +60,9 @@ export default function ItemDetailScreen() {
   const [borrowerName, setBorrowerName] = useState('');
   const [lendNote, setLendNote] = useState('');
   const [lendLoading, setLendLoading] = useState(false);
+
+  // Menu state
+  const [showMenu, setShowMenu] = useState(false);
 
   // Move state
   const [showMoveModal, setShowMoveModal] = useState(false);
@@ -149,7 +154,7 @@ export default function ItemDetailScreen() {
     setShowMoveModal(false);
     try {
       await ItemService.moveItem(item.id, item.spaceId, spaceId);
-      await loadItem();
+      router.back();
     } catch {
       Alert.alert('Error', 'Failed to move item');
     }
@@ -160,7 +165,7 @@ export default function ItemDetailScreen() {
     setShowMoveModal(false);
     try {
       await ItemService.moveItemToContainer(item.id, spaceId, containerId);
-      await loadItem();
+      router.back();
     } catch {
       Alert.alert('Error', 'Failed to move item');
     }
@@ -251,35 +256,22 @@ export default function ItemDetailScreen() {
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
       {/* Header */}
       <View style={[styles.headerBar, { borderBottomColor: borderColor, paddingTop: insets.top, backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={[styles.backText, { color: PRIMARY }]}>{'< Back'}</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <FontAwesomeIcon icon={faChevronLeft} size={18} color={PRIMARY} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>Item Details</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity onPress={openMoveModal} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-            <Text style={styles.headerActionIcon}>📦</Text>
-          </TouchableOpacity>
-          {isLent ? (
-            <TouchableOpacity onPress={handleMarkReturned} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-              <Text style={styles.headerActionIcon}>✅</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity onPress={() => { setBorrowerName(''); setLendNote(''); setShowLendModal(true); }} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-              <Text style={styles.headerActionIcon}>🤝</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity onPress={handleDelete} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-            <Text style={styles.headerActionIcon}>🗑️</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity onPress={() => setShowMenu(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={styles.menuBtn}>
+          <FontAwesomeIcon icon={faEllipsisVertical} size={20} color={PRIMARY} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
         {/* Lending badge */}
         {isLent && (
           <View style={[styles.lendingBanner, { backgroundColor: `${PRIMARY}15`, borderColor: `${PRIMARY}40` }]}>
+            <FontAwesomeIcon icon={faHandshake} size={16} color={PRIMARY} />
             <Text style={[styles.lendingBannerText, { color: PRIMARY }]}>
-              🤝 Lent to {activeLending.borrower_name}
+              Lent to {activeLending.borrower_name}
               {activeLending.lent_at ? ` · since ${new Date(activeLending.lent_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}
             </Text>
           </View>
@@ -385,6 +377,33 @@ export default function ItemDetailScreen() {
 
       </ScrollView>
 
+      {/* Action Menu */}
+      <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
+        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowMenu(false)}>
+          <View style={[styles.menuDropdown, { backgroundColor: cardBg, borderColor, top: insets.top + 44 }]}>  
+            <TouchableOpacity style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]} onPress={() => { setShowMenu(false); openMoveModal(); }}>
+              <FontAwesomeIcon icon={faBox} size={18} color={PRIMARY} />
+              <Text style={[styles.menuItemText, { color: colors.text }]}>Move to...</Text>
+            </TouchableOpacity>
+            {isLent ? (
+              <TouchableOpacity style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]} onPress={() => { setShowMenu(false); handleMarkReturned(); }}>
+                <FontAwesomeIcon icon={faCheck} size={18} color={PRIMARY} />
+                <Text style={[styles.menuItemText, { color: colors.text }]}>Mark as returned</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]} onPress={() => { setShowMenu(false); setBorrowerName(''); setLendNote(''); setShowLendModal(true); }}>
+                <FontAwesomeIcon icon={faHandshake} size={18} color={PRIMARY} />
+                <Text style={[styles.menuItemText, { color: colors.text }]}>Lend item</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setShowMenu(false); handleDelete(); }}>
+              <FontAwesomeIcon icon={faTrash} size={18} color="#e53e3e" />
+              <Text style={[styles.menuItemText, { color: '#e53e3e' }]}>Delete item</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Lend Modal */}
       <LendingFormModal
         visible={showLendModal}
@@ -411,7 +430,7 @@ export default function ItemDetailScreen() {
                     style={[styles.moveOption, { borderColor }]}
                     onPress={() => handleMoveToSpace(s.id)}
                   >
-                    <Text style={styles.moveOptionIcon}>📍</Text>
+                    <FontAwesomeIcon icon={faMapPin} size={16} color={PRIMARY} />
                     <Text style={[styles.moveOptionText, { color: colors.text }]}>{s.name}</Text>
                   </TouchableOpacity>
                   {(spaceContainers[s.id] ?? []).map((c) => (
@@ -420,7 +439,7 @@ export default function ItemDetailScreen() {
                       style={[styles.moveOption, styles.moveOptionIndented, { borderColor }]}
                       onPress={() => handleMoveToContainer(s.id, c.id)}
                     >
-                      <Text style={styles.moveOptionIcon}>📁</Text>
+                      <FontAwesomeIcon icon={faFolder} size={16} color={PRIMARY} />
                       <Text style={[styles.moveOptionText, { color: colors.text }]}>{c.name}</Text>
                     </TouchableOpacity>
                   ))}
@@ -442,15 +461,18 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   errorText: { fontSize: 16, fontWeight: '500' },
 
-  headerBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1 },
-  backBtn: { paddingRight: 12, paddingVertical: 8 },
+  headerBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, paddingVertical: 8 },
+  backBtn: { paddingRight: 12, paddingVertical: 4 },
   backText: { fontSize: 16, fontWeight: '500' },
-  headerTitle: { fontSize: 17, fontWeight: '600' },
+  headerTitle: { fontSize: 17, fontWeight: '600', flex: 1, textAlign: 'center' },
 
   content: { paddingHorizontal: 16, paddingTop: 16 },
 
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 12, paddingVertical: 8 },
-  headerActionIcon: { fontSize: 20 },
+  menuBtn: { paddingLeft: 12, paddingVertical: 8 },
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
+  menuDropdown: { position: 'absolute', right: 16, borderRadius: 12, borderWidth: 1, minWidth: 180, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, gap: 12 },
+  menuItemText: { fontSize: 15, fontWeight: '500' },
 
   lendingBanner: {
     flexDirection: 'row',
@@ -460,6 +482,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 16,
+    gap: 10,
   },
   lendingBannerText: { fontSize: 14, fontWeight: '500' },
 
@@ -479,15 +502,12 @@ const styles = StyleSheet.create({
   saveBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   cancelText: { fontSize: 14, marginTop: 4 },
 
-  headerActionIcon: { fontSize: 20 },
-
   sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   moveSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '70%' },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
   moveSheetTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.3, marginBottom: 16 },
   moveOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, marginBottom: 6, gap: 12 },
   moveOptionIndented: { marginLeft: 24 },
-  moveOptionIcon: { fontSize: 16 },
   moveOptionText: { fontSize: 15, fontWeight: '500' },
   moveCancelBtn: { marginTop: 12, borderWidth: 1.5, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   moveCancelText: { fontSize: 15, fontWeight: '600' },

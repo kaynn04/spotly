@@ -20,6 +20,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faBox } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -138,9 +140,11 @@ export default function HomePage() {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <Text style={[styles.greetingText, { color: subtleText }]}>{getGreeting()}</Text>
-            <Text style={[styles.nameText, { color: colors.text }]}>
-              {userName ?? 'there'} {'\uD83D\uDC4B'}
-            </Text>
+            <View style={styles.greetingRow}>
+              <Text style={[styles.nameText, { color: colors.text }]}>
+                {userName ?? 'there'}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -312,7 +316,7 @@ export default function HomePage() {
             {/* ── Empty state ────────────────────────────────── */}
             {data?.isEmpty && (
               <View style={[styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
-                <Text style={styles.emptyIcon}>{'\uD83D\uDCE6'}</Text>
+                <FontAwesomeIcon icon={faBox} size={40} color={PRIMARY} />
                 <Text style={[styles.emptyTitle, { color: colors.text }]}>Nothing here yet</Text>
                 <Text style={[styles.emptySubtitle, { color: subtleText }]}>
                   Go to the Spaces tab to create your first space and start organizing.

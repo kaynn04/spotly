@@ -13,11 +13,12 @@ import React from 'react';
 import {
   Animated,
   View,
-  Text,
   Pressable,
   StyleSheet,
   Platform,
 } from 'react-native';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faHome, faBook, faHandshake, faSuitcase } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -26,11 +27,11 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
 const PRIMARY = '#6b7f99';
 
-const TAB_ICONS: Record<string, string> = {
-  index: '🏠',
-  spaces: '📚',
-  lending: '🤝',
-  outside: '🧳',
+const TAB_ICONS: Record<string, any> = {
+  index: faHome,
+  spaces: faBook,
+  lending: faHandshake,
+  outside: faSuitcase,
 };
 
 export default function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
@@ -58,7 +59,7 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
     >
       {state.routes.map((route, idx) => {
         const focused = state.index === idx;
-        const emoji = TAB_ICONS[route.name] ?? '●';
+        const icon = TAB_ICONS[route.name];
 
         const onPress = () => {
           if (Platform.OS === 'ios') {
@@ -77,9 +78,11 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
         return (
           <Pressable key={route.key} onPress={onPress} style={styles.tab}>
             <View style={[styles.iconBg, focused && styles.iconBgActive]}>
-              <Text style={[styles.icon, { opacity: focused ? 1 : 0.35 }]}>
-                {emoji}
-              </Text>
+              <FontAwesomeIcon 
+                icon={icon} 
+                size={18} 
+                color={focused ? PRIMARY : '#999'}
+              />
             </View>
             <View style={[styles.dot, { opacity: focused ? 1 : 0 }]} />
           </Pressable>

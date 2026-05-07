@@ -16,6 +16,8 @@ import {
   Alert,
   Modal,
 } from 'react-native';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faCheck, faTimes, faHome, faBox, faFolder, faChevronLeft } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -270,7 +272,7 @@ export default function SessionDetailScreen() {
               : { borderColor: isDark ? '#48484a' : '#c7c7cc' },
           ]}
         >
-          {checked && <Text style={styles.checkMark}>✓</Text>}
+          {checked && <FontAwesomeIcon icon={faCheck} size={12} color="#ffffff" />}
         </View>
 
         {/* Text */}
@@ -300,7 +302,7 @@ export default function SessionDetailScreen() {
           onPress={() => handleRemoveItem(item.item_id)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Text style={[styles.removeIcon, { color: isDark ? '#48484a' : '#c7c7cc' }]}>✕</Text>
+          <FontAwesomeIcon icon={faTimes} size={14} color={isDark ? '#48484a' : '#c7c7cc'} />
         </TouchableOpacity>
       </TouchableOpacity>
     );
@@ -311,7 +313,7 @@ export default function SessionDetailScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top, backgroundColor: isDark ? '#1c1c1e' : '#ffffff', borderBottomColor: borderColor }]}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={[styles.backText, { color: PRIMARY }]}>‹ Back</Text>
+          <FontAwesomeIcon icon={faChevronLeft} size={16} color={PRIMARY} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
           {session.title}
@@ -410,7 +412,7 @@ export default function SessionDetailScreen() {
               onPress={handlePutAwayOriginal}
               activeOpacity={0.7}
             >
-              <Text style={styles.sheetOptionIcon}>🏠</Text>
+              <FontAwesomeIcon icon={faHome} size={18} color={PRIMARY} />
               <View style={styles.sheetOptionText}>
                 <Text style={[styles.sheetOptionLabel, { color: colors.text }]}>Return to original location</Text>
                 <Text style={[styles.sheetOptionDesc, { color: subtleText }]}>
@@ -425,7 +427,7 @@ export default function SessionDetailScreen() {
               onPress={handlePutAwayMove}
               activeOpacity={0.7}
             >
-              <Text style={styles.sheetOptionIcon}>📦</Text>
+              <FontAwesomeIcon icon={faBox} size={18} color={PRIMARY} />
               <View style={styles.sheetOptionText}>
                 <Text style={[styles.sheetOptionLabel, { color: colors.text }]}>Move to a different location</Text>
                 <Text style={[styles.sheetOptionDesc, { color: subtleText }]}>Choose a space or container</Text>
@@ -465,7 +467,7 @@ export default function SessionDetailScreen() {
                     onPress={() => handleMoveToSpace(space.id)}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.moveOptionIcon}>🗂️</Text>
+                    <FontAwesomeIcon icon={faFolder} size={16} color={PRIMARY} />
                     <Text style={[styles.moveOptionText, { color: colors.text }]}>{space.name}</Text>
                     <Text style={[styles.moveOptionHint, { color: subtleText }]}>space root</Text>
                   </TouchableOpacity>
@@ -476,7 +478,7 @@ export default function SessionDetailScreen() {
                       onPress={() => handleMoveToContainer(space.id, c.id)}
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.moveOptionIcon}>📁</Text>
+                        <FontAwesomeIcon icon={faFolder} size={16} color={PRIMARY} />
                       <Text style={[styles.moveOptionText, { color: colors.text }]}>{c.name}</Text>
                     </TouchableOpacity>
                   ))}
