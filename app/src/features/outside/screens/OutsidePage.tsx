@@ -13,6 +13,8 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faSuitcase } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -266,7 +268,7 @@ export default function OutsidePage() {
           /* Empty State */
           <View style={[styles.card, styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
             <View style={[styles.emptyIconContainer, { backgroundColor: `${PRIMARY}12` }]}>
-              <Text style={styles.emptyIconText}>📦</Text>
+              <FontAwesomeIcon icon={faSuitcase} size={32} color={PRIMARY} />
             </View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No Active Session</Text>
             <Text style={[styles.emptySubtitle, { color: subtleText }]}>
