@@ -425,24 +425,6 @@ export default function ItemDetailScreen() {
             <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move Item</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
 
-              {/* Current location — always shown, non-tappable */}
-              <Text style={[styles.moveSectionLabel, { color: subtleText }]}>CURRENT LOCATION</Text>
-              <View style={[styles.moveOption, styles.moveOptionDisabled, { borderColor }]}>
-                <FontAwesomeIcon
-                  icon={item?.containerId ? faFolder : faMapPin}
-                  size={16}
-                  color={subtleText}
-                />
-                <Text style={[styles.moveOptionText, { color: subtleText, flex: 1 }]} numberOfLines={1}>
-                  {item?.container?.name
-                    ? `${item.container.name} · ${item.space?.name ?? ''}`
-                    : item?.space?.name ?? 'Unknown'}
-                </Text>
-                <View style={[styles.currentBadge, { backgroundColor: `${PRIMARY}18` }]}>
-                  <Text style={[styles.currentBadgeText, { color: PRIMARY }]}>Here</Text>
-                </View>
-              </View>
-
               {/* All destinations, grouped by space — current location shown disabled inline */}
               {allSpaces.map((s) => {
                 const isCurrentSpace = s.id === item?.spaceId;

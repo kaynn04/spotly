@@ -493,25 +493,6 @@ export default function SpaceDetailScreen() {
             <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
             <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move Item</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Current location indicator */}
-              {(() => {
-                const item = items.find(i => i.id === selectedMoveItemId);
-                const currentContainer = item?.containerId ? containers.find(c => c.id === item.containerId) : null;
-                const currentLabel = currentContainer ? currentContainer.name : `Root of ${space?.name ?? 'space'}`;
-                return (
-                  <View style={styles.currentLocationSection}>
-                    <Text style={[styles.moveSectionLabel, { color: subtleText }]}>CURRENT LOCATION</Text>
-                    <View style={[styles.moveOption, styles.moveOptionDisabled, { borderColor }]}>
-                      <FontAwesomeIcon icon={currentContainer ? faFolder : faMapPin} size={16} color={subtleText} />
-                      <Text style={[styles.moveOptionText, { color: subtleText }]}>{currentLabel}</Text>
-                      <View style={[styles.currentBadge, { backgroundColor: `${PRIMARY}18` }]}>
-                        <Text style={[styles.currentBadgeText, { color: PRIMARY }]}>Here</Text>
-                      </View>
-                    </View>
-                  </View>
-                );
-              })()}
-
               {/* Containers in this space — current one shown disabled */}
               {(() => {
                 const item = items.find(i => i.id === selectedMoveItemId);

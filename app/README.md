@@ -1,50 +1,64 @@
-# Welcome to your Expo app 👋
+# Spotly — Personal Inventory & Lending Tracker
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A React Native + Expo app for organizing, locating, and managing physical belongings across spaces, containers, and tracking lending to friends and family.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## 🚀 Quick Start
 
 ```bash
-npm run reset-project
+npm install
+npx expo start -c
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Press `i` for iOS simulator or `a` for Android emulator. Scan the QR code with Expo Go app.
 
-## Learn more
+## 📖 Documentation
 
-To learn more about developing your project with Expo, look at the following resources:
+For complete project documentation, architecture, roadmap, and development guidelines, see **[PROJECT.md](../PROJECT.md)** at the root of this repository.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## ✨ Features
 
-## Join the community
+- **Spaces & Containers**: Organize items into rooms and storage containers
+- **Item Tracking**: Know exactly where each item is located
+- **Lending Tracker**: Lend items to friends, track returns automatically
+- **Outside Sessions**: Create checklists for items taken outside, ensure nothing is forgotten
+- **Dark Mode**: Full light/dark theme support
+- **Onboarding**: 5-slide welcome flow for first-time users
 
-Join our community of developers creating universal apps.
+## 🏗️ Tech Stack
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- **React Native** + **Expo Router** (file-based routing)
+- **TypeScript** (strict mode)
+- **SQLite** (expo-sqlite)
+- **Font Awesome** icons
+- **Responsive Design** (works on phone & tablet)
+
+## 📁 Project Structure
+
+See [PROJECT.md — Architecture section](../PROJECT.md#️-architecture) for detailed folder breakdown.
+
+**Key directories:**
+- `app/` — Expo Router file-based routes
+- `src/services/` — Business logic layer
+- `src/repositories/` — Data access layer
+- `src/features/` — Feature-specific code (lending, outside, etc.)
+
+## 🎯 Development Workflow
+
+1. **Create/edit feature** in appropriate folder
+2. **Add database migrations** if needed (src/db/migrations.ts)
+3. **Test on device**: `npx expo start -c`
+4. **Commit with message** referencing feature spec (e.g., `feat: Add item duplicate check #004`)
+
+## 📱 Active Branch
+
+**Current**: `022-outside-mainscreen-enhancement`
+
+See [PROJECT.md — Current Branch](../PROJECT.md#-current-branch--workflow) for latest changes.
+
+## 🔗 More Info
+
+- **Full Documentation**: [PROJECT.md](../PROJECT.md)
+- **Feature Specs**: [specs/](../specs/) folder
+- **Expo Docs**: https://docs.expo.dev
+- **React Native**: https://reactnative.dev
+

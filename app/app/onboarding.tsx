@@ -25,6 +25,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   useWindowDimensions,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -56,17 +57,18 @@ export async function isOnboardingDone(): Promise<boolean> {
 
 interface Slide {
   key: string;
-  icon: any;
+  icon?: any;
   iconColor: string;
   title: string;
   subtitle: string;
   isNameSlide?: boolean;
+  source?: any;
 }
 
 const SLIDES: Slide[] = [
   {
     key: 'welcome',
-    icon: faBoxesStacked,
+    source: require('@/assets/images/logo.png'),
     iconColor: PRIMARY,
     title: 'Welcome to Spotly',
     subtitle: 'Your personal inventory tracker. Know exactly what you own, where it is, and who has it.',
@@ -161,9 +163,13 @@ export default function OnboardingScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={[styles.slide, { paddingTop: insets.top + 20, height: slideHeight }]}>
-        {/* Icon bubble */}
+        {/* Icon or Logo bubble */}
         <View style={[styles.iconBubble, { backgroundColor: `${item.iconColor}18` }]}>
-          <FontAwesomeIcon icon={item.icon} size={48} color={item.iconColor} />
+          {item.source ? (
+            <Image source={item.source} style={{ width: 80, height: 80 }} resizeMode="contain" />
+          ) : (
+            <FontAwesomeIcon icon={item.icon} size={48} color={item.iconColor} />
+          )}
         </View>
 
         <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>

@@ -24,7 +24,7 @@ import {
   Modal,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faChevronLeft, faMapPin, faEllipsisVertical, faBox, faHandshake, faCheck, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faChevronLeft, faMapPin, faEllipsisVertical, faBox, faHandshake, faCheck, faTrash, faFolder } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -63,6 +63,7 @@ export default function ContainerDetailScreen() {
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [selectedMoveItemId, setSelectedMoveItemId] = useState<string | null>(null);
   const [actionSheetItem, setActionSheetItem] = useState<Item | null>(null);
+  const [spaceContainers, setSpaceContainers] = useState<Record<string, Container[]>>({});
 
   // Lending state
   const [showLendModal, setShowLendModal] = useState(false);
@@ -114,7 +115,17 @@ export default function ContainerDetailScreen() {
   }
 
   async function loadAllSpaces() {
-    try { setAllSpaces(await SpaceService.getAllSpaces()); } catch {}
+    try {
+      const spaces = await SpaceService.getAllSpaces();
+      setAllSpaces(spaces);
+      const entries = await Promise.all(
+        spaces.map(async (s) => {
+          const cs = await ContainerService.getContainersBySpaceId(s.id);
+          return [s.id, cs] as [string, Container[]];
+        })
+      );
+      setSpaceContainers(Object.fromEntries(entries));
+    } catch {}
   }
 
   async function loadActiveLendings() {
@@ -192,6 +203,16 @@ export default function ContainerDetailScreen() {
     if (!selectedMoveItemId || !space) return;
     try {
       await ItemService.moveItem(selectedMoveItemId, space.id, targetSpaceId);
+      setShowMoveModal(false);
+      setSelectedMoveItemId(null);
+      await loadItems();
+    } catch { Alert.alert('Error', 'Failed to move item'); }
+  }
+
+  async function handleMoveToContainer(targetSpaceId: string, targetContainerId: string) {
+    if (!selectedMoveItemId) return;
+    try {
+      await ItemService.moveItemToContainer(selectedMoveItemId, targetSpaceId, targetContainerId);
       setShowMoveModal(false);
       setSelectedMoveItemId(null);
       await loadItems();
@@ -303,26 +324,33 @@ export default function ContainerDetailScreen() {
             <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
             <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move Item</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Current location */}
-              <Text style={[styles.moveSectionLabel, { color: subtleText }]}>CURRENT LOCATION</Text>
-              <View style={[styles.moveOption, styles.moveOptionDisabled, { borderColor }]}>
-                <FontAwesomeIcon icon={faBox} size={16} color={subtleText} />
-                <Text style={[styles.moveOptionText, { color: subtleText }]}>{container?.name ?? 'Container'}</Text>
-                <View style={[styles.currentBadge, { backgroundColor: `${PRIMARY}18` }]}>
-                  <Text style={[styles.currentBadgeText, { color: PRIMARY }]}>Here</Text>
-                </View>
-              </View>
-
-              {/* Move within same space — root disabled since item is in a container here */}
+              {/* In this space: root + other containers (current container shown disabled) */}
               {space && (
                 <>
                   <Text style={[styles.moveSectionLabel, { color: subtleText }]}>IN THIS SPACE</Text>
                   <TouchableOpacity style={[styles.moveOption, { borderColor }]} onPress={handleMoveToRootSpace}>
                     <FontAwesomeIcon icon={faMapPin} size={16} color={PRIMARY} />
-                    <Text style={[styles.moveOptionText, { color: colors.text }]}>
-                      Root of {space.name}
-                    </Text>
+                    <Text style={[styles.moveOptionText, { color: colors.text }]}>Root of {space.name}</Text>
                   </TouchableOpacity>
+                  {(spaceContainers[space.id] ?? []).map((c) => {
+                    const isCurrent = c.id === containerId;
+                    return (
+                      <TouchableOpacity
+                        key={c.id}
+                        style={[styles.moveOption, isCurrent && styles.moveOptionDisabled, { borderColor }]}
+                        onPress={isCurrent ? undefined : () => handleMoveToContainer(space.id, c.id)}
+                        activeOpacity={isCurrent ? 1 : 0.7}
+                      >
+                        <FontAwesomeIcon icon={faFolder} size={16} color={isCurrent ? subtleText : PRIMARY} />
+                        <Text style={[styles.moveOptionText, { color: isCurrent ? subtleText : colors.text }]}>{c.name}</Text>
+                        {isCurrent && (
+                          <View style={[styles.currentBadge, { backgroundColor: `${PRIMARY}18` }]}>
+                            <Text style={[styles.currentBadgeText, { color: PRIMARY }]}>Here</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </>
               )}
 
@@ -331,10 +359,18 @@ export default function ContainerDetailScreen() {
                 <>
                   <Text style={[styles.moveSectionLabel, { color: subtleText }]}>MOVE TO ANOTHER SPACE</Text>
                   {allSpaces.filter((s) => s.id !== space?.id).map((s) => (
-                    <TouchableOpacity key={s.id} style={[styles.moveOption, { borderColor }]} onPress={() => handleMoveToSpace(s.id)}>
-                      <FontAwesomeIcon icon={faMapPin} size={16} color={PRIMARY} />
-                      <Text style={[styles.moveOptionText, { color: colors.text }]}>{s.name}</Text>
-                    </TouchableOpacity>
+                    <View key={s.id}>
+                      <TouchableOpacity style={[styles.moveOption, { borderColor }]} onPress={() => handleMoveToSpace(s.id)}>
+                        <FontAwesomeIcon icon={faMapPin} size={16} color={PRIMARY} />
+                        <Text style={[styles.moveOptionText, { color: colors.text }]}>{s.name} (root)</Text>
+                      </TouchableOpacity>
+                      {(spaceContainers[s.id] ?? []).map((c) => (
+                        <TouchableOpacity key={c.id} style={[styles.moveOption, styles.moveOptionIndented, { borderColor }]} onPress={() => handleMoveToContainer(s.id, c.id)}>
+                          <FontAwesomeIcon icon={faFolder} size={16} color={PRIMARY} />
+                          <Text style={[styles.moveOptionText, { color: colors.text }]}>{c.name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
                   ))}
                 </>
               )}
@@ -440,6 +476,7 @@ const styles = StyleSheet.create({
   moveSectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8, marginTop: 8 },
   moveOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, marginBottom: 6, gap: 12 },
   moveOptionDisabled: { opacity: 0.6 },
+  moveOptionIndented: { marginLeft: 16 },
   moveOptionIcon: { fontSize: 16 },
   moveOptionText: { fontSize: 15, fontWeight: '500', flex: 1 },
   currentBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },

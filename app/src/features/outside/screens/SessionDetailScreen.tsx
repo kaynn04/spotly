@@ -462,29 +462,7 @@ export default function SessionDetailScreen() {
             data={allSpaces}
             keyExtractor={(s) => s.id}
             style={styles.moveList}
-            ListHeaderComponent={
-              putAwayItem ? (
-                <View style={styles.moveCurrentSection}>
-                  <Text style={[styles.moveSectionLabel, { color: subtleText }]}>CURRENT LOCATION</Text>
-                  <View style={[styles.moveOption, styles.moveOptionDisabled, { borderColor }]}>
-                    <FontAwesomeIcon
-                      icon={putAwayItem.container_name ? faFolder : faMapPin}
-                      size={16}
-                      color={subtleText}
-                    />
-                    <Text style={[styles.moveOptionText, { color: subtleText }]} numberOfLines={1}>
-                      {putAwayItem.container_name
-                        ? `${putAwayItem.container_name} · ${putAwayItem.space_name}`
-                        : putAwayItem.space_name ?? 'Unknown'}
-                    </Text>
-                    <View style={[styles.currentBadge, { backgroundColor: `${PRIMARY}18` }]}>
-                      <Text style={[styles.currentBadgeText, { color: PRIMARY }]}>Here</Text>
-                    </View>
-                  </View>
-                  <Text style={[styles.moveSectionLabel, { color: subtleText, marginTop: 12 }]}>MOVE TO</Text>
-                </View>
-              ) : null
-            }
+            ListHeaderComponent={null}
             renderItem={({ item: space }) => {
               const isCurrentSpace = space.id === currentItemSpaceId;
               const containers = spaceContainers[space.id] ?? [];
