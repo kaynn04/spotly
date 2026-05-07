@@ -46,7 +46,7 @@ import ContainerFormModal from '@/src/features/spaces/screens/components/Contain
 import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
 import ItemActionSheet from '@/src/features/spaces/screens/components/ItemActionSheet';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faBox, faHandshake, faCheck, faTrash, faMapPin, faFolder, faMagnifyingGlass, faTimes, faChevronRight, faChevronLeft } from '@fortawesome/free-solid-svg-icons';
+import { faBox, faHandshake, faCheck, faTrash, faMapPin, faFolder, faMagnifyingGlass, faTimes, faChevronRight, faChevronLeft, faEllipsisVertical } from '@fortawesome/free-solid-svg-icons';
 
 const PRIMARY = '#6b7f99';
 
