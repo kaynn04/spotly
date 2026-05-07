@@ -194,9 +194,11 @@ export class ContainerRepository {
   static async moveContainer(containerId: string, targetSpaceId: string): Promise<void> {
     try {
       const db = getDatabase();
-      await db.runAsync('UPDATE containers SET space_id = ? WHERE id = ?', [targetSpaceId, containerId]);
-      // Also update all items in this container to the new space
-      await db.runAsync('UPDATE items SET space_id = ? WHERE container_id = ?', [targetSpaceId, containerId]);
+      await db.withTransactionAsync(async () => {
+        await db.runAsync('UPDATE containers SET space_id = ? WHERE id = ?', [targetSpaceId, containerId]);
+        // Also update all items in this container to the new space
+        await db.runAsync('UPDATE items SET space_id = ? WHERE container_id = ?', [targetSpaceId, containerId]);
+      });
     } catch (error) {
       console.error('[ContainerRepository.moveContainer] Database error:', error);
       const serviceError: ServiceError = {

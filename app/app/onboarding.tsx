@@ -237,16 +237,14 @@ export default function OnboardingScreen() {
 
         {/* Buttons row */}
         <View style={styles.btnsRow}>
-          {currentIndex > 0 ? (
+          {currentIndex > 0 && (
             <TouchableOpacity style={[styles.backBtn, { borderColor }]} onPress={goBack}>
               <Text style={[styles.backBtnText, { color: subtleText }]}>Back</Text>
             </TouchableOpacity>
-          ) : (
-            <View style={styles.backBtnPlaceholder} />
           )}
 
           <TouchableOpacity
-            style={[styles.nextBtn, { backgroundColor: PRIMARY }]}
+            style={[styles.nextBtn, currentIndex === 0 && styles.nextBtnFull, { backgroundColor: PRIMARY }]}
             onPress={goNext}
           >
             <Text style={styles.nextBtnText}>
@@ -340,14 +338,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  backBtnPlaceholder: {
-    flex: 1,
-  },
   nextBtn: {
     flex: 2,
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: 'center',
+  },
+  nextBtnFull: {
+    flex: 1,
   },
   nextBtnText: {
     color: '#ffffff',

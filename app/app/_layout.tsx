@@ -16,21 +16,26 @@ export const unstable_settings = {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
-  const [ready, setReady] = useState(false);
+  const [dbReady, setDbReady] = useState(false);
+  const [navChecked, setNavChecked] = useState(false);
 
+  // Effect 1: Initialize DB — blocks rendering until done
   useEffect(() => {
-    async function init() {
-      await initializeDatabase().catch((err) => {
-        console.error('Failed to initialize database:', err);
-      });
-      const done = await isOnboardingDone();
-      if (!done) {
-        router.replace('/onboarding');
-      }
-      setReady(true);
-    }
-    init();
+    initializeDatabase()
+      .catch((err) => console.error('Failed to initialize database:', err))
+      .finally(() => setDbReady(true));
   }, []);
+
+  // Effect 2: Check onboarding only after Stack is mounted (dbReady = true)
+  useEffect(() => {
+    if (!dbReady) return;
+    isOnboardingDone().then((done) => {
+      if (!done) router.replace('/onboarding');
+      setNavChecked(true);
+    });
+  }, [dbReady]);
+
+  if (!dbReady) return null;
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

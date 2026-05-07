@@ -4,7 +4,7 @@
  * Main Spaces tab -- minimalist redesign uniform with Outside feature
  */
 
-import React, { useCallback, useState, useMemo } from 'react';
+import React, { useCallback, useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -95,6 +95,15 @@ export default function SpacesPage() {
     setSearchText(text);
     const trimmed = text.trim();
     if (!trimmed) { setSearchResults([]); return; }
+
+    // Debounce: cancel previous pending search
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => performSearch(trimmed), 300);
+  }, []);
+
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const performSearch = useCallback(async (trimmed: string) => {
     setSearchLoading(true);
     try {
       const itemRepo = new ItemRepository();

@@ -318,7 +318,8 @@ export class ItemRepository {
          FROM items
          JOIN spaces ON items.space_id = spaces.id
          ORDER BY items.created_at DESC
-         LIMIT ${sanitizedLimit}`
+         LIMIT ?`,
+        [sanitizedLimit]
       );
 
       return result.map((row: any) => ({

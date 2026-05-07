@@ -24,7 +24,7 @@ import {
   Modal,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faChevronLeft, faFolder, faMapPin, faChevronRight, faEllipsisVertical, faBox, faHandshake, faCheck, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faChevronLeft, faMapPin, faEllipsisVertical, faBox, faHandshake, faCheck, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -81,9 +81,11 @@ export default function ContainerDetailScreen() {
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
   const subtleText = isDark ? '#8e8e93' : '#a0aec0';
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadContainer(); }, [containerId]);
 
   useFocusEffect(
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     useCallback(() => {
       if (container?.id) { loadItems(); loadAllSpaces(); loadActiveLendings(); }
     }, [container?.id])

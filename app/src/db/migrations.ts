@@ -75,19 +75,10 @@ export async function initializeDatabase() {
       `);
       console.log('✓ Created items table with container_id column');
     } else if (!hasContainerId) {
-      // Table exists but is missing container_id column - drop and recreate
-      console.log('⚠ Items table schema incorrect, recreating...');
-      await db.execAsync('DROP TABLE IF EXISTS items;');
-      await db.execAsync(`
-        CREATE TABLE items (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          space_id TEXT NOT NULL,
-          container_id TEXT,
-          created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        );
-      `);
-      console.log('✓ Recreated items table with correct schema');
+      // Table exists but is missing container_id column - add it safely
+      console.log('⚠ Items table missing container_id, adding column...');
+      await db.execAsync(`ALTER TABLE items ADD COLUMN container_id TEXT;`);
+      console.log('✓ Added container_id column to items table');
     } else {
       console.log('✓ Items table schema is correct');
     }
