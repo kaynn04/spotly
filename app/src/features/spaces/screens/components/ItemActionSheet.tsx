@@ -134,7 +134,11 @@ export default function ItemActionSheet({
                 styles.iconWrap,
                 { backgroundColor: action.destructive ? `${DESTRUCTIVE}15` : `${PRIMARY}15` },
               ]}>
-                {typeof action.icon === 'string' ? (\n                  <Text style={styles.iconEmoji}>{action.icon}</Text>\n                ) : (\n                  <FontAwesomeIcon icon={action.icon} size={18} color={action.destructive ? DESTRUCTIVE : PRIMARY} />\n                )}
+                {typeof action.icon === 'string' ? (
+                  <Text style={styles.iconEmoji}>{action.icon}</Text>
+                ) : (
+                  <FontAwesomeIcon icon={action.icon} size={18} color={action.destructive ? DESTRUCTIVE : PRIMARY} />
+                )}
               </View>
               <View style={styles.actionTextWrap}>
                 <Text style={[
