@@ -76,6 +76,9 @@ export default function SpaceDetailScreen() {
   const [lendLoading, setLendLoading] = useState(false);
 
   const [actionSheetItem, setActionSheetItem] = useState<Item | null>(null);
+  const [actionSheetContainer, setActionSheetContainer] = useState<Container | null>(null);
+  const [showMoveContainerModal, setShowMoveContainerModal] = useState(false);
+  const [selectedMoveContainer, setSelectedMoveContainer] = useState<Container | null>(null);
   const [searchText, setSearchText] = useState('');
   const [filterSegment, setFilterSegment] = useState<'all' | 'containers' | 'items' | 'lent'>('all');
   // Map of item_id → active Lending (null = not lent)
@@ -154,6 +157,46 @@ export default function SpaceDetailScreen() {
 
   function handleItemPress(item: Item) {
     setActionSheetItem(item);
+  }
+
+  function handleContainerLongPress(container: Container) {
+    setActionSheetContainer(container);
+  }
+
+  function confirmDeleteContainer(container: Container) {
+    const itemCount = items.filter((i) => i.containerId === container.id).length;
+    const msg = itemCount > 0
+      ? `Delete "${container.name}" and its ${itemCount} item${itemCount !== 1 ? 's' : ''}? This cannot be undone.`
+      : `Delete "${container.name}"? This cannot be undone.`;
+    Alert.alert('Delete Container', msg, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await ContainerService.deleteContainer(container.id);
+            await loadContainers();
+            await loadItems();
+          } catch {
+            Alert.alert('Error', 'Failed to delete container');
+          }
+        },
+      },
+    ]);
+  }
+
+  async function handleMoveContainerToSpace(targetSpaceId: string) {
+    if (!selectedMoveContainer) return;
+    try {
+      await ContainerService.moveContainer(selectedMoveContainer.id, targetSpaceId);
+      setShowMoveContainerModal(false);
+      setSelectedMoveContainer(null);
+      await loadContainers();
+      await loadItems();
+    } catch {
+      Alert.alert('Error', 'Failed to move container');
+    }
   }
 
   function confirmDeleteItem(itemId: string, itemName: string) {
@@ -359,6 +402,7 @@ export default function SpaceDetailScreen() {
                 <TouchableOpacity
                   style={[styles.containerCard, { backgroundColor: cardBg, borderColor }]}
                   onPress={() => router.push({ pathname: '../container/[id]' as any, params: { id: c.id } })}
+                  onLongPress={() => handleContainerLongPress(c)}
                   activeOpacity={0.7}
                 >
                   <View style={[styles.containerIcon, { backgroundColor: `${PRIMARY}15` }]}>
@@ -380,7 +424,7 @@ export default function SpaceDetailScreen() {
             return (
               <TouchableOpacity
                 style={[styles.itemCard, { backgroundColor: cardBg, borderColor: isLent ? `${PRIMARY}40` : borderColor }]}
-                onPress={() => handleItemPress(item)}
+                onLongPress={() => handleItemPress(item)}
                 activeOpacity={0.7}
               >
                 <View style={[styles.itemDot, { backgroundColor: isLent ? PRIMARY : isDark ? '#48484a' : '#c7c7cc' }]} />
@@ -529,6 +573,57 @@ export default function SpaceDetailScreen() {
           ];
         })()}
       />
+      <ItemActionSheet
+        visible={actionSheetContainer !== null}
+        itemName={actionSheetContainer?.name ?? ''}
+        onClose={() => setActionSheetContainer(null)}
+        actions={(() => {
+          const c = actionSheetContainer;
+          if (!c) return [];
+          const itemCount = items.filter((i) => i.containerId === c.id).length;
+          return [
+            {
+              icon: '📦',
+              label: 'Move',
+              description: 'Move container to another space',
+              onPress: () => { setSelectedMoveContainer(c); setShowMoveContainerModal(true); },
+            },
+            {
+              icon: '🗑️',
+              label: 'Delete',
+              description: itemCount > 0 ? `Will delete ${itemCount} item${itemCount !== 1 ? 's' : ''} inside` : 'Remove this empty container',
+              destructive: true,
+              onPress: () => confirmDeleteContainer(c),
+            },
+          ];
+        })()}
+      />
+      {/* Move Container Modal */}
+      <Modal visible={showMoveContainerModal} transparent animationType="slide" onRequestClose={() => setShowMoveContainerModal(false)}>
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.moveSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+            <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move Container</Text>
+            <Text style={[styles.moveSheetSubtitle, { color: subtleText }]}>
+              Move "{selectedMoveContainer?.name}" to another space
+            </Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {allSpaces.filter((s) => s.id !== id).map((s) => (
+                <TouchableOpacity key={s.id} style={[styles.moveOption, { borderColor }]} onPress={() => handleMoveContainerToSpace(s.id)}>
+                  <Text style={styles.moveOptionIcon}>{'\u{1F4CD}'}</Text>
+                  <Text style={[styles.moveOptionText, { color: colors.text }]}>{s.name}</Text>
+                </TouchableOpacity>
+              ))}
+              {allSpaces.filter((s) => s.id !== id).length === 0 && (
+                <Text style={[styles.moveEmptyText, { color: subtleText }]}>No other spaces available</Text>
+              )}
+            </ScrollView>
+            <TouchableOpacity style={[styles.moveCancelBtn, { borderColor }]} onPress={() => setShowMoveContainerModal(false)}>
+              <Text style={[styles.moveCancelText, { color: subtleText }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -568,7 +663,9 @@ const styles = StyleSheet.create({
   sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   moveSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '70%' },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
-  moveSheetTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.3, marginBottom: 16 },
+  moveSheetTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.3, marginBottom: 4 },
+  moveSheetSubtitle: { fontSize: 14, marginBottom: 16 },
+  moveEmptyText: { fontSize: 14, textAlign: 'center', paddingVertical: 20 },
   moveSectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8, marginTop: 8 },
   moveOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, marginBottom: 6, gap: 12 },
   moveOptionIcon: { fontSize: 16 },

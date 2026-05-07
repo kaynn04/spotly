@@ -11,7 +11,7 @@
  *  - Full dark mode support
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -33,8 +33,13 @@ import type { Container } from '@/src/models/Container';
 import { SpaceService } from '@/src/services/SpaceService';
 import { ItemService } from '@/src/services/ItemService';
 import { ContainerService } from '@/src/services/ContainerService';
+import { LendingService } from '@/src/features/lending/services/LendingService';
+import { LendingRepository } from '@/src/features/lending/repositories/LendingRepository';
+import { ItemRepository } from '@/src/repositories/ItemRepository';
+import { Lending } from '@/src/features/lending/models/Lending';
 import ItemFormModal from '@/src/features/spaces/screens/components/ItemFormModal';
 import ItemActionSheet from '@/src/features/spaces/screens/components/ItemActionSheet';
+import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
 
 const PRIMARY = '#6b7f99';
 
@@ -57,6 +62,19 @@ export default function ContainerDetailScreen() {
   const [selectedMoveItemId, setSelectedMoveItemId] = useState<string | null>(null);
   const [actionSheetItem, setActionSheetItem] = useState<Item | null>(null);
 
+  // Lending state
+  const [showLendModal, setShowLendModal] = useState(false);
+  const [selectedLendItem, setSelectedLendItem] = useState<Item | null>(null);
+  const [borrowerName, setBorrowerName] = useState('');
+  const [lendNote, setLendNote] = useState('');
+  const [lendLoading, setLendLoading] = useState(false);
+  const [activeLendingMap, setActiveLendingMap] = useState<Record<string, Lending>>({});
+
+  const lendingService = useMemo(
+    () => new LendingService(new LendingRepository(), new ItemRepository()),
+    []
+  );
+
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
   const subtleText = isDark ? '#8e8e93' : '#a0aec0';
@@ -65,7 +83,7 @@ export default function ContainerDetailScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (container?.id) { loadItems(); loadAllSpaces(); }
+      if (container?.id) { loadItems(); loadAllSpaces(); loadActiveLendings(); }
     }, [container?.id])
   );
 
@@ -95,6 +113,50 @@ export default function ContainerDetailScreen() {
 
   async function loadAllSpaces() {
     try { setAllSpaces(await SpaceService.getAllSpaces()); } catch {}
+  }
+
+  async function loadActiveLendings() {
+    try {
+      const active = await lendingService.getActiveLendings();
+      const map: Record<string, Lending> = {};
+      active.forEach((l) => { map[l.item_id] = l; });
+      setActiveLendingMap(map);
+    } catch {}
+  }
+
+  async function handleMarkReturned(lendingId: string, item?: Item | null) {
+    try {
+      await lendingService.markAsReturned(lendingId);
+      await loadActiveLendings();
+      if (item) {
+        Alert.alert('Returned ✓', `${item.name} has been marked as returned.\n\nIt belongs in the "${container?.name ?? 'current'}" container.`);
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to mark as returned');
+    }
+  }
+
+  async function handleLendSubmit() {
+    if (!borrowerName.trim() || !selectedLendItem) return;
+    setLendLoading(true);
+    try {
+      await lendingService.createLending({
+        item_id: selectedLendItem.id,
+        borrower_name: borrowerName.trim(),
+        note: lendNote.trim() || undefined,
+      });
+      setShowLendModal(false);
+      setBorrowerName('');
+      setLendNote('');
+      setSelectedLendItem(null);
+      await loadActiveLendings();
+    } catch (err: any) {
+      Alert.alert('Error', err.code === 'DUPLICATE_ACTIVE_LENDING'
+        ? 'This item is already lent out'
+        : err.message || 'Failed to lend item');
+    } finally {
+      setLendLoading(false);
+    }
   }
 
   function handleItemPress(item: Item) {
@@ -181,19 +243,36 @@ export default function ContainerDetailScreen() {
               </Text>
             ) : null
           }
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.itemCard, { backgroundColor: cardBg, borderColor }]}
-              onPress={() => handleItemPress(item)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.itemDot, { backgroundColor: isDark ? '#48484a' : '#c7c7cc' }]} />
-              <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={1}>
-                {item.name}
-              </Text>
-              <Text style={[styles.itemMoreDots, { color: subtleText }]}>{'...'}</Text>
-            </TouchableOpacity>
-          )}
+          renderItem={({ item }) => {
+            const activeLending = activeLendingMap[item.id];
+            const isLent = !!activeLending;
+            return (
+              <TouchableOpacity
+                style={[styles.itemCard, { backgroundColor: cardBg, borderColor: isLent ? `${PRIMARY}40` : borderColor }]}
+                onLongPress={() => handleItemPress(item)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.itemDot, { backgroundColor: isLent ? PRIMARY : isDark ? '#48484a' : '#c7c7cc' }]} />
+                <View style={styles.itemTextWrap}>
+                  <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  {isLent && (
+                    <Text style={[styles.itemLentMeta, { color: PRIMARY }]} numberOfLines={1}>
+                      Lent to {activeLending.borrower_name}
+                    </Text>
+                  )}
+                </View>
+                {isLent ? (
+                  <View style={[styles.lentBadge, { backgroundColor: `${PRIMARY}15` }]}>
+                    <Text style={[styles.lentBadgeText, { color: PRIMARY }]}>Lent</Text>
+                  </View>
+                ) : (
+                  <Text style={[styles.itemMoreDots, { color: subtleText }]}>{'...'}</Text>
+                )}
+              </TouchableOpacity>
+            );
+          }}
           ListEmptyComponent={
             <View style={[styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
               <Text style={[styles.emptyText, { color: subtleText }]}>
@@ -257,25 +336,56 @@ export default function ContainerDetailScreen() {
         onSubmit={handleAddItem}
         contextLabel={container?.name}
       />
+      <LendingFormModal
+        visible={showLendModal}
+        item={selectedLendItem}
+        borrowerName={borrowerName}
+        onBorrowerNameChange={setBorrowerName}
+        note={lendNote}
+        onNoteChange={setLendNote}
+        onSubmit={handleLendSubmit}
+        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setSelectedLendItem(null); }}
+        loading={lendLoading}
+      />
       <ItemActionSheet
         visible={actionSheetItem !== null}
         itemName={actionSheetItem?.name ?? ''}
+        activeLending={actionSheetItem ? (activeLendingMap[actionSheetItem.id] ?? null) : null}
         onClose={() => setActionSheetItem(null)}
-        actions={[
-          {
-            icon: '📦',
-            label: 'Move',
-            description: 'Move to another space or container',
-            onPress: () => { setSelectedMoveItemId(actionSheetItem!.id); setShowMoveModal(true); },
-          },
-          {
-            icon: '🗑️',
-            label: 'Delete',
-            description: 'Permanently remove this item',
-            destructive: true,
-            onPress: () => confirmDeleteItem(actionSheetItem!.id, actionSheetItem!.name),
-          },
-        ]}
+        actions={(() => {
+          const item = actionSheetItem;
+          if (!item) return [];
+          const lending = activeLendingMap[item.id];
+          const isLent = !!lending;
+          return [
+            {
+              icon: '📦',
+              label: 'Move',
+              description: 'Move to another space or container',
+              onPress: () => { setSelectedMoveItemId(item.id); setShowMoveModal(true); },
+            },
+            isLent
+              ? {
+                  icon: '✅',
+                  label: 'Mark as Returned',
+                  description: `${lending.borrower_name} returned this item`,
+                  onPress: () => handleMarkReturned(lending.id, item),
+                }
+              : {
+                  icon: '🤝',
+                  label: 'Lend',
+                  description: 'Track who you lent this item to',
+                  onPress: () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setShowLendModal(true); },
+                },
+            {
+              icon: '🗑️',
+              label: 'Delete',
+              description: isLent ? 'Item is currently lent out' : 'Permanently remove this item',
+              destructive: true,
+              onPress: () => confirmDeleteItem(item.id, item.name),
+            },
+          ];
+        })()}
       />
     </View>
   );
@@ -296,7 +406,11 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3, marginBottom: 12 },
   itemCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingVertical: 14, paddingHorizontal: 14, marginBottom: 6, gap: 10 },
   itemDot: { width: 6, height: 6, borderRadius: 3 },
-  itemName: { flex: 1, fontSize: 15, fontWeight: '500' },
+  itemTextWrap: { flex: 1 },
+  itemName: { fontSize: 15, fontWeight: '500' },
+  itemLentMeta: { fontSize: 12, marginTop: 2 },
+  lentBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  lentBadgeText: { fontSize: 11, fontWeight: '600' },
   itemMoreDots: { fontSize: 14, letterSpacing: 1 },
   emptyCard: { borderRadius: 14, borderWidth: 1, padding: 28, alignItems: 'center', marginTop: 20 },
   emptyText: { fontSize: 14, textAlign: 'center', lineHeight: 22 },

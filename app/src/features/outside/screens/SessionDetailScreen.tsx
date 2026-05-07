@@ -4,15 +4,17 @@
  * Manage an active outside session — modern minimalist redesign
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   FlatList,
   ActivityIndicator,
   Alert,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -21,6 +23,11 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { useOutsideService } from '../services/OutsideService';
 import { OutsideSessionItemWithContext } from '../models/OutsideSessionItem';
+import { SpaceService } from '@/src/services/SpaceService';
+import { ContainerService } from '@/src/services/ContainerService';
+import { ItemService } from '@/src/services/ItemService';
+import type { Space } from '@/src/models/Space';
+import type { Container } from '@/src/models/Container';
 import ItemPickerModal from './components/ItemPickerModal';
 
 const PRIMARY = '#6b7f99';
@@ -39,6 +46,13 @@ export default function SessionDetailScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showItemPicker, setShowItemPicker] = useState(false);
+
+  // Put Away state
+  const [putAwayItem, setPutAwayItem] = useState<OutsideSessionItemWithContext | null>(null);
+  const [showPutAwaySheet, setShowPutAwaySheet] = useState(false);
+  const [showMoveSheet, setShowMoveSheet] = useState(false);
+  const [allSpaces, setAllSpaces] = useState<Space[]>([]);
+  const [spaceContainers, setSpaceContainers] = useState<Record<string, Container[]>>({});
 
   useFocusEffect(
     useCallback(() => {
@@ -62,14 +76,87 @@ export default function SessionDetailScreen() {
     }
   };
 
-  const handleToggleItem = async (itemId: string) => {
+  const handleToggleItem = async (item: OutsideSessionItemWithContext) => {
+    const checked = Boolean(item.is_checked);
+    if (checked) {
+      // Item is already checked (dealt with) — uncheck to undo
+      try {
+        await outsideService.checkItem(id!, item.item_id);
+        await loadSession();
+      } catch (err) {
+        console.error('Error toggling item:', err);
+        Alert.alert('Error', 'Failed to update item');
+      }
+    } else {
+      // Item is unchecked — show "Put Away" sheet to decide where it goes
+      setPutAwayItem(item);
+      setShowPutAwaySheet(true);
+    }
+  };
+
+  const handlePutAwayOriginal = async () => {
+    // Return to original location — just check the item
+    setShowPutAwaySheet(false);
+    if (!putAwayItem) return;
     try {
-      await outsideService.checkItem(id!, itemId);
+      await outsideService.checkItem(id!, putAwayItem.item_id);
       await loadSession();
     } catch (err) {
-      console.error('Error toggling item:', err);
       Alert.alert('Error', 'Failed to update item');
     }
+    setPutAwayItem(null);
+  };
+
+  const handlePutAwayMove = async () => {
+    setShowPutAwaySheet(false);
+    // Load all spaces and their containers for the picker
+    try {
+      const spaces = await SpaceService.getAllSpaces();
+      setAllSpaces(spaces);
+      const containersMap: Record<string, Container[]> = {};
+      await Promise.all(
+        spaces.map(async (s) => {
+          const cs = await ContainerService.getContainersBySpaceId(s.id);
+          containersMap[s.id] = cs;
+        })
+      );
+      setSpaceContainers(containersMap);
+      setShowMoveSheet(true);
+    } catch (err) {
+      Alert.alert('Error', 'Failed to load spaces');
+      setPutAwayItem(null);
+    }
+  };
+
+  const handleMoveToSpace = async (spaceId: string) => {
+    if (!putAwayItem) return;
+    setShowMoveSheet(false);
+    try {
+      await ItemService.moveItem(putAwayItem.item_id, '', spaceId);
+      const spaceName = allSpaces.find(s => s.id === spaceId)?.name ?? 'Unknown';
+      await outsideService.recordItemMove(id!, putAwayItem.item_id, spaceName, null);
+      await outsideService.checkItem(id!, putAwayItem.item_id); // check as dealt with
+      await loadSession();
+    } catch (err) {
+      Alert.alert('Error', 'Failed to move item');
+    }
+    setPutAwayItem(null);
+  };
+
+  const handleMoveToContainer = async (spaceId: string, containerId: string) => {
+    if (!putAwayItem) return;
+    setShowMoveSheet(false);
+    try {
+      await ItemService.moveItemToContainer(putAwayItem.item_id, spaceId, containerId);
+      const spaceName = allSpaces.find(s => s.id === spaceId)?.name ?? 'Unknown';
+      const containerName = spaceContainers[spaceId]?.find(c => c.id === containerId)?.name ?? null;
+      await outsideService.recordItemMove(id!, putAwayItem.item_id, spaceName, containerName);
+      await outsideService.checkItem(id!, putAwayItem.item_id); // check as dealt with
+      await loadSession();
+    } catch (err) {
+      Alert.alert('Error', 'Failed to move item');
+    }
+    setPutAwayItem(null);
   };
 
   const handleRemoveItem = (itemId: string) => {
@@ -171,7 +258,7 @@ export default function SessionDetailScreen() {
           index < items.length - 1 && { borderBottomWidth: 1, borderBottomColor: borderColor },
           checked && { opacity: 0.7 },
         ]}
-        onPress={() => handleToggleItem(item.item_id)}
+        onPress={() => handleToggleItem(item)}
         activeOpacity={0.6}
       >
         {/* Checkbox */}
@@ -305,6 +392,106 @@ export default function SessionDetailScreen() {
           onClose={() => setShowItemPicker(false)}
         />
       )}
+
+      {/* Put Away Bottom Sheet */}
+      <Modal visible={showPutAwaySheet} transparent animationType="slide" onRequestClose={() => { setShowPutAwaySheet(false); setPutAwayItem(null); }}>
+        <TouchableWithoutFeedback onPress={() => { setShowPutAwaySheet(false); setPutAwayItem(null); }}>
+          <View style={styles.sheetBackdrop} />
+        </TouchableWithoutFeedback>
+        <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+          <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+          <Text style={[styles.sheetTitle, { color: colors.text }]}>Put Away</Text>
+          <Text style={[styles.sheetSubtitle, { color: subtleText }]}>
+            Where do you want to put "{putAwayItem?.item_name}"?
+          </Text>
+          <View style={styles.sheetActions}>
+            <TouchableOpacity
+              style={[styles.sheetOption, { backgroundColor: isDark ? '#2c2c2e' : '#f8f9fa', borderColor }]}
+              onPress={handlePutAwayOriginal}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.sheetOptionIcon}>🏠</Text>
+              <View style={styles.sheetOptionText}>
+                <Text style={[styles.sheetOptionLabel, { color: colors.text }]}>Return to original location</Text>
+                <Text style={[styles.sheetOptionDesc, { color: subtleText }]}>
+                  {putAwayItem?.container_name
+                    ? `${putAwayItem.space_name} › ${putAwayItem.container_name}`
+                    : putAwayItem?.space_name ?? 'Current location'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sheetOption, { backgroundColor: isDark ? '#2c2c2e' : '#f8f9fa', borderColor }]}
+              onPress={handlePutAwayMove}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.sheetOptionIcon}>📦</Text>
+              <View style={styles.sheetOptionText}>
+                <Text style={[styles.sheetOptionLabel, { color: colors.text }]}>Move to a different location</Text>
+                <Text style={[styles.sheetOptionDesc, { color: subtleText }]}>Choose a space or container</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            style={[styles.sheetCancel, { backgroundColor: isDark ? '#2c2c2e' : '#f2f2f7' }]}
+            onPress={() => { setShowPutAwaySheet(false); setPutAwayItem(null); }}
+          >
+            <Text style={[styles.sheetCancelText, { color: PRIMARY }]}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* Move Picker Modal */}
+      <Modal visible={showMoveSheet} transparent animationType="slide" onRequestClose={() => { setShowMoveSheet(false); setPutAwayItem(null); }}>
+        <TouchableWithoutFeedback onPress={() => { setShowMoveSheet(false); setPutAwayItem(null); }}>
+          <View style={styles.sheetBackdrop} />
+        </TouchableWithoutFeedback>
+        <View style={[styles.sheet, styles.moveSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+          <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+          <Text style={[styles.sheetTitle, { color: colors.text }]}>Move Item</Text>
+          <Text style={[styles.sheetSubtitle, { color: subtleText }]}>
+            Choose where to place "{putAwayItem?.item_name}"
+          </Text>
+          <FlatList
+            data={allSpaces}
+            keyExtractor={(s) => s.id}
+            style={styles.moveList}
+            renderItem={({ item: space }) => {
+              const containers = spaceContainers[space.id] ?? [];
+              return (
+                <View>
+                  <TouchableOpacity
+                    style={[styles.moveOption, { borderColor }]}
+                    onPress={() => handleMoveToSpace(space.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.moveOptionIcon}>🗂️</Text>
+                    <Text style={[styles.moveOptionText, { color: colors.text }]}>{space.name}</Text>
+                    <Text style={[styles.moveOptionHint, { color: subtleText }]}>space root</Text>
+                  </TouchableOpacity>
+                  {containers.map((c) => (
+                    <TouchableOpacity
+                      key={c.id}
+                      style={[styles.moveOption, styles.moveOptionNested, { borderColor }]}
+                      onPress={() => handleMoveToContainer(space.id, c.id)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.moveOptionIcon}>📁</Text>
+                      <Text style={[styles.moveOptionText, { color: colors.text }]}>{c.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              );
+            }}
+          />
+          <TouchableOpacity
+            style={[styles.sheetCancel, { backgroundColor: isDark ? '#2c2c2e' : '#f2f2f7' }]}
+            onPress={() => { setShowMoveSheet(false); setPutAwayItem(null); }}
+          >
+            <Text style={[styles.sheetCancelText, { color: PRIMARY }]}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -388,4 +575,57 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   outlineButtonText: { fontSize: 15, fontWeight: '600' },
+
+  // Put Away / Move sheets
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  sheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  sheetTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.3, marginBottom: 4 },
+  sheetSubtitle: { fontSize: 14, marginBottom: 20 },
+  sheetActions: { gap: 10, marginBottom: 16 },
+  sheetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 14,
+  },
+  sheetOptionIcon: { fontSize: 20 },
+  sheetOptionText: { flex: 1 },
+  sheetOptionLabel: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
+  sheetOptionDesc: { fontSize: 12 },
+  sheetCancel: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  sheetCancelText: { fontSize: 16, fontWeight: '600' },
+
+  // Move sheet
+  moveSheet: { maxHeight: '70%' },
+  moveList: { marginBottom: 12 },
+  moveOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 6,
+    gap: 12,
+  },
+  moveOptionNested: { marginLeft: 24 },
+  moveOptionIcon: { fontSize: 16 },
+  moveOptionText: { flex: 1, fontSize: 15, fontWeight: '500' },
+  moveOptionHint: { fontSize: 11 },
 });

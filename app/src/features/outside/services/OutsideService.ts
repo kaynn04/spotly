@@ -226,6 +226,18 @@ export class OutsideService {
   }
 
   /**
+   * Record that an item was moved to a different location during put-away
+   */
+  async recordItemMove(sessionId: string, itemId: string, spaceName: string, containerName: string | null): Promise<void> {
+    try {
+      await this.itemRepository.recordMove(sessionId, itemId, spaceName, containerName);
+    } catch (error) {
+      console.error('✗ Service: Error recording item move:', error);
+      // Non-critical — don't throw, just log
+    }
+  }
+
+  /**
    * Remove an item from a session
    */
   async removeItemFromSession(sessionId: string, itemId: string): Promise<void> {

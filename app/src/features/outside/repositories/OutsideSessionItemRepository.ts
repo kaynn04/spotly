@@ -62,6 +62,8 @@ export class OutsideSessionItemRepository {
           osi.item_id,
           osi.is_checked,
           osi.checked_at,
+          osi.moved_to_space_name,
+          osi.moved_to_container_name,
           COALESCE(i.name, 'Unknown Item') as item_name,
           COALESCE(s.name, 'Unknown Space') as space_name,
           c.name as container_name
@@ -86,6 +88,8 @@ export class OutsideSessionItemRepository {
         item_name: String(row.item_name || 'Unknown Item'),
         space_name: String(row.space_name || 'Unknown Space'),
         container_name: row.container_name ? String(row.container_name) : null,
+        moved_to_space_name: row.moved_to_space_name ? String(row.moved_to_space_name) : null,
+        moved_to_container_name: row.moved_to_container_name ? String(row.moved_to_container_name) : null,
       }));
 
       console.log('[OutsideSessionItemRepository] Parsed results:', parsed);
@@ -198,6 +202,24 @@ export class OutsideSessionItemRepository {
       return stats || { total: 0, checked: 0 };
     } catch (error) {
       console.error('✗ Error fetching session stats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Record that an item was moved to a different location during put-away
+   */
+  async recordMove(sessionId: string, itemId: string, spaceName: string, containerName: string | null): Promise<void> {
+    const db = getDatabase();
+
+    try {
+      await db.runAsync(
+        'UPDATE outside_session_items SET moved_to_space_name = ?, moved_to_container_name = ? WHERE session_id = ? AND item_id = ?',
+        [spaceName, containerName, sessionId, itemId]
+      );
+      console.log(`✓ Recorded move for item ${itemId} in session ${sessionId}`);
+    } catch (error) {
+      console.error('✗ Error recording item move:', error);
       throw error;
     }
   }

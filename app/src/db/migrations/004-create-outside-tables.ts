@@ -78,6 +78,15 @@ export async function createOutsideSessionsTables(db: SQLiteDatabase) {
     `);
 
     console.log('✓ Outside sessions tables created successfully');
+
+    // Add moved_to columns if they don't exist (added for put-away tracking)
+    const tableInfo = await db.getAllAsync<any>("PRAGMA table_info(outside_session_items);");
+    const hasMovedToSpace = tableInfo.some((col: any) => col.name === 'moved_to_space_name');
+    if (!hasMovedToSpace) {
+      await db.execAsync(`ALTER TABLE outside_session_items ADD COLUMN moved_to_space_name TEXT;`);
+      await db.execAsync(`ALTER TABLE outside_session_items ADD COLUMN moved_to_container_name TEXT;`);
+      console.log('✓ Added moved_to columns to outside_session_items');
+    }
   } catch (error) {
     console.error('✗ Error creating outside sessions tables:', error);
     throw error;

@@ -22,6 +22,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { ItemRepository } from '../../../../repositories/ItemRepository';
+import { LendingService } from '../../../lending/services/LendingService';
+import { LendingRepository } from '../../../lending/repositories/LendingRepository';
 import { useOutsideService } from '../../services/OutsideService';
 
 interface ItemPickerModalProps {
@@ -49,6 +51,7 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
   const [searchText, setSearchText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lentItemIds, setLentItemIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadItems();
@@ -58,9 +61,19 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
     setLoading(true);
     setError(null);
     try {
+      // Load all items
       const itemRepository = new ItemRepository();
       const items = await itemRepository.getAll();
-      const pickerItems: PickerItem[] = items.map(item => ({
+      
+      // Load active lendings to filter them out
+      const lendingService = new LendingService(new LendingRepository(), itemRepository);
+      const activeLendings = await lendingService.getActiveLendings();
+      const lentIds = new Set(activeLendings.map(l => l.item_id));
+      setLentItemIds(lentIds);
+      
+      // Filter out lent items
+      const availableItems = items.filter(item => !lentIds.has(item.id));
+      const pickerItems: PickerItem[] = availableItems.map(item => ({
         id: item.id,
         name: item.name,
         space: item.space,

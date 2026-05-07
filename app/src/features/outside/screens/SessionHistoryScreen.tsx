@@ -21,6 +21,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { useOutsideService } from '../services/OutsideService';
 import { OutsideSession } from '../models/OutsideSession';
+import { OutsideSessionItemWithContext } from '../models/OutsideSessionItem';
 
 const PRIMARY = '#6b7f99';
 
@@ -35,6 +36,9 @@ export default function SessionHistoryScreen() {
   const [sessions, setSessions] = useState<OutsideSession[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedItems, setExpandedItems] = useState<OutsideSessionItemWithContext[]>([]);
+  const [expandLoading, setExpandLoading] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -65,6 +69,7 @@ export default function SessionHistoryScreen() {
           try {
             await outsideService.deleteSession(sessionId);
             setSessions(prev => prev.filter(s => s.id !== sessionId));
+            if (expandedId === sessionId) { setExpandedId(null); setExpandedItems([]); }
           } catch (err) {
             console.error('Error deleting session:', err);
             Alert.alert('Error', 'Failed to delete session');
@@ -73,6 +78,24 @@ export default function SessionHistoryScreen() {
         style: 'destructive',
       },
     ]);
+  };
+
+  const handleToggleExpand = async (sessionId: string) => {
+    if (expandedId === sessionId) {
+      setExpandedId(null);
+      setExpandedItems([]);
+      return;
+    }
+    setExpandedId(sessionId);
+    setExpandLoading(true);
+    try {
+      const items = await outsideService.getSessionItems(sessionId);
+      setExpandedItems(items);
+    } catch {
+      setExpandedItems([]);
+    } finally {
+      setExpandLoading(false);
+    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -146,36 +169,86 @@ export default function SessionHistoryScreen() {
           data={sessions}
           keyExtractor={item => item.id}
           contentContainerStyle={[styles.listContent, { backgroundColor: cardBg }]}
-          renderItem={({ item, index }) => (
-            <View
-              style={[
-                styles.sessionRow,
-                index < sessions.length - 1 && { borderBottomWidth: 1, borderBottomColor: borderColor },
-              ]}
-            >
-              {/* Completion dot */}
-              <View style={styles.completedDot} />
+          renderItem={({ item, index }) => {
+            const isExpanded = expandedId === item.id;
+            return (
+              <View>
+                <TouchableOpacity
+                  style={[
+                    styles.sessionRow,
+                    !isExpanded && index < sessions.length - 1 && { borderBottomWidth: 1, borderBottomColor: borderColor },
+                  ]}
+                  onPress={() => handleToggleExpand(item.id)}
+                  activeOpacity={0.7}
+                >
+                  {/* Completion dot */}
+                  <View style={styles.completedDot} />
 
-              {/* Info */}
-              <View style={styles.sessionInfo}>
-                <Text style={[styles.sessionTitle, { color: colors.text }]} numberOfLines={1}>
-                  {item.title}
-                </Text>
-                <Text style={[styles.sessionDate, { color: subtleText }]}>
-                  {item.completed_at ? formatDate(item.completed_at) : 'Unknown date'}
-                </Text>
+                  {/* Info */}
+                  <View style={styles.sessionInfo}>
+                    <Text style={[styles.sessionTitle, { color: colors.text }]} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                    <Text style={[styles.sessionDate, { color: subtleText }]}>
+                      {item.completed_at ? formatDate(item.completed_at) : 'Unknown date'}
+                    </Text>
+                  </View>
+
+                  {/* Expand / Delete */}
+                  <Text style={[styles.expandIcon, { color: subtleText }]}>{isExpanded ? '▾' : '›'}</Text>
+                  <TouchableOpacity
+                    style={styles.deleteBtn}
+                    onPress={() => handleDeleteSession(item.id, item.title)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={[styles.deleteIcon, { color: isDark ? '#48484a' : '#c7c7cc' }]}>✕</Text>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+
+                {/* Expanded items */}
+                {isExpanded && (
+                  <View style={[styles.expandedSection, { borderBottomWidth: index < sessions.length - 1 ? 1 : 0, borderBottomColor: borderColor }]}>
+                    {expandLoading ? (
+                      <ActivityIndicator size="small" color={PRIMARY} style={{ paddingVertical: 12 }} />
+                    ) : expandedItems.length === 0 ? (
+                      <Text style={[styles.expandedEmpty, { color: subtleText }]}>No items recorded</Text>
+                    ) : (
+                      expandedItems.map((si) => {
+                        const checked = Boolean(si.is_checked);
+                        const location = si.container_name
+                          ? `${si.space_name ?? ''} › ${si.container_name}`
+                          : si.space_name;
+                        const movedTo = si.moved_to_container_name
+                          ? `${si.moved_to_space_name} › ${si.moved_to_container_name}`
+                          : si.moved_to_space_name;
+                        return (
+                          <View key={si.id} style={styles.expandedItem}>
+                            <View style={[styles.expandedCheck, { backgroundColor: checked ? '#6b9e7a' : isDark ? '#48484a' : '#d1d5db' }]}>
+                              {checked && <Text style={styles.expandedCheckMark}>✓</Text>}
+                            </View>
+                            <View style={styles.expandedItemText}>
+                              <Text style={[styles.expandedItemName, { color: colors.text, textDecorationLine: checked ? 'line-through' : 'none' }]} numberOfLines={1}>
+                                {si.item_name}
+                              </Text>
+                              {movedTo ? (
+                                <Text style={[styles.expandedItemLocation, { color: '#e8a838' }]} numberOfLines={1}>
+                                  Moved → {movedTo}
+                                </Text>
+                              ) : location ? (
+                                <Text style={[styles.expandedItemLocation, { color: subtleText }]} numberOfLines={1}>
+                                  {location}
+                                </Text>
+                              ) : null}
+                            </View>
+                          </View>
+                        );
+                      })
+                    )}
+                  </View>
+                )}
               </View>
-
-              {/* Delete */}
-              <TouchableOpacity
-                style={styles.deleteBtn}
-                onPress={() => handleDeleteSession(item.id, item.title)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={[styles.deleteIcon, { color: isDark ? '#48484a' : '#c7c7cc' }]}>✕</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+            );
+          }}
         />
       )}
     </View>
@@ -212,6 +285,17 @@ const styles = StyleSheet.create({
   sessionDate: { fontSize: 12, marginTop: 2 },
   deleteBtn: { padding: 4 },
   deleteIcon: { fontSize: 14 },
+  expandIcon: { fontSize: 14, marginRight: 4 },
+
+  /* Expanded items */
+  expandedSection: { paddingHorizontal: 16, paddingBottom: 12 },
+  expandedEmpty: { fontSize: 13, paddingVertical: 8, paddingLeft: 20 },
+  expandedItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingLeft: 20, gap: 10 },
+  expandedCheck: { width: 16, height: 16, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  expandedCheckMark: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  expandedItemText: { flex: 1 },
+  expandedItemName: { fontSize: 14, fontWeight: '500' },
+  expandedItemLocation: { fontSize: 11, marginTop: 1 },
 
   /* Empty state */
   emptyIconWrap: { width: 72, height: 72, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
