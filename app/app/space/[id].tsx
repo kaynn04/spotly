@@ -23,6 +23,7 @@ import {
   Alert,
   ScrollView,
   Modal,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -37,9 +38,11 @@ import { ContainerService } from '@/src/services/ContainerService';
 import { LendingService } from '@/src/features/lending/services/LendingService';
 import { LendingRepository } from '@/src/features/lending/repositories/LendingRepository';
 import { ItemRepository } from '@/src/repositories/ItemRepository';
+import { Lending } from '@/src/features/lending/models/Lending';
 import ItemFormModal from '@/src/features/spaces/screens/components/ItemFormModal';
 import ContainerFormModal from '@/src/features/spaces/screens/components/ContainerFormModal';
 import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
+import ItemActionSheet from '@/src/features/spaces/screens/components/ItemActionSheet';
 
 const PRIMARY = '#6b7f99';
 
@@ -72,6 +75,12 @@ export default function SpaceDetailScreen() {
   const [lendNote, setLendNote] = useState('');
   const [lendLoading, setLendLoading] = useState(false);
 
+  const [actionSheetItem, setActionSheetItem] = useState<Item | null>(null);
+  const [searchText, setSearchText] = useState('');
+  const [filterSegment, setFilterSegment] = useState<'all' | 'containers' | 'items'>('all');
+  // Map of item_id → active Lending (null = not lent)
+  const [activeLendingMap, setActiveLendingMap] = useState<Record<string, Lending>>({});
+
   const lendingService = useMemo(
     () => new LendingService(new LendingRepository(), new ItemRepository()),
     []
@@ -85,7 +94,7 @@ export default function SpaceDetailScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (id) { loadItems(); loadContainers(); }
+      if (id) { loadItems(); loadContainers(); loadActiveLendings(); }
     }, [id])
   );
 
@@ -94,7 +103,7 @@ export default function SpaceDetailScreen() {
     setLoading(true);
     try {
       setSpace(await SpaceService.getSpaceById(id));
-      await Promise.all([loadItems(), loadContainers(), loadAllSpaces()]);
+      await Promise.all([loadItems(), loadContainers(), loadAllSpaces(), loadActiveLendings()]);
     } catch (err) {
       console.error('[SpaceDetailScreen] loadAll:', err);
     } finally {
@@ -116,21 +125,35 @@ export default function SpaceDetailScreen() {
     try { setAllSpaces(await SpaceService.getAllSpaces()); } catch {}
   }
 
+  async function loadActiveLendings() {
+    try {
+      const active = await lendingService.getActiveLendings();
+      const map: Record<string, Lending> = {};
+      active.forEach((l) => { map[l.item_id] = l; });
+      setActiveLendingMap(map);
+    } catch {}
+  }
+
+  async function handleMarkReturned(lendingId: string, item?: Item | null) {
+    try {
+      await lendingService.markAsReturned(lendingId);
+      await loadActiveLendings();
+      if (item) {
+        const containerName = item.containerId
+          ? containers.find((c) => c.id === item.containerId)?.name
+          : null;
+        const locationHint = containerName
+          ? `It belongs in the "${containerName}" container.`
+          : `It lives in the "${space?.name ?? 'current'}" space.`;
+        Alert.alert('Returned ✓', `${item.name} has been marked as returned.\n\n${locationHint}`);
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to mark as returned');
+    }
+  }
+
   function handleItemPress(item: Item) {
-    Alert.alert(item.name, 'What do you want to do?', [
-      { text: 'Move', onPress: () => { setSelectedMoveItemId(item.id); setShowMoveModal(true); } },
-      {
-        text: 'Lend',
-        onPress: () => {
-          setSelectedLendItem(item);
-          setBorrowerName('');
-          setLendNote('');
-          setShowLendModal(true);
-        },
-      },
-      { text: 'Delete', style: 'destructive', onPress: () => confirmDeleteItem(item.id, item.name) },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    setActionSheetItem(item);
   }
 
   function confirmDeleteItem(itemId: string, itemName: string) {
@@ -179,6 +202,8 @@ export default function SpaceDetailScreen() {
       setBorrowerName('');
       setLendNote('');
       setSelectedLendItem(null);
+      // Refresh active lendings map to show "Lent" badge immediately
+      await loadActiveLendings();
     } catch (err: any) {
       Alert.alert('Error', err.code === 'DUPLICATE_ACTIVE_LENDING'
         ? 'This item is already lent out'
@@ -214,10 +239,26 @@ export default function SpaceDetailScreen() {
   }
 
   const spaceLevelItems = items.filter((item) => !item.containerId);
-  const listData: ListEntry[] = [
+  
+  // Filter logic: combine search + segment filter
+  const searchLower = searchText.toLowerCase();
+  const allEntries: ListEntry[] = [
     ...containers.map((c) => ({ type: 'container' as const, data: c })),
     ...spaceLevelItems.map((i) => ({ type: 'item' as const, data: i })),
   ];
+  
+  const filteredData = allEntries.filter((entry) => {
+    // Apply segment filter
+    if (filterSegment === 'containers' && entry.type !== 'container') return false;
+    if (filterSegment === 'items' && entry.type !== 'item') return false;
+    
+    // Apply search filter
+    if (searchText.trim()) {
+      const name = entry.data.name.toLowerCase();
+      return name.includes(searchLower);
+    }
+    return true;
+  });
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
@@ -239,23 +280,90 @@ export default function SpaceDetailScreen() {
           <ActivityIndicator size="large" color={PRIMARY} />
         </View>
       ) : (
-        <FlatList
-          data={listData}
-          keyExtractor={(entry) =>
-            entry.type === 'container' ? `c-${entry.data.id}` : `i-${entry.data.id}`
-          }
-          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 80 }]}
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            <Text style={[styles.sectionLabel, { color: subtleText }]}>
-              {containers.length} container{containers.length !== 1 ? 's' : ''}{' '}
-              {'\u00B7'} {spaceLevelItems.length} item{spaceLevelItems.length !== 1 ? 's' : ''} at root
-            </Text>
-          }
-          renderItem={({ item: entry }) => {
-            if (entry.type === 'container') {
-              const c = entry.data;
-              const count = items.filter((i) => i.containerId === c.id).length;
+        <>
+          {/* Search Bar */}
+          <View style={[styles.searchContainer, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+            <View style={[styles.searchInputWrapper, { backgroundColor: isDark ? '#2c2c2e' : '#ffffff', borderColor }]}>
+              <Text style={styles.searchIcon}>🔍</Text>
+              <TextInput
+                style={[styles.searchInput, { color: isDark ? '#ffffff' : '#2c3e50' }]}
+                placeholder="Search containers & items..."
+                placeholderTextColor={isDark ? '#8e8e93' : '#a0aec0'}
+                value={searchText}
+                onChangeText={setSearchText}
+              />
+              {searchText.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchText('')} style={styles.clearBtn}>
+                  <Text style={styles.clearBtnText}>✕</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Segment Control */}
+          <View style={[styles.segmentContainer, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+            <View style={[styles.segmentTrack, { backgroundColor: isDark ? '#1c1c1e' : '#eef0f3' }]}>
+              {(['all', 'containers', 'items'] as const).map((segment) => {
+                const isActive = filterSegment === segment;
+                const count = segment === 'all'
+                  ? containers.length + spaceLevelItems.length
+                  : segment === 'containers'
+                    ? containers.length
+                    : spaceLevelItems.length;
+                return (
+                  <TouchableOpacity
+                    key={segment}
+                    style={[
+                      styles.segmentBtn,
+                      isActive && [styles.segmentBtnActive, { backgroundColor: isDark ? '#2c2c2e' : '#ffffff' }],
+                    ]}
+                    onPress={() => setFilterSegment(segment)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[
+                      styles.segmentBtnText,
+                      { color: isActive ? (isDark ? '#ffffff' : '#1c1c1e') : subtleText },
+                    ]}>
+                      {segment === 'all' ? 'All' : segment === 'containers' ? 'Containers' : 'Items'}
+                    </Text>
+                    <View style={[
+                      styles.segmentBadge,
+                      { backgroundColor: isActive ? `${PRIMARY}20` : 'transparent' },
+                    ]}>
+                      <Text style={[
+                        styles.segmentBadgeText,
+                        { color: isActive ? PRIMARY : subtleText },
+                      ]}>
+                        {count}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* List */}
+          <FlatList
+            data={filteredData}
+            keyExtractor={(entry) =>
+              entry.type === 'container' ? `c-${entry.data.id}` : `i-${entry.data.id}`
+            }
+            contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 80 }]}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              filteredData.length > 0 ? (
+                <Text style={[styles.sectionLabel, { color: subtleText }]}>
+                  {filterSegment === 'all' && `${filteredData.filter(e => e.type === 'container').length} container${filteredData.filter(e => e.type === 'container').length !== 1 ? 's' : ''} ${'\u00B7'} ${filteredData.filter(e => e.type === 'item').length} item${filteredData.filter(e => e.type === 'item').length !== 1 ? 's' : ''}`}
+                  {filterSegment === 'containers' && `${filteredData.length} container${filteredData.length !== 1 ? 's' : ''}`}
+                  {filterSegment === 'items' && `${filteredData.length} item${filteredData.length !== 1 ? 's' : ''}`}
+                </Text>
+              ) : null
+            }
+            renderItem={({ item: entry }) => {
+              if (entry.type === 'container') {
+                const c = entry.data;
+                const count = items.filter((i) => i.containerId === c.id).length;
               return (
                 <TouchableOpacity
                   style={[styles.containerCard, { backgroundColor: cardBg, borderColor }]}
@@ -276,26 +384,50 @@ export default function SpaceDetailScreen() {
               );
             }
             const item = entry.data;
+            const activeLending = activeLendingMap[item.id];
+            const isLent = !!activeLending;
             return (
               <TouchableOpacity
-                style={[styles.itemCard, { backgroundColor: cardBg, borderColor }]}
+                style={[styles.itemCard, { backgroundColor: cardBg, borderColor: isLent ? `${PRIMARY}40` : borderColor }]}
                 onPress={() => handleItemPress(item)}
                 activeOpacity={0.7}
               >
-                <View style={[styles.itemDot, { backgroundColor: isDark ? '#48484a' : '#c7c7cc' }]} />
-                <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
-                <Text style={[styles.itemMoreDots, { color: subtleText }]}>{'...'}</Text>
+                <View style={[styles.itemDot, { backgroundColor: isLent ? PRIMARY : isDark ? '#48484a' : '#c7c7cc' }]} />
+                <View style={styles.itemTextWrap}>
+                  <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
+                  {isLent && (
+                    <Text style={[styles.itemLentMeta, { color: PRIMARY }]} numberOfLines={1}>
+                      Lent to {activeLending.borrower_name}
+                    </Text>
+                  )}
+                </View>
+                {isLent ? (
+                  <View style={[styles.lentBadge, { backgroundColor: `${PRIMARY}15` }]}>
+                    <Text style={[styles.lentBadgeText, { color: PRIMARY }]}>Lent</Text>
+                  </View>
+                ) : (
+                  <Text style={[styles.itemMoreDots, { color: subtleText }]}>{'...'}</Text>
+                )}
               </TouchableOpacity>
             );
           }}
           ListEmptyComponent={
             <View style={[styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
               <Text style={[styles.emptyText, { color: subtleText }]}>
-                {'No items or containers yet.\nUse the buttons below to get started.'}
+                {searchText ? (
+                  'No results found'
+                ) : filterSegment === 'containers' ? (
+                  'No containers yet'
+                ) : filterSegment === 'items' ? (
+                  'No items yet'
+                ) : (
+                  'No items or containers yet.\nUse the buttons below to get started.'
+                )}
               </Text>
             </View>
           }
         />
+        </>
       )}
 
       {/* Bottom Action Bar */}
@@ -364,6 +496,46 @@ export default function SpaceDetailScreen() {
         onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setSelectedLendItem(null); }}
         loading={lendLoading}
       />
+      <ItemActionSheet
+        visible={actionSheetItem !== null}
+        itemName={actionSheetItem?.name ?? ''}
+        activeLending={actionSheetItem ? (activeLendingMap[actionSheetItem.id] ?? null) : null}
+        onClose={() => setActionSheetItem(null)}
+        actions={(() => {
+          const item = actionSheetItem;
+          if (!item) return [];
+          const lending = activeLendingMap[item.id];
+          const isLent = !!lending;
+          return [
+            {
+              icon: '📦',
+              label: 'Move',
+              description: 'Move to another space or container',
+              onPress: () => { setSelectedMoveItemId(item.id); setShowMoveModal(true); },
+            },
+            isLent
+              ? {
+                  icon: '✅',
+                  label: 'Mark as Returned',
+                  description: `${lending.borrower_name} returned this item`,
+                  onPress: () => handleMarkReturned(lending.id, item),
+                }
+              : {
+                  icon: '🤝',
+                  label: 'Lend',
+                  description: 'Track who you lent this item to',
+                  onPress: () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setShowLendModal(true); },
+                },
+            {
+              icon: '🗑️',
+              label: 'Delete',
+              description: isLent ? 'Item is currently lent out' : 'Permanently remove this item',
+              destructive: true,
+              onPress: () => confirmDeleteItem(item.id, item.name),
+            },
+          ];
+        })()}
+      />
     </View>
   );
 }
@@ -388,8 +560,12 @@ const styles = StyleSheet.create({
   chevron: { fontSize: 16 },
   itemCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingVertical: 14, paddingHorizontal: 14, marginBottom: 6, gap: 10 },
   itemDot: { width: 6, height: 6, borderRadius: 3 },
-  itemName: { flex: 1, fontSize: 15, fontWeight: '500' },
+  itemTextWrap: { flex: 1, gap: 2 },
+  itemName: { fontSize: 15, fontWeight: '500' },
+  itemLentMeta: { fontSize: 11, fontWeight: '500' },
   itemMoreDots: { fontSize: 14, letterSpacing: 1 },
+  lentBadge: { borderRadius: 6, paddingVertical: 3, paddingHorizontal: 8 },
+  lentBadgeText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
   emptyCard: { borderRadius: 14, borderWidth: 1, padding: 28, alignItems: 'center', marginTop: 20 },
   emptyText: { fontSize: 14, textAlign: 'center', lineHeight: 22 },
   actionBar: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1, gap: 10 },
@@ -406,4 +582,23 @@ const styles = StyleSheet.create({
   moveOptionText: { fontSize: 15, fontWeight: '500' },
   moveCancelBtn: { marginTop: 12, borderWidth: 1.5, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   moveCancelText: { fontSize: 15, fontWeight: '600' },
+  
+  // Search & Filter
+  searchContainer: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
+  searchInputWrapper: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, height: 40 },
+  searchIcon: { fontSize: 16, marginRight: 8 },
+  searchInput: { flex: 1, fontSize: 15, paddingVertical: 0 },
+  clearBtn: { padding: 4 },
+  clearBtnText: { fontSize: 18, fontWeight: '300' },
+  
+  segmentContainer: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12 },
+  segmentTrack: { flexDirection: 'row', borderRadius: 12, padding: 3, gap: 2 },
+  segmentBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, borderRadius: 10, gap: 6 },
+  segmentBtnActive: { shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
+  segmentBtnText: { fontSize: 13, fontWeight: '600' },
+  segmentBadge: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8, minWidth: 20, alignItems: 'center' },
+  segmentBadgeText: { fontSize: 11, fontWeight: '700' },
+  
+  emptyStateContainer: { padding: 20, alignItems: 'center', justifyContent: 'center' },
+  emptyStateText: { fontSize: 14, textAlign: 'center' },
 });

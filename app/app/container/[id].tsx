@@ -34,6 +34,7 @@ import { SpaceService } from '@/src/services/SpaceService';
 import { ItemService } from '@/src/services/ItemService';
 import { ContainerService } from '@/src/services/ContainerService';
 import ItemFormModal from '@/src/features/spaces/screens/components/ItemFormModal';
+import ItemActionSheet from '@/src/features/spaces/screens/components/ItemActionSheet';
 
 const PRIMARY = '#6b7f99';
 
@@ -54,6 +55,7 @@ export default function ContainerDetailScreen() {
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [selectedMoveItemId, setSelectedMoveItemId] = useState<string | null>(null);
+  const [actionSheetItem, setActionSheetItem] = useState<Item | null>(null);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
@@ -96,11 +98,7 @@ export default function ContainerDetailScreen() {
   }
 
   function handleItemPress(item: Item) {
-    Alert.alert(item.name, 'What do you want to do?', [
-      { text: 'Move', onPress: () => { setSelectedMoveItemId(item.id); setShowMoveModal(true); } },
-      { text: 'Delete', style: 'destructive', onPress: () => confirmDeleteItem(item.id, item.name) },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    setActionSheetItem(item);
   }
 
   function confirmDeleteItem(itemId: string, itemName: string) {
@@ -258,6 +256,26 @@ export default function ContainerDetailScreen() {
         onClose={() => setShowAddItemModal(false)}
         onSubmit={handleAddItem}
         contextLabel={container?.name}
+      />
+      <ItemActionSheet
+        visible={actionSheetItem !== null}
+        itemName={actionSheetItem?.name ?? ''}
+        onClose={() => setActionSheetItem(null)}
+        actions={[
+          {
+            icon: '📦',
+            label: 'Move',
+            description: 'Move to another space or container',
+            onPress: () => { setSelectedMoveItemId(actionSheetItem!.id); setShowMoveModal(true); },
+          },
+          {
+            icon: '🗑️',
+            label: 'Delete',
+            description: 'Permanently remove this item',
+            destructive: true,
+            onPress: () => confirmDeleteItem(actionSheetItem!.id, actionSheetItem!.name),
+          },
+        ]}
       />
     </View>
   );

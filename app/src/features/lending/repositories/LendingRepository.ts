@@ -117,6 +117,17 @@ export class LendingRepository {
   }
 
   /**
+   * Get the current ACTIVE lending for a single item, or null.
+   */
+  async getActiveLendingForItem(itemId: string): Promise<Lending | null> {
+    const result = await this.db.getFirstAsync(
+      `SELECT * FROM lendings WHERE item_id = ? AND status = ? LIMIT 1`,
+      [itemId, LendingStatus.ACTIVE]
+    );
+    return result ? this.rowToLending(result) : null;
+  }
+
+  /**
    * Check if item has an ACTIVE lending
    *
    * Quick boolean check for BR-001: "One item can only have one ACTIVE lending at a time"

@@ -360,4 +360,15 @@ export class LendingService {
       );
     }
   }
+
+  /**
+   * Get the current ACTIVE lending for a single item, or null if not lent.
+   */
+  async getActiveLendingForItem(itemId: string): Promise<Lending | null> {
+    try {
+      return await this.lendingRepository.getActiveLendingForItem(itemId);
+    } catch (error) {
+      throw createServiceError('DATABASE_ERROR', 'Failed to check lending status');
+    }
+  }
 }

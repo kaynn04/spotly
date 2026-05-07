@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -81,7 +82,21 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
     try {
       const updated = await lendingService.markAsReturned(lending.id);
       setLending(updated);
-      router.back();
+      // Show location hint before navigating back
+      const spaceName = item?.space?.name;
+      const containerName = item?.container?.name;
+      const locationHint = containerName
+        ? `It belongs in the "${containerName}" container in ${spaceName ?? 'its space'}.`
+        : spaceName
+        ? `It lives in the "${spaceName}" space.`
+        : null;
+      if (locationHint) {
+        Alert.alert('Returned ✓', `${item?.name ?? 'Item'} has been marked as returned.\n\n${locationHint}`, [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      } else {
+        router.back();
+      }
     } catch (err: any) {
       setError(err?.message || 'Failed to mark as returned');
     } finally {

@@ -4,7 +4,7 @@
  * Main Spaces tab -- minimalist redesign uniform with Outside feature
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -21,8 +22,22 @@ import { Colors } from '@/constants/theme';
 import { useScrollHide } from '@/hooks/use-scroll-hide';
 import { useTabBarPadding } from '@/hooks/use-tab-bar-padding';
 import type { Space } from '@/src/models/Space';
+import type { Item } from '@/src/models/Item';
+import type { Container } from '@/src/models/Container';
 import { SpaceService } from '@/src/services/SpaceService';
+import { ItemRepository } from '@/src/repositories/ItemRepository';
+import { ContainerRepository } from '@/src/repositories/ContainerRepository';
 import SpaceFormModal from './components/SpaceFormModal';
+
+interface SearchResult {
+  type: 'item' | 'container';
+  id: string;
+  name: string;
+  spaceName: string;
+  spaceId: string;
+  containerName: string | null;
+  containerId: string | null;
+}
 
 const PRIMARY = '#6b7f99';
 
@@ -38,6 +53,10 @@ export default function SpacesPage() {
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [loading, setLoading] = useState(false);
   const [formVisible, setFormVisible] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const isSearching = searchText.trim().length > 0;
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
@@ -60,6 +79,63 @@ export default function SpacesPage() {
       setLoading(false);
     }
   };
+
+  const handleSearch = useCallback(async (text: string) => {
+    setSearchText(text);
+    const trimmed = text.trim();
+    if (!trimmed) { setSearchResults([]); return; }
+    setSearchLoading(true);
+    try {
+      const itemRepo = new ItemRepository();
+      const [allItems, allSpaces] = await Promise.all([
+        itemRepo.getAll(),
+        SpaceService.getAllSpaces(),
+      ]);
+      const spaceMap = Object.fromEntries(allSpaces.map((s) => [s.id, s.name]));
+      const lower = trimmed.toLowerCase();
+
+      // Match items
+      const itemMatches: SearchResult[] = allItems
+        .filter((i: any) => i.name.toLowerCase().includes(lower))
+        .map((i: any) => ({
+          type: 'item' as const,
+          id: i.id,
+          name: i.name,
+          spaceName: i.space?.name ?? spaceMap[i.spaceId] ?? '',
+          spaceId: i.spaceId,
+          containerName: i.container?.name ?? null,
+          containerId: i.containerId ?? null,
+        }));
+
+      // Match containers (by fetching each space's containers - use cached spaces)
+      const containerRows = await Promise.all(
+        allSpaces.map((s) =>
+          ContainerRepository.getContainersBySpaceId(s.id).then((cs) =>
+            cs.map((c) => ({ ...c, spaceName: s.name }))
+          ).catch(() => [])
+        )
+      );
+      const containerMatches: SearchResult[] = containerRows
+        .flat()
+        .filter((c: any) => c.name.toLowerCase().includes(lower))
+        .map((c: any) => ({
+          type: 'container' as const,
+          id: c.id,
+          name: c.name,
+          spaceName: c.spaceName,
+          spaceId: c.spaceId,
+          containerName: null,
+          containerId: null,
+        }));
+
+      setSearchResults([...containerMatches, ...itemMatches]);
+    } catch (err) {
+      console.error('[SpacesPage] Search error:', err);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, []);
 
   const handleCreateSpace = async (name: string) => {
     await SpaceService.createSpace(name);
@@ -97,44 +173,107 @@ export default function SpacesPage() {
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
       <FlatList
-        data={spaces}
-        keyExtractor={(item) => item.id}
-        renderItem={renderSpace}
-        contentContainerStyle={[styles.listContent, { paddingTop: insets.top + 8, paddingBottom: tabBarPadding }]}
-        showsVerticalScrollIndicator={false}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        ListHeaderComponent={
-          <View style={styles.header}>
-            <View>
-              <Text style={[styles.title, { color: colors.text }]}>Spaces</Text>
-              <Text style={[styles.subtitle, { color: subtleText }]}>
-                Organize your belongings
-              </Text>
-            </View>
-            {spaces.length > 0 && (
-              <View
-                style={[
-                  styles.countBadge,
-                  { backgroundColor: `${PRIMARY}18`, borderColor: `${PRIMARY}30` },
-                ]}
-              >
-                <Text style={[styles.countBadgeText, { color: PRIMARY }]}>
-                  {spaces.length}
+        data={isSearching ? searchResults : spaces}
+        keyExtractor={(item) => (isSearching ? `sr-${(item as SearchResult).type}-${(item as SearchResult).id}` : (item as Space).id)}
+        renderItem={isSearching ? ({ item }) => {
+          const result = item as SearchResult;
+          const isContainer = result.type === 'container';
+          return (
+            <TouchableOpacity
+              style={[styles.resultCard, { backgroundColor: cardBg, borderColor }]}
+              onPress={() => {
+                if (isContainer) {
+                  router.push({ pathname: '/container/[id]' as any, params: { id: result.id } });
+                } else {
+                  router.push({ pathname: '/space/[id]' as any, params: { id: result.spaceId } });
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.resultIcon, { backgroundColor: isContainer ? `${PRIMARY}15` : `${isDark ? '#48484a' : '#e2e6ea'}` }]}>
+                <Text style={styles.resultIconText}>{isContainer ? '📁' : '📄'}</Text>
+              </View>
+              <View style={styles.resultContent}>
+                <Text style={[styles.resultName, { color: colors.text }]} numberOfLines={1}>{result.name}</Text>
+                <Text style={[styles.resultMeta, { color: subtleText }]} numberOfLines={1}>
+                  {isContainer ? `Container in ${result.spaceName}` : result.containerName ? `${result.spaceName} › ${result.containerName}` : result.spaceName}
                 </Text>
               </View>
-            )}
-          </View>
+              <Text style={[styles.chevron, { color: subtleText }]}>{'>'}</Text>
+            </TouchableOpacity>
+          );
+        } : renderSpace}
+        contentContainerStyle={[styles.listContent, { paddingTop: insets.top + 8, paddingBottom: tabBarPadding }]}
+        showsVerticalScrollIndicator={false}
+        onScroll={isSearching ? undefined : handleScroll}
+        scrollEventThrottle={16}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={
+          <>
+            {/* Page header */}
+            <View style={styles.header}>
+              <View>
+                <Text style={[styles.title, { color: colors.text }]}>Spaces</Text>
+                <Text style={[styles.subtitle, { color: subtleText }]}>
+                  Organize your belongings
+                </Text>
+              </View>
+              {spaces.length > 0 && !isSearching && (
+                <View style={[styles.countBadge, { backgroundColor: `${PRIMARY}18`, borderColor: `${PRIMARY}30` }]}>
+                  <Text style={[styles.countBadgeText, { color: PRIMARY }]}>{spaces.length}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Search bar */}
+            <View style={[styles.searchWrapper, { backgroundColor: isDark ? '#1c1c1e' : '#ffffff', borderColor }]}>
+              <Text style={styles.searchIcon}>🔍</Text>
+              <TextInput
+                style={[styles.searchInput, { color: isDark ? '#ffffff' : '#1c1c1e' }]}
+                placeholder="Search items & containers across all spaces..."
+                placeholderTextColor={subtleText}
+                value={searchText}
+                onChangeText={handleSearch}
+                returnKeyType="search"
+              />
+              {isSearching && (
+                <TouchableOpacity onPress={() => { setSearchText(''); setSearchResults([]); }} style={styles.clearBtn}>
+                  <Text style={[styles.clearBtnText, { color: subtleText }]}>✕</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Search result summary OR spaces section label */}
+            {isSearching ? (
+              <View style={styles.resultHeader}>
+                {searchLoading ? (
+                  <ActivityIndicator size="small" color={PRIMARY} style={{ marginRight: 8 }} />
+                ) : null}
+                <Text style={[styles.sectionLabel, { color: subtleText }]}>
+                  {searchLoading ? 'Searching...' : `${searchResults.length} result${searchResults.length !== 1 ? 's' : ''} for "${searchText.trim()}"`}
+                </Text>
+              </View>
+            ) : spaces.length > 0 ? (
+              <Text style={[styles.sectionLabel, { color: subtleText }]}>YOUR SPACES</Text>
+            ) : null}
+          </>
         }
         ListEmptyComponent={
-          loading ? (
+          isSearching ? (
+            searchLoading ? null : (
+              <View style={styles.emptySearch}>
+                <Text style={[styles.emptySearchIcon]}>🔍</Text>
+                <Text style={[styles.emptySearchText, { color: subtleText }]}>No items or containers found</Text>
+              </View>
+            )
+          ) : loading ? (
             <View style={styles.centerContainer}>
               <ActivityIndicator size="large" color={PRIMARY} />
             </View>
           ) : (
             <View style={[styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
               <View style={[styles.emptyIconContainer, { backgroundColor: `${PRIMARY}12` }]}>
-                <Text style={styles.emptyIcon}>{'🗂\uFE0F'}</Text>
+                <Text style={styles.emptyIcon}>{'🗂️'}</Text>
               </View>
               <Text style={[styles.emptyTitle, { color: colors.text }]}>No Spaces Yet</Text>
               <Text style={[styles.emptySubtitle, { color: subtleText }]}>
@@ -178,7 +317,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 20,
+    marginBottom: 16,
     paddingTop: 4,
   },
   title: { fontSize: 32, fontWeight: '700', letterSpacing: -0.5 },
@@ -191,6 +330,50 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   countBadgeText: { fontSize: 14, fontWeight: '600' },
+
+  // Search
+  searchWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    height: 44,
+    marginBottom: 12,
+    gap: 8,
+  },
+  searchIcon: { fontSize: 16 },
+  searchInput: { flex: 1, fontSize: 15, paddingVertical: 0 },
+  clearBtn: { padding: 4 },
+  clearBtnText: { fontSize: 16 },
+  resultHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5, marginBottom: 10 },
+
+  // Search results
+  resultCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 8,
+    gap: 12,
+  },
+  resultIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resultIconText: { fontSize: 18 },
+  resultContent: { flex: 1 },
+  resultName: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
+  resultMeta: { fontSize: 12 },
+
+  emptySearch: { alignItems: 'center', paddingTop: 40, gap: 10 },
+  emptySearchIcon: { fontSize: 36 },
+  emptySearchText: { fontSize: 15 },
   spaceCard: {
     flexDirection: 'row',
     alignItems: 'center',
