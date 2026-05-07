@@ -550,26 +550,26 @@ export default function SpaceDetailScreen() {
           const isLent = !!lending;
           return [
             {
-              icon: '📦',
+              icon: faBox,
               label: 'Move',
               description: 'Move to another space or container',
               onPress: () => { setSelectedMoveItemId(item.id); setShowMoveModal(true); },
             },
             isLent
               ? {
-                  icon: '✅',
+                  icon: faCheck,
                   label: 'Mark as Returned',
                   description: `${lending.borrower_name} returned this item`,
                   onPress: () => handleMarkReturned(lending.id, item),
                 }
               : {
-                  icon: '🤝',
+                  icon: faHandshake,
                   label: 'Lend',
                   description: 'Track who you lent this item to',
                   onPress: () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setShowLendModal(true); },
                 },
             {
-              icon: '🗑️',
+              icon: faTrash,
               label: 'Delete',
               description: isLent ? 'Item is currently lent out' : 'Permanently remove this item',
               destructive: true,
@@ -588,13 +588,13 @@ export default function SpaceDetailScreen() {
           const itemCount = items.filter((i) => i.containerId === c.id).length;
           return [
             {
-              icon: '📦',
+              icon: faBox,
               label: 'Move',
               description: 'Move container to another space',
               onPress: () => { setSelectedMoveContainer(c); setShowMoveContainerModal(true); },
             },
             {
-              icon: '🗑️',
+              icon: faTrash,
               label: 'Delete',
               description: itemCount > 0 ? `Will delete ${itemCount} item${itemCount !== 1 ? 's' : ''} inside` : 'Remove this empty container',
               destructive: true,

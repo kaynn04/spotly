@@ -23,6 +23,9 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
 } from 'react-native';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
+import { faHandshake } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Lending } from '@/src/features/lending/models/Lending';
@@ -31,7 +34,7 @@ const PRIMARY = '#6b7f99';
 const DESTRUCTIVE = '#d32f2f';
 
 export interface ItemAction {
-  icon: string;
+  icon: string | IconDefinition;
   label: string;
   description?: string;
   destructive?: boolean;
@@ -98,7 +101,7 @@ export default function ItemActionSheet({
         {/* Lent status banner */}
         {activeLending && (
           <View style={[styles.lentBanner, { backgroundColor: `${PRIMARY}12`, borderColor: `${PRIMARY}30` }]}>
-            <Text style={styles.lentBannerIcon}>🤝</Text>
+            <FontAwesomeIcon icon={faHandshake} size={20} color={PRIMARY} />
             <View style={styles.lentBannerText}>
               <Text style={[styles.lentBannerLabel, { color: PRIMARY }]}>Currently lent out</Text>
               <Text style={[styles.lentBannerMeta, { color: subtleText }]}>
@@ -131,7 +134,7 @@ export default function ItemActionSheet({
                 styles.iconWrap,
                 { backgroundColor: action.destructive ? `${DESTRUCTIVE}15` : `${PRIMARY}15` },
               ]}>
-                <Text style={styles.iconEmoji}>{action.icon}</Text>
+                {typeof action.icon === 'string' ? (\n                  <Text style={styles.iconEmoji}>{action.icon}</Text>\n                ) : (\n                  <FontAwesomeIcon icon={action.icon} size={18} color={action.destructive ? DESTRUCTIVE : PRIMARY} />\n                )}
               </View>
               <View style={styles.actionTextWrap}>
                 <Text style={[
