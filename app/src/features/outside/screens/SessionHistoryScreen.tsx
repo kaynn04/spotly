@@ -182,7 +182,7 @@ export default function SessionHistoryScreen() {
                   activeOpacity={0.7}
                 >
                   {/* Completion dot */}
-                  <View style={styles.completedDot} />
+                  <View style={[styles.completedDot, { backgroundColor: isDark ? '#4ade80' : '#6b9e7a' }]} />
 
                   {/* Info */}
                   <View style={styles.sessionInfo}>
@@ -223,7 +223,7 @@ export default function SessionHistoryScreen() {
                           : si.moved_to_space_name;
                         return (
                           <View key={si.id} style={styles.expandedItem}>
-                            <View style={[styles.expandedCheck, { backgroundColor: checked ? '#6b9e7a' : isDark ? '#48484a' : '#d1d5db' }]}>
+                            <View style={[styles.expandedCheck, { backgroundColor: checked ? (isDark ? '#4ade80' : '#6b9e7a') : isDark ? '#48484a' : '#d1d5db' }]}>
                               {checked && <Text style={styles.expandedCheckMark}>✓</Text>}
                             </View>
                             <View style={styles.expandedItemText}>
@@ -231,7 +231,7 @@ export default function SessionHistoryScreen() {
                                 {si.item_name}
                               </Text>
                               {movedTo ? (
-                                <Text style={[styles.expandedItemLocation, { color: '#e8a838' }]} numberOfLines={1}>
+                                <Text style={[styles.expandedItemLocation, { color: isDark ? '#fbbf24' : '#e8a838' }]} numberOfLines={1}>
                                   Moved → {movedTo}
                                 </Text>
                               ) : location ? (

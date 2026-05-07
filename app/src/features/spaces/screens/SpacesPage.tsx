@@ -285,9 +285,9 @@ export default function SpacesPage() {
 
             {/* Search bar */}
             <View style={[styles.searchWrapper, { backgroundColor: isDark ? '#1c1c1e' : '#ffffff', borderColor }]}>
-              <FontAwesomeIcon icon={faMagnifyingGlass} size={16} color={isDark ? '#ffffff' : '#1c1c1e'} />
+              <FontAwesomeIcon icon={faMagnifyingGlass} size={16} color={colors.text} />
               <TextInput
-                style={[styles.searchInput, { color: isDark ? '#ffffff' : '#1c1c1e' }]}
+                style={[styles.searchInput, { color: colors.text }]}
                 placeholder="Search items & containers across all spaces..."
                 placeholderTextColor={subtleText}
                 value={searchText}

@@ -54,7 +54,7 @@ export default function LendingFormModal({
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const inputBg = isDark ? '#2c2c2e' : '#f8f9fa';
-  const textColor = isDark ? '#ffffff' : '#2c3e50';
+  const textColor = isDark ? '#ecedee' : '#11181c';
   const subtleText = isDark ? '#8e8e93' : '#a0aec0';
   const borderColor = isDark ? '#3a3a3c' : '#e2e6ea';
 

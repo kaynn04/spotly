@@ -278,7 +278,7 @@ export default function SessionDetailScreen() {
       ? `${item.moved_to_space_name} › ${item.moved_to_container_name}`
       : item.moved_to_space_name;
     const locationLine = wasMoved ? `→ ${movedLocation}` : originalLocation;
-    const checkColor = wasMoved ? '#6b9e7a' : PRIMARY;
+    const checkColor = wasMoved ? (isDark ? '#4ade80' : '#6b9e7a') : PRIMARY;
 
     return (
       <TouchableOpacity
@@ -315,7 +315,7 @@ export default function SessionDetailScreen() {
           </Text>
           {locationLine && (
             <Text
-              style={[styles.itemLocation, { color: wasMoved ? '#6b9e7a' : subtleText }]}
+              style={[styles.itemLocation, { color: wasMoved ? (isDark ? '#4ade80' : '#6b9e7a') : subtleText }]}
               numberOfLines={1}
             >
               {locationLine}
@@ -338,7 +338,7 @@ export default function SessionDetailScreen() {
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top, backgroundColor: isDark ? '#1c1c1e' : '#ffffff', borderBottomColor: borderColor }]}>
+      <View style={[styles.header, { paddingTop: insets.top, backgroundColor: cardBg, borderBottomColor: borderColor }]}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <FontAwesomeIcon icon={faChevronLeft} size={16} color={PRIMARY} />
         </TouchableOpacity>
@@ -349,12 +349,12 @@ export default function SessionDetailScreen() {
       </View>
 
       {/* Progress bar */}
-      <View style={[styles.progressHeader, { backgroundColor: isDark ? '#1c1c1e' : '#ffffff', borderBottomColor: borderColor }]}>
+      <View style={[styles.progressHeader, { backgroundColor: cardBg, borderBottomColor: borderColor }]}>
         <View style={styles.progressLabelRow}>
           <Text style={[styles.progressLabel, { color: subtleText }]}>
             {checkedCount} of {itemCount} checked
           </Text>
-          <Text style={[styles.progressPercent, { color: progressPercent === 100 ? '#6b9e7a' : PRIMARY }]}>
+          <Text style={[styles.progressPercent, { color: progressPercent === 100 ? (isDark ? '#4ade80' : '#6b9e7a') : PRIMARY }]}>
             {progressPercent}%
           </Text>
         </View>
@@ -364,7 +364,7 @@ export default function SessionDetailScreen() {
               styles.progressFill,
               {
                 width: `${progressPercent}%`,
-                backgroundColor: progressPercent === 100 ? '#6b9e7a' : PRIMARY,
+                backgroundColor: progressPercent === 100 ? (isDark ? '#4ade80' : '#6b9e7a') : PRIMARY,
               },
             ]}
           />
@@ -395,7 +395,7 @@ export default function SessionDetailScreen() {
           styles.actionBar,
           {
             paddingBottom: insets.bottom + 8,
-            backgroundColor: isDark ? '#1c1c1e' : '#ffffff',
+            backgroundColor: cardBg,
             borderTopColor: borderColor,
           },
         ]}

@@ -189,7 +189,7 @@ export default function OnboardingScreen() {
               onSubmitEditing={handleFinish}
             />
             {nameError && (
-              <Text style={styles.errorText}>{nameError}</Text>
+              <Text style={[styles.errorText, { color: isDark ? '#ff453a' : '#e53e3e' }]}>{nameError}</Text>
             )}
           </View>
         )}

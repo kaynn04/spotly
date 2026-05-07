@@ -241,11 +241,11 @@ export default function LendingPage() {
             {/* Search Bar */}
             <View style={[styles.searchContainer, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
               <View style={[styles.searchInputWrapper, { backgroundColor: isDark ? '#2c2c2e' : '#ffffff', borderColor }]}>
-                <FontAwesomeIcon icon={faMagnifyingGlass} size={14} color={isDark ? '#ffffff' : '#1c1c1e'} />
+                <FontAwesomeIcon icon={faMagnifyingGlass} size={14} color={colors.text} />
                 <TextInput
-                  style={[styles.searchInput, { color: isDark ? '#ffffff' : '#2c3e50' }]}
+                  style={[styles.searchInput, { color: colors.text }]}
                   placeholder="Search items or borrowers..."
-                  placeholderTextColor={isDark ? '#8e8e93' : '#a0aec0'}
+                  placeholderTextColor={subtleText}
                   value={searchText}
                   onChangeText={setSearchText}
                 />
