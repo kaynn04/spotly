@@ -1,922 +1,783 @@
 /**
- * Space Detail Screen
+ * SpaceDetailScreen
  *
- * View details for a single space
+ * View and manage a single space -- minimalist redesign uniform with Outside feature
  * Accessed via /space/[id] dynamic route
  *
- * Implementation: T005 - Display space details in SpaceDetailScreen
+ * Design changes vs original:
+ *  - No 3-dot menu: "Delete" shown directly in header
+ *  - No FAB popup: explicit two-button bottom action bar
+ *  - No inline item dropdowns: tapping item row opens native ActionSheet (Alert)
+ *  - All modals replaced with bottom sheets
+ *  - Full dark mode support
  */
 
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Button, Alert, Pressable, FlatList, TextInput, Modal, StatusBar } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  Modal,
+  TextInput,
+} from 'react-native';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faChevronLeft, faEllipsisVertical, faBox, faHandshake, faCheck, faTrash, faMapPin } from '@fortawesome/free-solid-svg-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import type { Space } from '../../src/models/Space';
-import type { Item } from '../../src/models/Item';
-import type { Container } from '../../src/models/Container';
-import { SpaceService } from '../../src/services/SpaceService';
-import { ItemService } from '../../src/services/ItemService';
-import { ContainerService } from '../../src/services/ContainerService';
-import { Breadcrumb, type BreadcrumbItem } from '../../components/breadcrumb';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
+import type { Space } from '@/src/models/Space';
+import type { Item } from '@/src/models/Item';
+import type { Container } from '@/src/models/Container';
+import { SpaceService } from '@/src/services/SpaceService';
+import { ItemService } from '@/src/services/ItemService';
+import { ContainerService } from '@/src/services/ContainerService';
+import { LendingService } from '@/src/features/lending/services/LendingService';
+import { LendingRepository } from '@/src/features/lending/repositories/LendingRepository';
+import { ItemRepository } from '@/src/repositories/ItemRepository';
+import { Lending } from '@/src/features/lending/models/Lending';
+import { OutsideService } from '@/src/features/outside/services/OutsideService';
+import ItemFormModal from '@/src/features/spaces/screens/components/ItemFormModal';
+import ContainerFormModal from '@/src/features/spaces/screens/components/ContainerFormModal';
+import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
+import ItemActionSheet from '@/src/features/spaces/screens/components/ItemActionSheet';
+
+const PRIMARY = '#6b7f99';
+
+type ListEntry =
+  | { type: 'container'; data: Container }
+  | { type: 'item'; data: Item };
 
 export default function SpaceDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
+  const isDark = colorScheme === 'dark';
+
   const [space, setSpace] = useState<Space | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [containers, setContainers] = useState<Container[]>([]);
-  const [itemName, setItemName] = useState<string>('');
-  const [containerName, setContainerName] = useState<string>('');
   const [allSpaces, setAllSpaces] = useState<Space[]>([]);
-  const [showMoveModal, setShowMoveModal] = useState<boolean>(false);
+  const [loading, setLoading] = useState(true);
+
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [showAddContainerModal, setShowAddContainerModal] = useState(false);
+  const [showMoveModal, setShowMoveModal] = useState(false);
   const [selectedMoveItemId, setSelectedMoveItemId] = useState<string | null>(null);
-  const [showAddItemModal, setShowAddItemModal] = useState<boolean>(false);
-  const [showAddContainerModal, setShowAddContainerModal] = useState<boolean>(false);
-  const [selectedContainerId, setSelectedContainerId] = useState<string | null>(null);
-  const [showHeaderMenu, setShowHeaderMenu] = useState<boolean>(false);
-  const [showFabMenu, setShowFabMenu] = useState<boolean>(false);
-  const [selectedItemMenuId, setSelectedItemMenuId] = useState<string | null>(null);
+  const [spaceContainers, setSpaceContainers] = useState<Record<string, Container[]>>({});
 
-  // Fetch space details on mount
-  useEffect(() => {
-    loadSpace();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  const [showLendModal, setShowLendModal] = useState(false);
+  const [selectedLendItem, setSelectedLendItem] = useState<Item | null>(null);
+  const [borrowerName, setBorrowerName] = useState('');
+  const [lendNote, setLendNote] = useState('');
+  const [lendLoading, setLendLoading] = useState(false);
 
-  // Refresh items and containers when screen comes into focus
+  const [actionSheetItem, setActionSheetItem] = useState<Item | null>(null);
+  const [actionSheetContainer, setActionSheetContainer] = useState<Container | null>(null);
+  const [showMoveContainerModal, setShowMoveContainerModal] = useState(false);
+  const [selectedMoveContainer, setSelectedMoveContainer] = useState<Container | null>(null);
+  const [searchText, setSearchText] = useState('');
+  const [filterSegment, setFilterSegment] = useState<'all' | 'containers' | 'items' | 'lent'>('all');
+  // Map of item_id → active Lending (null = not lent)
+  const [activeLendingMap, setActiveLendingMap] = useState<Record<string, Lending>>({});
+  // Set of item IDs currently in an active outside session
+  const [activeOutsideItemIds, setActiveOutsideItemIds] = useState<Set<string>>(new Set());
+
+  const lendingService = useMemo(
+    () => new LendingService(new LendingRepository(), new ItemRepository()),
+    []
+  );
+  const outsideService = useMemo(() => new OutsideService(), []);
+
+  const cardBg = isDark ? '#1c1c1e' : '#ffffff';
+  const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
+  const subtleText = isDark ? '#8e8e93' : '#a0aec0';
+
+  useEffect(() => { loadAll(); }, [id]);
+
   useFocusEffect(
-    React.useCallback(() => {
-      if (space?.id) {
-        loadItems();
-        loadContainers();
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [space?.id])
+    useCallback(() => {
+      if (id) { loadItems(); loadContainers(); loadActiveLendings(); loadActiveOutsideItems(); }
+    }, [id])
   );
 
-  async function loadSpace() {
+  async function loadAll() {
     if (!id) return;
-
+    setLoading(true);
     try {
-      const result = await SpaceService.getSpaceById(id);
-      setSpace(result);
-      if (result?.id) {
-        loadItems();
-      }
-      loadAllSpaces();
-    } catch (error) {
-      console.error('Failed to load space:', error);
-      setSpace(null);
+      setSpace(await SpaceService.getSpaceById(id));
+      await Promise.all([loadItems(), loadContainers(), loadAllSpaces(), loadActiveLendings(), loadActiveOutsideItems()]);
+    } catch (err) {
+      console.error('[SpaceDetailScreen] loadAll:', err);
+    } finally {
+      setLoading(false);
     }
   }
 
   async function loadItems() {
     if (!id) return;
-
-    try {
-      const result = await ItemService.getItemsBySpaceId(id);
-      setItems(result);
-    } catch (error) {
-      console.error('Failed to load items:', error);
-      setItems([]);
-    }
-  }
-
-  async function loadAllSpaces() {
-    try {
-      const result = await SpaceService.getAllSpaces();
-      setAllSpaces(result);
-    } catch (error) {
-      console.error('Failed to load spaces:', error);
-      setAllSpaces([]);
-    }
+    try { setItems(await ItemService.getItemsBySpaceId(id)); } catch {}
   }
 
   async function loadContainers() {
     if (!id) return;
+    try { setContainers(await ContainerService.getContainersBySpaceId(id)); } catch {}
+  }
 
+  async function loadAllSpaces() {
+    try { setAllSpaces(await SpaceService.getAllSpaces()); } catch {}
+  }
+
+  async function loadActiveLendings() {
     try {
-      const result = await ContainerService.getContainersBySpaceId(id);
-      setContainers(result);
-    } catch (error) {
-      console.error('Failed to load containers:', error);
-      setContainers([]);
+      const active = await lendingService.getActiveLendings();
+      const map: Record<string, Lending> = {};
+      active.forEach((l) => { map[l.item_id] = l; });
+      setActiveLendingMap(map);
+    } catch {}
+  }
+
+  async function loadActiveOutsideItems() {
+    try {
+      const ids = await outsideService.getActiveSessionItemIds();
+      setActiveOutsideItemIds(ids);
+    } catch {}
+  }
+
+  async function handleMarkReturned(lendingId: string, item?: Item | null) {
+    try {
+      await lendingService.markAsReturned(lendingId);
+      await loadActiveLendings();
+      if (item) {
+        const containerName = item.containerId
+          ? containers.find((c) => c.id === item.containerId)?.name
+          : null;
+        const locationHint = containerName
+          ? `It belongs in the "${containerName}" container.`
+          : `It lives in the "${space?.name ?? 'current'}" space.`;
+        Alert.alert('Returned ✓', `${item.name} has been marked as returned.\n\n${locationHint}`);
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to mark as returned');
     }
   }
 
-  function handleMovePress(itemId: string) {
-    setSelectedMoveItemId(itemId);
-    setShowMoveModal(true);
+  function handleItemPress(item: Item) {
+    setActionSheetItem(item);
   }
 
-  /**
-   * Get items at space level (not in any container)
-   */
-  function getSpaceLevelItems() {
-    return items.filter((item) => !item.containerId);
+  function handleContainerLongPress(container: Container) {
+    setActionSheetContainer(container);
   }
 
-  /**
-   * Navigate to container detail page
-   */
-  function handleContainerPress(containerId: string) {
-    router.push({
-      pathname: '../container/[id]',
-      params: { id: containerId }
-    });
-  }
-
-  async function handleSelectTargetSpace(targetSpaceId: string) {
-    if (!selectedMoveItemId || !space) return;
-
-    try {
-      await ItemService.moveItem(selectedMoveItemId, space.id, targetSpaceId);
-      setShowMoveModal(false);
-      setSelectedMoveItemId(null);
-      // Refresh items from current space
-      await loadItems();
-    } catch (error) {
-      console.error('Failed to move item:', error);
-      Alert.alert('Error', 'Failed to move item. Please try again.');
-    }
-  }
-
-  function handleDeleteItemPress(itemId: string, itemName: string) {
-    // Show confirmation dialog
-    Alert.alert(
-      'Delete Item',
-      `Delete '${itemName}'? This cannot be undone.`,
-      [
-        { text: 'Cancel', onPress: () => {}, style: 'cancel' },
-        {
-          text: 'Delete',
-          onPress: async () => await deleteItem(itemId),
-          style: 'destructive',
+  function confirmDeleteContainer(container: Container) {
+    const itemCount = items.filter((i) => i.containerId === container.id).length;
+    const msg = itemCount > 0
+      ? `Delete "${container.name}" and its ${itemCount} item${itemCount !== 1 ? 's' : ''}? This cannot be undone.`
+      : `Delete "${container.name}"? This cannot be undone.`;
+    Alert.alert('Delete Container', msg, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await ContainerService.deleteContainer(container.id);
+            await loadContainers();
+            await loadItems();
+          } catch {
+            Alert.alert('Error', 'Failed to delete container');
+          }
         },
-      ]
-    );
+      },
+    ]);
   }
 
-  async function deleteItem(itemId: string) {
+  async function handleMoveContainerToSpace(targetSpaceId: string) {
+    if (!selectedMoveContainer) return;
     try {
-      await ItemService.deleteItem(itemId);
-      await loadItems(); // Refresh list
-    } catch (error) {
-      console.error('Failed to delete item:', error);
-      Alert.alert('Error', 'Failed to delete item. Please try again.');
-    }
-  }
-
-  function handleDeletePress() {
-    if (!space) return;
-
-    // Show confirmation dialog
-    Alert.alert(
-      'Delete Space',
-      `Delete '${space.name}'? This cannot be undone.`,
-      [
-        { text: 'Cancel', onPress: () => {}, style: 'cancel' },
-        {
-          text: 'Delete',
-          onPress: () => deleteSpace(),
-          style: 'destructive',
-        },
-      ]
-    );
-  }
-
-  async function deleteSpace() {
-    if (!id) return;
-
-    try {
-      await SpaceService.deleteSpace(id);
-      // Navigate back to space list after successful deletion
-      router.back();
-    } catch (error) {
-      console.error('Failed to delete space:', error);
-      Alert.alert('Error', 'Failed to delete space. Please try again.');
-    }
-  }
-
-  async function handleAddItem() {
-    if (!id) return;
-
-    if (!itemName.trim()) {
-      Alert.alert('Error', 'Item name cannot be empty.');
-      return;
-    }
-
-    try {
-      await ItemService.createItem(id, itemName, selectedContainerId);
-      setItemName('');
-      setShowAddItemModal(false);
-      setSelectedContainerId(null);
-      await loadItems();
-    } catch (error) {
-      console.error('Failed to add item:', error);
-      Alert.alert('Error', 'Failed to add item. Please try again.');
-    }
-  }
-
-  function handleFabMenuItemPress() {
-    setShowFabMenu(false);
-    setSelectedContainerId(null);
-    setShowAddItemModal(true);
-  }
-
-  function handleFabMenuContainerPress() {
-    setShowFabMenu(false);
-    setShowAddContainerModal(true);
-  }
-
-  async function handleCreateContainer() {
-    if (!id || !containerName.trim()) {
-      Alert.alert('Error', 'Container name cannot be empty.');
-      return;
-    }
-
-    try {
-      await ContainerService.createContainer(containerName, id);
-      setContainerName('');
-      setShowAddContainerModal(false);
+      await ContainerService.moveContainer(selectedMoveContainer.id, targetSpaceId);
+      setShowMoveContainerModal(false);
+      setSelectedMoveContainer(null);
       await loadContainers();
       await loadItems();
-    } catch (error) {
-      console.error('Failed to create container:', error);
-      if (error && typeof error === 'object' && 'code' in error) {
-        const err = error as any;
-        Alert.alert('Error', err.message || 'Failed to create container.');
-      } else {
-        Alert.alert('Error', 'Failed to create container. Please try again.');
-      }
+    } catch {
+      Alert.alert('Error', 'Failed to move container');
     }
   }
 
-  // Build breadcrumb items
-  const breadcrumbItems: BreadcrumbItem[] = [
-    {
-      label: '🏠',
-      isActive: true,
-    },
-  ];
+  function confirmDeleteItem(itemId: string, itemName: string) {
+    Alert.alert('Delete Item', `Delete "${itemName}"? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: async () => {
+          try { await ItemService.deleteItem(itemId); await loadItems(); }
+          catch { Alert.alert('Error', 'Failed to delete item'); }
+        },
+      },
+    ]);
+  }
 
-  const spaceLevelItems = getSpaceLevelItems();
+  async function openMoveModalForItem(itemId: string) {
+    setSelectedMoveItemId(itemId);
+    try {
+      const spaces = await SpaceService.getAllSpaces();
+      setAllSpaces(spaces);
+      const containersMap: Record<string, Container[]> = {};
+      await Promise.all(
+        spaces.map(async (s) => {
+          const cs = await ContainerService.getContainersBySpaceId(String(s.id));
+          containersMap[String(s.id)] = cs;
+        })
+      );
+      setSpaceContainers(containersMap);
+      setShowMoveModal(true);
+    } catch {
+      Alert.alert('Error', 'Failed to load spaces');
+    }
+  }
+
+  async function handleMoveToContainer(targetSpaceId: string, containerId: string) {
+    if (!selectedMoveItemId) return;
+    try {
+      await ItemService.moveItemToContainer(selectedMoveItemId, targetSpaceId, containerId);
+      setShowMoveModal(false);
+      setSelectedMoveItemId(null);
+      await loadItems();
+    } catch { Alert.alert('Error', 'Failed to move item'); }
+  }
+
+  async function handleMoveToSpace(targetSpaceId: string) {
+    if (!selectedMoveItemId || !id) return;
+    try {
+      if (targetSpaceId === id) {
+        await ItemService.moveItemToContainer(selectedMoveItemId, id, '');
+      } else {
+        await ItemService.moveItem(selectedMoveItemId, id, targetSpaceId);
+      }
+      setShowMoveModal(false);
+      setSelectedMoveItemId(null);
+      await loadItems();
+    } catch { Alert.alert('Error', 'Failed to move item'); }
+  }
+
+  async function handleLendSubmit() {
+    if (!borrowerName.trim() || !selectedLendItem) return;
+    setLendLoading(true);
+    try {
+      await lendingService.createLending({
+        item_id: selectedLendItem.id,
+        borrower_name: borrowerName.trim(),
+        note: lendNote.trim() || undefined,
+      });
+      setShowLendModal(false);
+      setBorrowerName('');
+      setLendNote('');
+      setSelectedLendItem(null);
+      // Refresh active lendings map to show "Lent" badge immediately
+      await loadActiveLendings();
+    } catch (err: any) {
+      Alert.alert('Error', err.code === 'DUPLICATE_ACTIVE_LENDING'
+        ? 'This item is already lent out'
+        : err.message || 'Failed to lend item');
+    } finally {
+      setLendLoading(false);
+    }
+  }
+
+  function handleDeleteSpace() {
+    if (!space) return;
+    Alert.alert('Delete Space', `Delete "${space.name}"? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: async () => {
+          try { await SpaceService.deleteSpace(id!); router.back(); }
+          catch { Alert.alert('Error', 'Failed to delete space'); }
+        },
+      },
+    ]);
+  }
+
+  async function handleAddItem(name: string, description?: string, quantity?: number) {
+    await ItemService.createItem(id!, name, null, description, quantity);
+    await loadItems();
+  }
+
+  async function handleAddContainer(name: string) {
+    await ContainerService.createContainer(name, id!);
+    await loadContainers();
+    await loadItems();
+  }
+
+  const spaceLevelItems = items.filter((item) => !item.containerId);
+  
+  // Filter logic: combine search + segment filter
+  const searchLower = searchText.toLowerCase();
+  const allEntries: ListEntry[] = [
+    ...containers.map((c) => ({ type: 'container' as const, data: c })),
+    ...spaceLevelItems.map((i) => ({ type: 'item' as const, data: i })),
+  ];
+  
+  const filteredData = allEntries.filter((entry) => {
+    // Apply segment filter
+    if (filterSegment === 'containers' && entry.type !== 'container') return false;
+    if (filterSegment === 'items' && entry.type !== 'item') return false;
+    if (filterSegment === 'lent') {
+      if (entry.type !== 'item') return false;
+      if (!activeLendingMap[(entry.data as Item).id]) return false;
+    }
+    // Apply search filter
+    if (searchText.trim()) {
+      const name = entry.data.name.toLowerCase();
+      return name.includes(searchLower);
+    }
+    return true;
+  });
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" translucent={false} />
-
+    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <Button title="Back" onPress={() => router.back()} />
-        <Text style={styles.title}>Space Details</Text>
-        <Pressable 
-          style={styles.headerMenuButton}
-          onPress={() => setShowHeaderMenu(true)}
-        >
-          <Text style={styles.headerMenuText}>⋮</Text>
-        </Pressable>
+      <View style={[styles.headerBar, { borderBottomColor: borderColor, paddingTop: insets.top, backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <FontAwesomeIcon icon={faChevronLeft} size={16} color={PRIMARY} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+          {space?.name ?? 'Space'}
+        </Text>
+        <TouchableOpacity onPress={handleDeleteSpace} style={styles.deleteBtn}>
+          <Text style={[styles.deleteBtnText, { color: isDark ? '#ff453a' : '#d32f2f' }]}>Delete</Text>
+        </TouchableOpacity>
       </View>
 
+      {loading ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={PRIMARY} />
+        </View>
+      ) : (
+        <>
+          {/* Search Bar */}
+          <View style={[styles.searchContainer, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+            <View style={[styles.searchInputWrapper, { backgroundColor: isDark ? '#2c2c2e' : '#ffffff', borderColor }]}>
+              <FontAwesomeIcon icon={faMagnifyingGlass} size={14} color={colors.text} />
+              <TextInput
+                style={[styles.searchInput, { color: colors.text }]}
+                placeholder="Search containers & items..."
+                placeholderTextColor={subtleText}
+                value={searchText}
+                onChangeText={setSearchText}
+              />
+              {searchText.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchText('')} style={styles.clearBtn}>
+                  <FontAwesomeIcon icon={faTimes} size={13} color={isDark ? '#8e8e93' : '#8e8e93'} />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
 
+          {/* Segment Control */}
+          <View style={[styles.segmentContainer, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+            <View style={[styles.segmentTrack, { backgroundColor: isDark ? '#1c1c1e' : '#eef0f3' }]}>
+              {(['all', 'containers', 'items', 'lent'] as const).map((segment) => {
+                const isActive = filterSegment === segment;
+                return (
+                  <TouchableOpacity
+                    key={segment}
+                    style={[
+                      styles.segmentBtn,
+                      isActive && [styles.segmentBtnActive, { backgroundColor: isDark ? '#2c2c2e' : '#ffffff' }],
+                    ]}
+                    onPress={() => setFilterSegment(segment)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[
+                      styles.segmentBtnText,
+                      { color: isActive ? (isDark ? '#ffffff' : '#1c1c1e') : subtleText },
+                    ]}>
+                      {segment === 'all' ? 'All' : segment === 'containers' ? 'Containers' : segment === 'items' ? 'Items' : 'Lent'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
 
-      {/* Main Content - Full Height */}
-      <View style={styles.contentWrapper}>
-        {space ? (
-          <>
-            {/* Fixed Top Section with Space Info */}
-            <View style={styles.fixedSection}>
-              {/* Space Title */}
-              <View style={styles.titleSection}>
-                <Text style={styles.spaceName}>{space.name}</Text>
-                <Text style={styles.createdDate}>
-                  Created {new Date(space.createdAt).toLocaleDateString()}
+          {/* List */}
+          <FlatList
+            data={filteredData}
+            keyExtractor={(entry) =>
+              entry.type === 'container' ? `c-${entry.data.id}` : `i-${entry.data.id}`
+            }
+            contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 80 }]}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              filteredData.length > 0 ? (
+                <Text style={[styles.sectionLabel, { color: subtleText }]}>
+                  {filterSegment === 'all'
+                    ? `${filteredData.filter(e => e.type === 'container').length} container${filteredData.filter(e => e.type === 'container').length !== 1 ? 's' : ''} \u00B7 ${filteredData.filter(e => e.type === 'item').length} item${filteredData.filter(e => e.type === 'item').length !== 1 ? 's' : ''} \u00B7 Hold to manage`
+                    : filterSegment === 'containers'
+                    ? `${filteredData.length} container${filteredData.length !== 1 ? 's' : ''} \u00B7 Hold to manage`
+                    : filterSegment === 'items'
+                    ? `${filteredData.length} item${filteredData.length !== 1 ? 's' : ''} \u00B7 Hold to manage`
+                    : `${filteredData.length} lent item${filteredData.length !== 1 ? 's' : ''}`}
                 </Text>
-              </View>
-            </View>
-
-            {/* Breadcrumb Navigation */}
-            <View style={styles.breadcrumbSection}>
-              <Breadcrumb items={breadcrumbItems} />
-            </View>
-
-            {/* Scrollable Containers and Items List */}
-            <FlatList
-              style={styles.itemsList}
-              contentContainerStyle={styles.itemsListContent}
-              data={[
-                ...containers.map(c => ({ type: 'container' as const, data: c })),
-                ...items.map(i => ({ type: 'item' as const, data: i })),
-              ]}
-              keyExtractor={(item, index) => {
-                if ('type' in item) {
-                  if (item.type === 'container') return `container-${(item as any).data.id}`;
-                  if (item.type === 'item') return `item-${(item as any).data.id}`;
-                }
-                return String(index);
-              }}
-              renderItem={({ item }) => {
-                if ('type' in item) {
-                  const typedItem = item as any;
-                  if (typedItem.type === 'container') {
-                    const container = typedItem.data as Container;
-                    const itemCount = items.filter(i => i.containerId === container.id).length;
-                    return (
-                      <Pressable
-                        style={styles.containerCard}
-                        onPress={() => handleContainerPress(container.id)}
-                      >
-                        <View style={styles.containerHeader}>
-                          <View style={styles.containerInfo}>
-                            <Text style={styles.containerBadge}>📁 Container</Text>
-                            <Text style={styles.containerName}>{container.name}</Text>
-                            <Text style={styles.containerItemCount}>
-                              {itemCount} {itemCount === 1 ? 'item' : 'items'}
-                            </Text>
-                          </View>
-                          <Text style={styles.containerArrow}>›</Text>
-                        </View>
-                      </Pressable>
-                    );
-                  }
-                  if (typedItem.type === 'item') {
-                    const item = typedItem.data as Item;
-                    const container = containers.find(c => c.id === item.containerId);
-                    return (
-                      <View style={styles.itemCard}>
-                        <View style={styles.itemHeader}>
-                          <View style={styles.itemInfo}>
-                            <Text style={styles.itemName}>{item.name}</Text>
-                            {container && (
-                              <Text style={styles.itemContainerLabel}>in {container.name}</Text>
-                            )}
-                          </View>
-                          <Pressable
-                            style={styles.itemMenu}
-                            onPress={() => setSelectedItemMenuId(selectedItemMenuId === item.id ? null : item.id)}
-                          >
-                            <Text style={styles.itemMenuText}>⋯</Text>
-                          </Pressable>
-                        </View>
-                        {selectedItemMenuId === item.id && (
-                          <View style={styles.itemMenuDropdown}>
-                            <Pressable
-                              style={styles.itemMenuOption}
-                              onPress={() => {
-                                setSelectedItemMenuId(null);
-                                handleMovePress(item.id);
-                              }}
-                            >
-                              <Text style={styles.itemMenuOptionText}>Move</Text>
-                            </Pressable>
-                            <Pressable
-                              style={[styles.itemMenuOption, styles.itemMenuOptionDelete]}
-                              onPress={() => {
-                                setSelectedItemMenuId(null);
-                                handleDeleteItemPress(item.id, item.name);
-                              }}
-                            >
-                              <Text style={styles.itemMenuOptionDeleteText}>Delete</Text>
-                            </Pressable>
-                          </View>
-                        )}
-                      </View>
-                    );
-                  }
-                }
-                return null;
-              }}
-              ListEmptyComponent={
-                <Text style={styles.emptyState}>No containers or items yet</Text>
-              }
-              scrollEnabled={true}
-            />
-
-            {/* Floating Action Button (FAB) with Menu */}
-            <Pressable
-              style={styles.fab}
-              onPress={() => setShowFabMenu(!showFabMenu)}
-            >
-              <Text style={styles.fabText}>+</Text>
-            </Pressable>
-
-            {/* FAB Menu */}
-            {showFabMenu && (
-              <View style={styles.fabMenu}>
-                <Pressable
-                  style={styles.fabMenuItem}
-                  onPress={handleFabMenuItemPress}
+              ) : null
+            }
+            renderItem={({ item: entry }) => {
+              if (entry.type === 'container') {
+                const c = entry.data;
+                const count = items.filter((i) => i.containerId === c.id).length;
+              return (
+                <TouchableOpacity
+                  style={[styles.containerCard, { backgroundColor: cardBg, borderColor }]}
+                  onPress={() => router.push({ pathname: '../container/[id]' as any, params: { id: c.id } })}
+                  onLongPress={() => handleContainerLongPress(c)}
+                  activeOpacity={0.7}
                 >
-                  <Text style={styles.fabMenuItemText}>Add Item</Text>
-                </Pressable>
-                <Pressable
-                  style={styles.fabMenuItem}
-                  onPress={handleFabMenuContainerPress}
-                >
-                  <Text style={styles.fabMenuItemText}>Add Container</Text>
-                </Pressable>
-              </View>
-            )}
-
-            {/* Modal for Moving Items */}
-            <Modal
-              visible={showMoveModal}
-              transparent={true}
-              animationType="fade"
-              onRequestClose={() => setShowMoveModal(false)}
-            >
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                  <Text style={styles.modalTitle}>Move to space</Text>
-                  
-                  <FlatList
-                    data={allSpaces.filter((s) => s.id !== space?.id)}
-                    keyExtractor={(s) => s.id}
-                    renderItem={({ item: targetSpace }) => (
-                      <Pressable
-                        style={styles.spaceOption}
-                        onPress={() => handleSelectTargetSpace(targetSpace.id)}
-                      >
-                        <Text style={styles.spaceOptionText}>{targetSpace.name}</Text>
-                      </Pressable>
-                    )}
-                    scrollEnabled={true}
-                  />
-
-                  <Pressable
-                    style={[styles.button, styles.cancelButton]}
-                    onPress={() => setShowMoveModal(false)}
-                  >
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </Modal>
-
-            {/* Header Menu Modal */}
-            <Modal
-              visible={showHeaderMenu}
-              transparent={true}
-              animationType="fade"
-              onRequestClose={() => setShowHeaderMenu(false)}
-            >
-              <Pressable 
-                style={styles.modalOverlay}
-                onPress={() => setShowHeaderMenu(false)}
+                  <View style={[styles.containerIcon, { backgroundColor: `${PRIMARY}15` }]}>
+                    <FontAwesomeIcon icon={faFolder} size={16} color={PRIMARY} />
+                  </View>
+                  <View style={styles.containerContent}>
+                    <Text style={[styles.containerName, { color: colors.text }]} numberOfLines={1}>{c.name}</Text>
+                    <Text style={[styles.containerMeta, { color: subtleText }]}>
+                      {count} {count === 1 ? 'item' : 'items'}
+                    </Text>
+                  </View>
+                  <FontAwesomeIcon icon={faChevronRight} size={16} color={subtleText} />
+                </TouchableOpacity>
+              );
+            }
+            const item = entry.data;
+            const activeLending = activeLendingMap[item.id];
+            const isLent = !!activeLending;
+            const isOutside = activeOutsideItemIds.has(item.id);
+            return (
+              <TouchableOpacity
+                style={[styles.itemCard, { backgroundColor: cardBg, borderColor: isOutside ? '#e67e2240' : isLent ? `${PRIMARY}40` : borderColor }]}
+                onPress={() => router.push({ pathname: '../item/[id]' as any, params: { id: item.id } })}
+                onLongPress={() => handleItemPress(item)}
+                activeOpacity={0.7}
               >
-                <View style={styles.headerMenuContent}>
-                  <Pressable
-                    style={styles.headerMenuOption}
-                    onPress={() => {
-                      setShowHeaderMenu(false);
-                      handleDeletePress();
-                    }}
-                  >
-                    <Text style={styles.headerMenuOptionText}>Delete Space</Text>
-                  </Pressable>
+                <View style={[styles.itemDot, { backgroundColor: isOutside ? '#e67e22' : isLent ? PRIMARY : isDark ? '#48484a' : '#c7c7cc' }]} />
+                <View style={styles.itemTextWrap}>
+                  <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
+                  {isLent && (
+                    <Text style={[styles.itemLentMeta, { color: PRIMARY }]} numberOfLines={1}>
+                      Lent to {activeLending.borrower_name}
+                    </Text>
+                  )}
+                  {isOutside && !isLent && (
+                    <Text style={[styles.itemLentMeta, { color: '#e67e22' }]} numberOfLines={1}>
+                      In outside session
+                    </Text>
+                  )}
                 </View>
-              </Pressable>
-            </Modal>
-
-            {/* Modal for Adding Item */}
-            <Modal
-              visible={showAddItemModal}
-              transparent={true}
-              animationType="slide"
-              onRequestClose={() => {
-                setShowAddItemModal(false);
-                setItemName('');
-                setSelectedContainerId(null);
-              }}
-            >
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                  <Text style={styles.modalTitle}>Add Item</Text>
-                  <TextInput
-                    style={styles.itemInput}
-                    placeholder="Enter item name"
-                    value={itemName}
-                    onChangeText={setItemName}
-                    placeholderTextColor="#999"
-                    autoFocus={true}
-                  />
-                  <View style={styles.modalButtonContainer}>
-                    <Pressable
-                      style={[styles.button, styles.addButton]}
-                      onPress={handleAddItem}
-                    >
-                      <Text style={styles.addButtonText}>Add Item</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.button, styles.cancelButton]}
-                      onPress={() => {
-                        setShowAddItemModal(false);
-                        setItemName('');
-                        setSelectedContainerId(null);
-                      }}
-                    >
-                      <Text style={styles.cancelButtonText}>Cancel</Text>
-                    </Pressable>
+                {isOutside && (
+                  <View style={[styles.lentBadge, { backgroundColor: '#e67e2215' }]}>
+                    <Text style={[styles.lentBadgeText, { color: '#e67e22' }]}>Outside</Text>
                   </View>
-                </View>
-              </View>
-            </Modal>
-
-            {/* Modal for Adding Container */}
-            <Modal
-              visible={showAddContainerModal}
-              transparent={true}
-              animationType="slide"
-              onRequestClose={() => {
-                setShowAddContainerModal(false);
-                setContainerName('');
-              }}
-            >
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                  <Text style={styles.modalTitle}>Add Container</Text>
-                  <TextInput
-                    style={styles.itemInput}
-                    placeholder="Enter container name"
-                    value={containerName}
-                    onChangeText={setContainerName}
-                    placeholderTextColor="#999"
-                    autoFocus={true}
-                  />
-                  <View style={styles.modalButtonContainer}>
-                    <Pressable
-                      style={[styles.button, styles.addButton]}
-                      onPress={handleCreateContainer}
-                    >
-                      <Text style={styles.addButtonText}>Add Container</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.button, styles.cancelButton]}
-                      onPress={() => {
-                        setShowAddContainerModal(false);
-                        setContainerName('');
-                      }}
-                    >
-                      <Text style={styles.cancelButtonText}>Cancel</Text>
-                    </Pressable>
+                )}
+                {!isOutside && isLent && (
+                  <View style={[styles.lentBadge, { backgroundColor: `${PRIMARY}15` }]}>
+                    <Text style={[styles.lentBadgeText, { color: PRIMARY }]}>Lent</Text>
                   </View>
-                </View>
-              </View>
-            </Modal>
-          </>
-        ) : (
-          <Text style={styles.notFound}>Space not found</Text>
-        )}
+                )}
+              </TouchableOpacity>
+            );
+          }}
+          ListEmptyComponent={
+            <View style={[styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
+              <Text style={[styles.emptyText, { color: subtleText }]}>
+                {searchText ? (
+                  'No results found'
+                ) : filterSegment === 'containers' ? (
+                  'No containers yet'
+                ) : filterSegment === 'items' ? (
+                  'No items yet'
+                ) : filterSegment === 'lent' ? (
+                  'No items are currently lent out'
+                ) : (
+                  'No items or containers yet.\nUse the buttons below to get started.'
+                )}
+              </Text>
+            </View>
+          }
+        />
+        </>
+      )}
+
+      {/* Bottom Action Bar */}
+      <View style={[styles.actionBar, { backgroundColor: cardBg, borderTopColor: borderColor, paddingBottom: insets.bottom + 8 }]}>
+        <TouchableOpacity
+          style={[styles.actionBarBtn, styles.actionBarBtnOutline, { borderColor: PRIMARY }]}
+          onPress={() => setShowAddContainerModal(true)}
+        >
+          <Text style={[styles.actionBarBtnText, { color: PRIMARY }]}>+ Container</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionBarBtn, { backgroundColor: PRIMARY }]}
+          onPress={() => setShowAddItemModal(true)}
+        >
+          <Text style={[styles.actionBarBtnText, { color: '#fff' }]}>+ Add Item</Text>
+        </TouchableOpacity>
       </View>
-    </SafeAreaView>
+
+      {/* Move Bottom Sheet */}
+      <Modal visible={showMoveModal} transparent animationType="slide" onRequestClose={() => setShowMoveModal(false)}>
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.moveSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+            <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move Item</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {allSpaces.map((s) => {
+                const movingItem = items.find(i => i.id === selectedMoveItemId);
+                const isCurrentSpace = s.id === id;
+                const spaceContainerList = spaceContainers[s.id] ?? [];
+                const isRootCurrent = isCurrentSpace && !movingItem?.containerId;
+                return (
+                  <View key={s.id}>
+                    <Text style={[styles.moveSectionLabel, { color: subtleText }]}>
+                      {isCurrentSpace ? 'IN THIS SPACE' : s.name.toUpperCase()}
+                    </Text>
+                    <TouchableOpacity
+                      style={[styles.moveOption, isRootCurrent && styles.moveOptionDisabled, { borderColor }]}
+                      onPress={isRootCurrent ? undefined : () => handleMoveToSpace(s.id)}
+                      activeOpacity={isRootCurrent ? 1 : 0.7}
+                    >
+                      <FontAwesomeIcon icon={faMapPin} size={16} color={isRootCurrent ? subtleText : PRIMARY} />
+                      <Text style={[styles.moveOptionText, { color: isRootCurrent ? subtleText : colors.text }]}>
+                        {isCurrentSpace ? `Root of ${s.name}` : `${s.name} (root)`}
+                      </Text>
+                      {isRootCurrent && (
+                        <View style={[styles.currentBadge, { backgroundColor: `${PRIMARY}18` }]}>
+                          <Text style={[styles.currentBadgeText, { color: PRIMARY }]}>Here</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                    {spaceContainerList.map((c) => {
+                      const isContainerCurrent = c.id === movingItem?.containerId;
+                      return (
+                        <TouchableOpacity
+                          key={c.id}
+                          style={[
+                            styles.moveOption,
+                            !isCurrentSpace && styles.moveOptionIndented,
+                            isContainerCurrent && styles.moveOptionDisabled,
+                            { borderColor },
+                          ]}
+                          onPress={isContainerCurrent ? undefined : () => handleMoveToContainer(s.id, c.id)}
+                          activeOpacity={isContainerCurrent ? 1 : 0.7}
+                        >
+                          <FontAwesomeIcon icon={faFolder} size={16} color={isContainerCurrent ? subtleText : PRIMARY} />
+                          <Text style={[styles.moveOptionText, { color: isContainerCurrent ? subtleText : colors.text }]}>
+                            {c.name}
+                          </Text>
+                          {isContainerCurrent && (
+                            <View style={[styles.currentBadge, { backgroundColor: `${PRIMARY}18` }]}>
+                              <Text style={[styles.currentBadgeText, { color: PRIMARY }]}>Here</Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                );
+              })}
+            </ScrollView>
+            <TouchableOpacity style={[styles.moveCancelBtn, { borderColor }]} onPress={() => setShowMoveModal(false)}>
+              <Text style={[styles.moveCancelText, { color: subtleText }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <ItemFormModal visible={showAddItemModal} onClose={() => setShowAddItemModal(false)} onSubmit={handleAddItem} contextLabel={space?.name} />
+      <ContainerFormModal visible={showAddContainerModal} onClose={() => setShowAddContainerModal(false)} onSubmit={handleAddContainer} />
+      <LendingFormModal
+        visible={showLendModal}
+        item={selectedLendItem}
+        borrowerName={borrowerName}
+        onBorrowerNameChange={setBorrowerName}
+        note={lendNote}
+        onNoteChange={setLendNote}
+        onSubmit={handleLendSubmit}
+        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setSelectedLendItem(null); }}
+        loading={lendLoading}
+      />
+      <ItemActionSheet
+        visible={actionSheetItem !== null}
+        itemName={actionSheetItem?.name ?? ''}
+        activeLending={actionSheetItem ? (activeLendingMap[actionSheetItem.id] ?? null) : null}
+        activeOutsideSession={actionSheetItem ? activeOutsideItemIds.has(actionSheetItem.id) : false}
+        onClose={() => setActionSheetItem(null)}
+        actions={(() => {
+          const item = actionSheetItem;
+          if (!item) return [];
+          const lending = activeLendingMap[item.id];
+          const isLent = !!lending;
+          const isOutside = activeOutsideItemIds.has(item.id);
+          const outsideGuard = () =>
+            Alert.alert(
+              'Item is Outside',
+              'This item is in an active outside session. Complete or remove it from the session before moving or lending it.'
+            );
+          return [
+            {
+              icon: faBox,
+              label: 'Move',
+              description: isOutside ? 'In active outside session' : 'Move to another space or container',
+              onPress: isOutside ? outsideGuard : () => openMoveModalForItem(item.id),
+            },
+            isLent
+              ? {
+                  icon: faCheck,
+                  label: 'Mark as Returned',
+                  description: `${lending.borrower_name} returned this item`,
+                  onPress: () => handleMarkReturned(lending.id, item),
+                }
+              : {
+                  icon: faHandshake,
+                  label: 'Lend',
+                  description: isOutside ? 'In active outside session' : 'Track who you lent this item to',
+                  onPress: isOutside ? outsideGuard : () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setShowLendModal(true); },
+                },
+            {
+              icon: faTrash,
+              label: 'Delete',
+              description: isLent ? 'Item is currently lent out' : isOutside ? 'In active outside session' : 'Permanently remove this item',
+              destructive: true,
+              onPress: () => confirmDeleteItem(item.id, item.name),
+            },
+          ];
+        })()}
+      />
+      <ItemActionSheet
+        visible={actionSheetContainer !== null}
+        itemName={actionSheetContainer?.name ?? ''}
+        onClose={() => setActionSheetContainer(null)}
+        actions={(() => {
+          const c = actionSheetContainer;
+          if (!c) return [];
+          const itemCount = items.filter((i) => i.containerId === c.id).length;
+          return [
+            {
+              icon: faBox,
+              label: 'Move',
+              description: 'Move container to another space',
+              onPress: () => { setSelectedMoveContainer(c); setShowMoveContainerModal(true); },
+            },
+            {
+              icon: faTrash,
+              label: 'Delete',
+              description: itemCount > 0 ? `Will delete ${itemCount} item${itemCount !== 1 ? 's' : ''} inside` : 'Remove this empty container',
+              destructive: true,
+              onPress: () => confirmDeleteContainer(c),
+            },
+          ];
+        })()}
+      />
+      {/* Move Container Modal */}
+      <Modal visible={showMoveContainerModal} transparent animationType="slide" onRequestClose={() => setShowMoveContainerModal(false)}>
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.moveSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+            <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move Container</Text>
+            <Text style={[styles.moveSheetSubtitle, { color: subtleText }]}>
+              Move "{selectedMoveContainer?.name}" to another space
+            </Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {allSpaces.filter((s) => s.id !== id).map((s) => (
+                <TouchableOpacity key={s.id} style={[styles.moveOption, { borderColor }]} onPress={() => handleMoveContainerToSpace(s.id)}>
+                  <Text style={styles.moveOptionIcon}>{'\u{1F4CD}'}</Text>
+                  <Text style={[styles.moveOptionText, { color: colors.text }]}>{s.name}</Text>
+                </TouchableOpacity>
+              ))}
+              {allSpaces.filter((s) => s.id !== id).length === 0 && (
+                <Text style={[styles.moveEmptyText, { color: subtleText }]}>No other spaces available</Text>
+              )}
+            </ScrollView>
+            <TouchableOpacity style={[styles.moveCancelBtn, { borderColor }]} onPress={() => setShowMoveContainerModal(false)}>
+              <Text style={[styles.moveCancelText, { color: subtleText }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    backgroundColor: '#f8f8f8',
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    flex: 1,
-    marginHorizontal: 12,
-    color: '#333',
-  },
-  headerMenuButton: {
-    padding: 8,
-  },
-  headerMenuText: {
-    fontSize: 20,
-    color: '#333',
-  },
-  contentWrapper: {
-    flex: 1,
-  },
-  fixedSection: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#f9f9f9',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  titleSection: {
-    marginBottom: 8,
-  },
-  spaceName: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#333',
-    marginBottom: 4,
-  },
-  createdDate: {
-    fontSize: 12,
-    color: '#999',
-    marginBottom: 12,
-  },
-  breadcrumbWrapper: {
-    marginTop: 8,
-  },
-  breadcrumbSection: {
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  itemsList: {
-    flex: 1,
-  },
-  itemsListContent: {
-    paddingVertical: 8,
-  },
-  sectionHeader: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#f0f0f0',
-    marginTop: 8,
-  },
-  containerCard: {
-    marginVertical: 4,
-    marginHorizontal: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#f0f7ff',
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#0a84ff',
-  },
-  containerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  containerInfo: {
-    flex: 1,
-  },
-  containerName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0a84ff',
-    marginBottom: 4,
-  },
-  containerItemCount: {
-    fontSize: 12,
-    color: '#666',
-  },
-  containerArrow: {
-    fontSize: 20,
-    color: '#999',
-    marginLeft: 8,
-  },
-  containerBadge: {
-    fontSize: 11,
-    color: '#0a84ff',
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  itemCard: {
-    marginVertical: 4,
-    marginHorizontal: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#0a84ff',
-  },
-  itemHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  itemInfo: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 4,
-    color: '#333',
-  },
-  itemContainerLabel: {
-    fontSize: 12,
-    color: '#999',
-    fontStyle: 'italic',
-  },
-  itemMenu: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  itemMenuText: {
-    fontSize: 18,
-    color: '#666',
-  },
-  itemMenuDropdown: {
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    paddingTop: 8,
-  },
-  itemMenuOption: {
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 4,
-    marginBottom: 4,
-    backgroundColor: '#f5f5f5',
-  },
-  itemMenuOptionDelete: {
-    backgroundColor: '#ffebee',
-  },
-  itemMenuOptionText: {
-    fontSize: 14,
-    color: '#0a84ff',
-    fontWeight: '500',
-  },
-  itemMenuOptionDeleteText: {
-    fontSize: 14,
-    color: '#d32f2f',
-    fontWeight: '500',
-  },
-  button: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  moveButton: {
-    backgroundColor: '#e3f2fd',
-  },
-  moveButtonText: {
-    color: '#0a84ff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  deleteItemButton: {
-    backgroundColor: '#ffebee',
-  },
-  deleteItemButtonText: {
-    color: '#d32f2f',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#0a84ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  fabText: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '300',
-  },
-  fabMenu: {
-    position: 'absolute',
-    bottom: 80,
-    right: 20,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    overflow: 'hidden',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  fabMenuItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  fabMenuItemText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
-  },
-  emptyState: {
-    fontSize: 16,
-    color: '#999',
-    textAlign: 'center',
-    marginVertical: 32,
-  },
-  notFound: {
-    fontSize: 16,
-    color: '#999',
-    textAlign: 'center',
-    marginVertical: 32,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
-    color: '#333',
-  },
-  itemInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 16,
-    fontSize: 16,
-    color: '#333',
-  },
-  modalButtonContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  addButton: {
-    flex: 1,
-    backgroundColor: '#0a84ff',
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: '#e0e0e0',
-  },
-  cancelButtonText: {
-    color: '#333',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  spaceOption: {
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  spaceOptionText: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-  },
-  headerMenuContent: {
-    position: 'absolute',
-    top: 60,
-    right: 12,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    overflow: 'hidden',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3,
-  },
-  headerMenuOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  headerMenuOptionText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#d32f2f',
-  },
+  container: { flex: 1 },
+  headerBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1 },
+  backBtn: { paddingRight: 12, paddingVertical: 8 },
+  backBtnText: { fontSize: 16, fontWeight: '500' },
+  headerTitle: { flex: 1, fontSize: 17, fontWeight: '600', textAlign: 'center' },
+  deleteBtn: { paddingLeft: 12, paddingVertical: 8 },
+  deleteBtnText: { fontSize: 15, color: '#d32f2f', fontWeight: '500' },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  listContent: { paddingHorizontal: 16, paddingTop: 12 },
+  sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3, marginBottom: 12 },
+  containerCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 8, gap: 12 },
+  containerIcon: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  containerIconText: { fontSize: 18 },
+  containerContent: { flex: 1 },
+  containerName: { fontSize: 16, fontWeight: '600', marginBottom: 2 },
+  containerMeta: { fontSize: 12 },
+  chevron: { fontSize: 16 },
+  itemCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingVertical: 14, paddingHorizontal: 14, marginBottom: 6, gap: 10 },
+  itemDot: { width: 6, height: 6, borderRadius: 3 },
+  itemTextWrap: { flex: 1, gap: 2 },
+  itemName: { fontSize: 15, fontWeight: '500' },
+  itemLentMeta: { fontSize: 11, fontWeight: '500' },
+  itemMoreDots: { fontSize: 14, letterSpacing: 1 },
+  lentBadge: { borderRadius: 6, paddingVertical: 3, paddingHorizontal: 8 },
+  lentBadgeText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
+  emptyCard: { borderRadius: 14, borderWidth: 1, padding: 28, alignItems: 'center', marginTop: 20 },
+  emptyText: { fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  actionBar: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1, gap: 10 },
+  actionBarBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  actionBarBtnOutline: { borderWidth: 1.5 },
+  actionBarBtnText: { fontSize: 15, fontWeight: '600' },
+  sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  moveSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '70%' },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
+  moveSheetTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.3, marginBottom: 4 },
+  moveSheetSubtitle: { fontSize: 14, marginBottom: 16 },
+  moveEmptyText: { fontSize: 14, textAlign: 'center', paddingVertical: 20 },
+  moveSectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 8, marginTop: 8 },
+  moveOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, marginBottom: 6, gap: 12 },
+  moveOptionDisabled: { opacity: 0.6 },
+  moveOptionIndented: { marginLeft: 24 },
+  moveOptionIcon: { fontSize: 16 },
+  moveOptionText: { fontSize: 15, fontWeight: '500', flex: 1 },
+  currentLocationSection: { marginBottom: 4 },
+  currentBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
+  currentBadgeText: { fontSize: 11, fontWeight: '600' },
+  moveCancelBtn: { marginTop: 12, borderWidth: 1.5, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  moveCancelText: { fontSize: 15, fontWeight: '600' },
+  
+  // Search & Filter
+  searchContainer: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
+  searchInputWrapper: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, height: 40 },
+  searchIcon: { fontSize: 16, marginRight: 8 },
+  searchInput: { flex: 1, fontSize: 15, paddingVertical: 0 },
+  clearBtn: { padding: 4 },
+  clearBtnText: { fontSize: 18, fontWeight: '300' },
+  
+  segmentContainer: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12 },
+  segmentTrack: { flexDirection: 'row', borderRadius: 10, padding: 3, gap: 2 },
+  segmentBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8, borderRadius: 8 },
+  segmentBtnActive: { shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
+  segmentBtnText: { fontSize: 13, fontWeight: '600' },
+  
+  emptyStateContainer: { padding: 20, alignItems: 'center', justifyContent: 'center' },
+  emptyStateText: { fontSize: 14, textAlign: 'center' },
 });

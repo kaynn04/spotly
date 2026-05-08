@@ -8,6 +8,8 @@
  */
 
 import { getDatabase } from './client';
+import { createLendingsTable, dropLendingsTable } from './migrations/003-create-lendings-table';
+import { createOutsideSessionsTables, dropOutsideSessionsTables } from './migrations/004-create-outside-tables';
 
 /**
  * Initialize the database schema
@@ -73,19 +75,10 @@ export async function initializeDatabase() {
       `);
       console.log('✓ Created items table with container_id column');
     } else if (!hasContainerId) {
-      // Table exists but is missing container_id column - drop and recreate
-      console.log('⚠ Items table schema incorrect, recreating...');
-      await db.execAsync('DROP TABLE IF EXISTS items;');
-      await db.execAsync(`
-        CREATE TABLE items (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          space_id TEXT NOT NULL,
-          container_id TEXT,
-          created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        );
-      `);
-      console.log('✓ Recreated items table with correct schema');
+      // Table exists but is missing container_id column - add it safely
+      console.log('⚠ Items table missing container_id, adding column...');
+      await db.execAsync(`ALTER TABLE items ADD COLUMN container_id TEXT;`);
+      console.log('✓ Added container_id column to items table');
     } else {
       console.log('✓ Items table schema is correct');
     }
@@ -100,6 +93,20 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_items_container_id 
       ON items(container_id);
     `);
+
+    // Add description and quantity columns if they don't exist
+    const itemsCols = await db.getAllAsync<any>("PRAGMA table_info(items);");
+    if (!itemsCols.some((col: any) => col.name === 'description')) {
+      await db.execAsync(`ALTER TABLE items ADD COLUMN description TEXT;`);
+      await db.execAsync(`ALTER TABLE items ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1;`);
+      console.log('✓ Added description and quantity columns to items');
+    }
+
+    // Create lendings table (Migration 003)
+    await createLendingsTable(db);
+
+    // Create outside sessions tables (Migration 004)
+    await createOutsideSessionsTables(db);
 
     console.log('✓ Database initialized successfully');
   } catch (error) {
@@ -117,6 +124,9 @@ export async function resetDatabase() {
 
   try {
     await db.execAsync(`
+      DROP TABLE IF EXISTS outside_session_items;
+      DROP TABLE IF EXISTS outside_sessions;
+      DROP TABLE IF EXISTS lendings;
       DROP TABLE IF EXISTS items;
       DROP TABLE IF EXISTS containers;
       DROP TABLE IF EXISTS spaces;

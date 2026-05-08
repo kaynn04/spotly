@@ -82,7 +82,7 @@ export class ContainerRepository {
       );
 
       // Map database rows (snake_case) to Container objects (camelCase)
-      return result.map((row: ContainerRow) => ({
+      return (result as any[]).map((row: ContainerRow) => ({
         id: row.id,
         name: row.name,
         spaceId: row.space_id,
@@ -167,6 +167,45 @@ export class ContainerRepository {
       // Log error but return 0 as fallback
       console.error('[ContainerRepository.countContainers] Database error:', error);
       return 0;
+    }
+  }
+
+  /**
+   * Delete a container by id
+   * Items inside the container will be cascade-deleted by the DB
+   */
+  static async deleteContainer(containerId: string): Promise<void> {
+    try {
+      const db = getDatabase();
+      await db.runAsync('DELETE FROM containers WHERE id = ?', [containerId]);
+    } catch (error) {
+      console.error('[ContainerRepository.deleteContainer] Database error:', error);
+      const serviceError: ServiceError = {
+        code: 'DB_ERROR',
+        message: 'Failed to delete container. Try again.',
+      };
+      throw serviceError;
+    }
+  }
+
+  /**
+   * Move a container to a different space
+   */
+  static async moveContainer(containerId: string, targetSpaceId: string): Promise<void> {
+    try {
+      const db = getDatabase();
+      await db.withTransactionAsync(async () => {
+        await db.runAsync('UPDATE containers SET space_id = ? WHERE id = ?', [targetSpaceId, containerId]);
+        // Also update all items in this container to the new space
+        await db.runAsync('UPDATE items SET space_id = ? WHERE container_id = ?', [targetSpaceId, containerId]);
+      });
+    } catch (error) {
+      console.error('[ContainerRepository.moveContainer] Database error:', error);
+      const serviceError: ServiceError = {
+        code: 'DB_ERROR',
+        message: 'Failed to move container. Try again.',
+      };
+      throw serviceError;
     }
   }
 }

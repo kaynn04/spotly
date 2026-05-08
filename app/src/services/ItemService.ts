@@ -31,7 +31,9 @@ export class ItemService {
   static async createItem(
     spaceId: string,
     name: string,
-    containerId?: string | null
+    containerId?: string | null,
+    description?: string | null,
+    quantity?: number
   ): Promise<Item> {
     try {
       // Trim input
@@ -47,7 +49,7 @@ export class ItemService {
       }
 
       // Create item in database via repository
-      const item = await ItemRepository.createItem(trimmedName, spaceId, containerId);
+      const item = await ItemRepository.createItem(trimmedName, spaceId, containerId, description, quantity);
 
       return item;
     } catch (error) {
@@ -136,6 +138,45 @@ export class ItemService {
   }
 
   /**
+   * Move an item to a container within the same space
+   * Pass empty string to move item to root space (remove from container)
+   *
+   * @param itemId - The item id to move
+   * @param spaceId - The space id (for validation)
+   * @param containerId - The container id to move the item to (empty string for root space)
+   * @returns void (no return value)
+   * @throws ServiceError if validation fails or database operation fails
+   *
+   * Validation:
+   * - Item must be in the same space as the container
+   * - Empty containerId moves item to root of space
+   */
+  static async moveItemToContainer(
+    itemId: string,
+    spaceId: string,
+    containerId: string
+  ): Promise<void> {
+    try {
+      // Move item to container in database via repository — updates both space_id and container_id
+      await ItemRepository.updateSpaceAndContainer(itemId, spaceId, containerId);
+    } catch (error) {
+      // If already a ServiceError, re-throw it
+      if (error && typeof error === 'object' && 'code' in error) {
+        throw error;
+      }
+
+      // Convert unexpected errors to ServiceError
+      const serviceError: ServiceError = {
+        code: 'DB_ERROR',
+        message: 'Failed to move item to container. Try again.',
+      };
+
+      console.error('[ItemService.moveItemToContainer] Unexpected error:', error);
+      throw serviceError;
+    }
+  }
+
+  /**
    * Delete an item (permanent deletion)
    *
    * @param itemId - The item id to delete
@@ -163,5 +204,27 @@ export class ItemService {
       console.error('[ItemService.deleteItem] Unexpected error:', error);
       throw serviceError;
     }
+  }
+
+  /**
+   * Get a single item by ID with full context (space/container names)
+   */
+  static async getItemById(itemId: string): Promise<Item | null> {
+    return ItemRepository.getItemById(itemId);
+  }
+
+  /**
+   * Update item fields (name, description, quantity)
+   */
+  static async updateItem(itemId: string, updates: { name?: string; description?: string | null; quantity?: number }): Promise<void> {
+    if (updates.name !== undefined) {
+      const trimmed = updates.name.trim();
+      if (trimmed.length === 0) {
+        const error: ServiceError = { code: 'VALIDATION_ERROR', message: 'Item name cannot be empty.' };
+        throw error;
+      }
+      updates.name = trimmed;
+    }
+    return ItemRepository.updateItem(itemId, updates);
   }
 }

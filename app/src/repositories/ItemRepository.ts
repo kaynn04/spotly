@@ -32,7 +32,9 @@ export class ItemRepository {
   static async createItem(
     name: string,
     spaceId: string,
-    containerId?: string | null
+    containerId?: string | null,
+    description?: string | null,
+    quantity?: number
   ): Promise<Item> {
     try {
       const db = getDatabase();
@@ -40,17 +42,20 @@ export class ItemRepository {
       // Generate UUID and current ISO 8601 timestamp
       const id = generateUUID();
       const now = new Date().toISOString();
+      const qty = quantity ?? 1;
 
       // Execute parameterized INSERT query (handle optional containerId)
       await db.runAsync(
-        'INSERT INTO items (id, name, space_id, container_id, created_at) VALUES (?, ?, ?, ?, ?)',
-        [id, name, spaceId, containerId ?? null, now]
+        'INSERT INTO items (id, name, space_id, container_id, description, quantity, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [id, name, spaceId, containerId ?? null, description ?? null, qty, now]
       );
 
       // Return the created Item object
       return {
         id,
         name,
+        description: description ?? null,
+        quantity: qty,
         spaceId,
         containerId,
         createdAt: now,
@@ -92,9 +97,11 @@ export class ItemRepository {
         [spaceId]
       );
 
-      return result.map((row: ItemRow) => ({
+      return (result as any[]).map((row: ItemRow) => ({
         id: row.id,
         name: row.name,
+        description: row.description ?? null,
+        quantity: row.quantity ?? 1,
         spaceId: row.space_id,
         containerId: row.container_id,
         createdAt: row.created_at,
@@ -131,9 +138,11 @@ export class ItemRepository {
         [containerId]
       );
 
-      return result.map((row: ItemRow) => ({
+      return (result as any[]).map((row: ItemRow) => ({
         id: row.id,
         name: row.name,
+        description: row.description ?? null,
+        quantity: row.quantity ?? 1,
         spaceId: row.space_id,
         createdAt: row.created_at,
         containerId: row.container_id,
@@ -154,22 +163,25 @@ export class ItemRepository {
 
   /**
    * Update an item's space_id to move it to a different space
+   * Also clears container_id if item was in a container
    *
    * @param itemId - The item id to move
    * @param newSpaceId - The new space id to move the item to
    * @returns void (no return value)
    * @throws ServiceError if database operation fails
    *
-   * SQL: UPDATE items SET space_id = ? WHERE id = ?
+   * SQL: UPDATE items SET space_id = ?, container_id = NULL WHERE id = ?
    * Parameterized query prevents SQL injection
+   * Clears container_id to remove item from container when moving to different space
    */
   static async updateSpaceId(itemId: string, newSpaceId: string): Promise<void> {
     try {
       const db = getDatabase();
 
       // Execute parameterized UPDATE query
+      // When moving to a different space, remove from container (container_id = NULL)
       await db.runAsync(
-        'UPDATE items SET space_id = ? WHERE id = ?',
+        'UPDATE items SET space_id = ?, container_id = NULL WHERE id = ?',
         [newSpaceId, itemId]
       );
     } catch (error) {
@@ -182,6 +194,68 @@ export class ItemRepository {
       // Log error for debugging
       console.error('[ItemRepository.updateSpaceId] Database error:', error);
 
+      throw serviceError;
+    }
+  }
+
+  /**
+   * Update an item's container_id to move it to a different container
+   * Pass empty string to clear container (move to root space)
+   *
+   * @param itemId - The item id to move
+   * @param containerId - The new container id (empty string to move to root space)
+   * @returns void (no return value)
+   * @throws ServiceError if database operation fails
+   *
+   * SQL: UPDATE items SET container_id = ? WHERE id = ?
+   * Parameterized query prevents SQL injection
+   * Empty string sets container_id to NULL
+   */
+  static async updateContainerId(itemId: string, containerId: string): Promise<void> {
+    try {
+      const db = getDatabase();
+
+      // Execute parameterized UPDATE query
+      // Empty string is converted to NULL for root space
+      await db.runAsync(
+        'UPDATE items SET container_id = ? WHERE id = ?',
+        [containerId || null, itemId]
+      );
+    } catch (error) {
+      // Convert database error to ServiceError
+      const serviceError: ServiceError = {
+        code: 'DB_ERROR',
+        message: 'Failed to move item to container. Try again.',
+      };
+
+      // Log error for debugging
+      console.error('[ItemRepository.updateContainerId] Database error:', error);
+
+      throw serviceError;
+    }
+  }
+
+  /**
+   * Update an item's space_id and container_id atomically
+   * Used when moving an item to a container in a (possibly different) space
+   *
+   * @param itemId - The item id to move
+   * @param newSpaceId - The destination space id
+   * @param newContainerId - The destination container id (empty string to place at root)
+   */
+  static async updateSpaceAndContainer(itemId: string, newSpaceId: string, newContainerId: string): Promise<void> {
+    try {
+      const db = getDatabase();
+      await db.runAsync(
+        'UPDATE items SET space_id = ?, container_id = ? WHERE id = ?',
+        [newSpaceId, newContainerId || null, itemId]
+      );
+    } catch (error) {
+      const serviceError: ServiceError = {
+        code: 'DB_ERROR',
+        message: 'Failed to move item. Try again.',
+      };
+      console.error('[ItemRepository.updateSpaceAndContainer] Database error:', error);
       throw serviceError;
     }
   }
@@ -253,7 +327,7 @@ export class ItemRepository {
    *
    * SQL: SELECT items.id, items.name, items.created_at, spaces.name as space_name
    *      FROM items JOIN spaces ON items.space_id = spaces.id
-   *      ORDER BY items.created_at DESC LIMIT ?
+   *      ORDER BY items.created_at DESC LIMIT <limit>
    */
   static async getRecentItems(
     limit: number = 5
@@ -261,13 +335,16 @@ export class ItemRepository {
     try {
       const db = getDatabase();
 
+      // Sanitize limit to be a positive integer
+      const sanitizedLimit = Math.max(1, Math.min(1000, Math.floor(limit)));
+
       const result = await db.getAllAsync(
         `SELECT items.id, items.name, items.created_at, spaces.name as space_name
          FROM items
          JOIN spaces ON items.space_id = spaces.id
          ORDER BY items.created_at DESC
          LIMIT ?`,
-        [limit]
+        [sanitizedLimit]
       );
 
       return result.map((row: any) => ({
@@ -280,6 +357,137 @@ export class ItemRepository {
       // Log error but return empty array as fallback
       console.error('[ItemRepository.getRecentItems] Database error:', error);
       return [];
+    }
+  }
+
+  /**
+   * Instance method: Get all items
+   * 
+   * Used by lending feature for item selection
+   * Returns all items with their space information
+   * 
+   * @returns Array of all items
+   * @throws Error if database query fails
+   */
+  async getAll(): Promise<Item[]> {
+    try {
+      const db = getDatabase();
+      const result = await db.getAllAsync(`
+        SELECT 
+          i.id,
+          i.name,
+          i.space_id,
+          i.container_id,
+          i.created_at,
+          s.name as space,
+          c.name as container
+        FROM items i
+        LEFT JOIN spaces s ON i.space_id = s.id
+        LEFT JOIN containers c ON i.container_id = c.id
+        ORDER BY i.name ASC
+      `);
+
+      return (result as any[]).map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        description: row.description ?? null,
+        quantity: row.quantity ?? 1,
+        spaceId: row.space_id,
+        containerId: row.container_id,
+        createdAt: row.created_at,
+        space: row.space ? { name: row.space } : null,
+        container: row.container ? { name: row.container } : null,
+      }));
+    } catch (error) {
+      console.error('[ItemRepository.getAll] Database error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Instance method: Get item by ID
+   * 
+   * Used by lending feature for item lookup and validation
+   * Returns a single item with its space/container information
+   * 
+   * @param id - Item ID
+   * @returns Item object or null if not found
+   * @throws Error if database query fails
+   */
+  async getById(id: string): Promise<Item | null> {
+    console.log('[ItemRepository.getById] Looking up item:', id);
+    try {
+      const db = getDatabase();
+      const result = await db.getFirstAsync<any>(`
+        SELECT 
+          i.id,
+          i.name,
+          i.description,
+          i.quantity,
+          i.space_id,
+          i.container_id,
+          i.created_at,
+          s.name as space,
+          c.name as container
+        FROM items i
+        LEFT JOIN spaces s ON i.space_id = s.id
+        LEFT JOIN containers c ON i.container_id = c.id
+        WHERE i.id = ?
+      `, [id]);
+
+      if (!result) {
+        console.log('[ItemRepository.getById] Item not found:', id);
+        return null;
+      }
+
+      const item: Item = {
+        id: result.id,
+        name: result.name,
+        description: result.description ?? null,
+        quantity: result.quantity ?? 1,
+        spaceId: result.space_id,
+        containerId: result.container_id,
+        createdAt: result.created_at,
+        space: result.space ? { name: result.space } : null,
+        container: result.container ? { name: result.container } : null,
+      };
+      console.log('[ItemRepository.getById] Item found:', item);
+      return item;
+    } catch (error) {
+      console.error('[ItemRepository.getById] Database error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Static: Get item by ID with space/container info
+   */
+  static async getItemById(id: string): Promise<Item | null> {
+    const repo = new ItemRepository();
+    return repo.getById(id);
+  }
+
+  /**
+   * Update item fields (name, description, quantity)
+   */
+  static async updateItem(id: string, updates: { name?: string; description?: string | null; quantity?: number }): Promise<void> {
+    try {
+      const db = getDatabase();
+      const fields: string[] = [];
+      const values: any[] = [];
+
+      if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name); }
+      if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description); }
+      if (updates.quantity !== undefined) { fields.push('quantity = ?'); values.push(updates.quantity); }
+
+      if (fields.length === 0) return;
+      values.push(id);
+
+      await db.runAsync(`UPDATE items SET ${fields.join(', ')} WHERE id = ?`, values);
+    } catch (error) {
+      console.error('[ItemRepository.updateItem] Database error:', error);
+      const serviceError: ServiceError = { code: 'DB_ERROR', message: 'Failed to update item.' };
+      throw serviceError;
     }
   }
 }

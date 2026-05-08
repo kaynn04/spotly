@@ -93,4 +93,18 @@ export class ContainerService {
   static async getContainerById(containerId: string): Promise<Container | null> {
     return ContainerRepository.getContainerById(containerId);
   }
+
+  /**
+   * Delete a container and all its items
+   */
+  static async deleteContainer(containerId: string): Promise<void> {
+    return ContainerRepository.deleteContainer(containerId);
+  }
+
+  /**
+   * Move a container (and its items) to a different space
+   */
+  static async moveContainer(containerId: string, targetSpaceId: string): Promise<void> {
+    return ContainerRepository.moveContainer(containerId, targetSpaceId);
+  }
 }
