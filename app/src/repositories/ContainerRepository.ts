@@ -194,10 +194,26 @@ export class ContainerRepository {
   static async moveContainer(containerId: string, targetSpaceId: string): Promise<void> {
     try {
       const db = getDatabase();
+      const now = new Date().toISOString();
       await db.withTransactionAsync(async () => {
-        await db.runAsync('UPDATE containers SET space_id = ? WHERE id = ?', [targetSpaceId, containerId]);
+        try {
+          await db.runAsync(
+            'UPDATE containers SET space_id = ?, updated_at = ? WHERE id = ?',
+            [targetSpaceId, now, containerId]
+          );
+        } catch {
+          // updated_at column may not exist yet (migration pending restart)
+          await db.runAsync('UPDATE containers SET space_id = ? WHERE id = ?', [targetSpaceId, containerId]);
+        }
         // Also update all items in this container to the new space
-        await db.runAsync('UPDATE items SET space_id = ? WHERE container_id = ?', [targetSpaceId, containerId]);
+        try {
+          await db.runAsync(
+            'UPDATE items SET space_id = ?, updated_at = ? WHERE container_id = ?',
+            [targetSpaceId, now, containerId]
+          );
+        } catch {
+          await db.runAsync('UPDATE items SET space_id = ? WHERE container_id = ?', [targetSpaceId, containerId]);
+        }
       });
     } catch (error) {
       console.error('[ContainerRepository.moveContainer] Database error:', error);
@@ -206,6 +222,35 @@ export class ContainerRepository {
         message: 'Failed to move container. Try again.',
       };
       throw serviceError;
+    }
+  }
+
+  static async getRecentlyMovedContainers(
+    limit: number = 5
+  ): Promise<Array<{ id: string; name: string; spaceName: string; containerName: null; updatedAt: string }>> {
+    try {
+      const db = getDatabase();
+      const sanitizedLimit = Math.max(1, Math.min(1000, Math.floor(limit)));
+      const result = await db.getAllAsync(
+        `SELECT c.id, c.name, c.updated_at,
+                s.name as space_name
+         FROM containers c
+         JOIN spaces s ON c.space_id = s.id
+         WHERE c.updated_at IS NOT NULL AND c.updated_at > c.created_at
+         ORDER BY c.updated_at DESC
+         LIMIT ?`,
+        [sanitizedLimit]
+      );
+      return result.map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        spaceName: row.space_name,
+        containerName: null,
+        updatedAt: row.updated_at,
+      }));
+    } catch (error) {
+      console.error('[ContainerRepository.getRecentlyMovedContainers] Database error:', error);
+      return [];
     }
   }
 }

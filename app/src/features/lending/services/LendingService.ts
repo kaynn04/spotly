@@ -276,6 +276,17 @@ export class LendingService {
     }
   }
 
+  async getActiveLendingsWithItemNames(): Promise<(Lending & { item_name: string })[]> {
+    try {
+      return await this.lendingRepository.getActiveLendingsWithItemNames();
+    } catch (error) {
+      throw createServiceError(
+        'DATABASE_ERROR',
+        'Failed to fetch active lendings'
+      );
+    }
+  }
+
   /**
    * Get All Lendings
    *

@@ -10,6 +10,7 @@
 import { getDatabase } from './client';
 import { createLendingsTable, dropLendingsTable } from './migrations/003-create-lendings-table';
 import { createOutsideSessionsTables, dropOutsideSessionsTables } from './migrations/004-create-outside-tables';
+import { addItemsUpdatedAt } from './migrations/005-add-items-updated-at';
 
 /**
  * Initialize the database schema
@@ -107,6 +108,9 @@ export async function initializeDatabase() {
 
     // Create outside sessions tables (Migration 004)
     await createOutsideSessionsTables(db);
+
+    // Add items.updated_at column (Migration 005)
+    await addItemsUpdatedAt(db);
 
     console.log('✓ Database initialized successfully');
   } catch (error) {

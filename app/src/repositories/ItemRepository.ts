@@ -178,12 +178,19 @@ export class ItemRepository {
     try {
       const db = getDatabase();
 
-      // Execute parameterized UPDATE query
-      // When moving to a different space, remove from container (container_id = NULL)
-      await db.runAsync(
-        'UPDATE items SET space_id = ?, container_id = NULL WHERE id = ?',
-        [newSpaceId, itemId]
-      );
+      const now = new Date().toISOString();
+      try {
+        await db.runAsync(
+          'UPDATE items SET space_id = ?, container_id = NULL, updated_at = ? WHERE id = ?',
+          [newSpaceId, now, itemId]
+        );
+      } catch {
+        // updated_at column may not exist yet (migration pending restart)
+        await db.runAsync(
+          'UPDATE items SET space_id = ?, container_id = NULL WHERE id = ?',
+          [newSpaceId, itemId]
+        );
+      }
     } catch (error) {
       // Convert database error to ServiceError
       const serviceError: ServiceError = {
@@ -215,12 +222,18 @@ export class ItemRepository {
     try {
       const db = getDatabase();
 
-      // Execute parameterized UPDATE query
-      // Empty string is converted to NULL for root space
-      await db.runAsync(
-        'UPDATE items SET container_id = ? WHERE id = ?',
-        [containerId || null, itemId]
-      );
+      const now = new Date().toISOString();
+      try {
+        await db.runAsync(
+          'UPDATE items SET container_id = ?, updated_at = ? WHERE id = ?',
+          [containerId || null, now, itemId]
+        );
+      } catch {
+        await db.runAsync(
+          'UPDATE items SET container_id = ? WHERE id = ?',
+          [containerId || null, itemId]
+        );
+      }
     } catch (error) {
       // Convert database error to ServiceError
       const serviceError: ServiceError = {
@@ -246,10 +259,18 @@ export class ItemRepository {
   static async updateSpaceAndContainer(itemId: string, newSpaceId: string, newContainerId: string): Promise<void> {
     try {
       const db = getDatabase();
-      await db.runAsync(
-        'UPDATE items SET space_id = ?, container_id = ? WHERE id = ?',
-        [newSpaceId, newContainerId || null, itemId]
-      );
+      const now = new Date().toISOString();
+      try {
+        await db.runAsync(
+          'UPDATE items SET space_id = ?, container_id = ?, updated_at = ? WHERE id = ?',
+          [newSpaceId, newContainerId || null, now, itemId]
+        );
+      } catch {
+        await db.runAsync(
+          'UPDATE items SET space_id = ?, container_id = ? WHERE id = ?',
+          [newSpaceId, newContainerId || null, itemId]
+        );
+      }
     } catch (error) {
       const serviceError: ServiceError = {
         code: 'DB_ERROR',
@@ -354,8 +375,38 @@ export class ItemRepository {
         createdAt: row.created_at,
       }));
     } catch (error) {
-      // Log error but return empty array as fallback
       console.error('[ItemRepository.getRecentItems] Database error:', error);
+      return [];
+    }
+  }
+
+  static async getRecentlyMovedItems(
+    limit: number = 5
+  ): Promise<Array<{ id: string; name: string; spaceName: string; containerName: string | null; updatedAt: string }>> {
+    try {
+      const db = getDatabase();
+      const sanitizedLimit = Math.max(1, Math.min(1000, Math.floor(limit)));
+      const result = await db.getAllAsync(
+        `SELECT i.id, i.name, i.updated_at,
+                s.name as space_name,
+                c.name as container_name
+         FROM items i
+         JOIN spaces s ON i.space_id = s.id
+         LEFT JOIN containers c ON i.container_id = c.id
+         WHERE i.updated_at IS NOT NULL AND i.updated_at > i.created_at
+         ORDER BY i.updated_at DESC
+         LIMIT ?`,
+        [sanitizedLimit]
+      );
+      return result.map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        spaceName: row.space_name,
+        containerName: row.container_name ?? null,
+        updatedAt: row.updated_at,
+      }));
+    } catch (error) {
+      console.error('[ItemRepository.getRecentlyMovedItems] Database error:', error);
       return [];
     }
   }

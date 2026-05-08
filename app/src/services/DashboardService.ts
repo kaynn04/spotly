@@ -22,6 +22,15 @@ export interface DashboardItem {
   createdAt: string;
 }
 
+export interface DashboardMovedItem {
+  id: string;
+  name: string;
+  spaceName: string;
+  containerName: string | null;
+  updatedAt: string;
+  kind: 'item' | 'container';
+}
+
 /**
  * Dashboard Statistics
  */
@@ -36,6 +45,7 @@ export interface DashboardStats {
  */
 export interface Dashboard {
   recentItems: DashboardItem[];
+  recentlyMoved: DashboardMovedItem[];
   stats: DashboardStats;
   isEmpty: boolean;
 }
@@ -75,11 +85,27 @@ export class DashboardService {
   static async getRecentItems(limit: number = 5): Promise<DashboardItem[]> {
     try {
       const items = await this.itemRepository.getRecentItems(limit);
-
-      // Already formatted correctly from repository
       return items;
     } catch (error) {
       console.error('[DashboardService.getRecentItems] Error:', error);
+      return [];
+    }
+  }
+
+  static async getRecentlyMovedItems(limit: number = 5): Promise<DashboardMovedItem[]> {
+    try {
+      const [movedItems, movedContainers] = await Promise.all([
+        this.itemRepository.getRecentlyMovedItems(limit),
+        this.containerRepository.getRecentlyMovedContainers(limit),
+      ]);
+      const combined: DashboardMovedItem[] = [
+        ...movedItems.map(i => ({ ...i, kind: 'item' as const })),
+        ...movedContainers.map(c => ({ ...c, kind: 'container' as const })),
+      ];
+      combined.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      return combined.slice(0, limit);
+    } catch (error) {
+      console.error('[DashboardService.getRecentlyMovedItems] Error:', error);
       return [];
     }
   }
@@ -128,27 +154,24 @@ export class DashboardService {
    */
   static async getFullDashboard(): Promise<Dashboard> {
     try {
-      const [recentItems, stats] = await Promise.all([
+      const [recentItems, recentlyMoved, stats] = await Promise.all([
         this.getRecentItems(5),
+        this.getRecentlyMovedItems(5),
         this.getDashboardStats(),
       ]);
 
       return {
         recentItems,
+        recentlyMoved,
         stats,
         isEmpty: stats.totalSpaces === 0,
       };
     } catch (error) {
       console.error('[DashboardService.getFullDashboard] Error:', error);
-
-      // Return empty dashboard on error
       return {
         recentItems: [],
-        stats: {
-          totalItems: 0,
-          totalSpaces: 0,
-          totalContainers: 0,
-        },
+        recentlyMoved: [],
+        stats: { totalItems: 0, totalSpaces: 0, totalContainers: 0 },
         isEmpty: true,
       };
     }
