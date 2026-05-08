@@ -21,7 +21,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faBox, faSun, faMoon } from '@fortawesome/free-solid-svg-icons';
+import { faBox, faSun, faMoon, faChevronRight } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -31,6 +31,7 @@ import { Colors } from '@/constants/theme';
 import { useScrollHide } from '@/hooks/use-scroll-hide';
 import { useTabBarPadding } from '@/hooks/use-tab-bar-padding';
 import { DashboardService } from '@/src/services/DashboardService';
+import type { DashboardMovedItem } from '@/src/services/DashboardService';
 import { UserService } from '@/src/services/UserService';
 import { ItemRepository } from '@/src/repositories/ItemRepository';
 import { SpaceRepository } from '@/src/repositories/SpaceRepository';
@@ -58,7 +59,8 @@ function formatDate(dateString: string) {
 interface DashboardData {
   stats: { totalItems: number; totalSpaces: number; totalContainers: number };
   recentItems: { id: string; name: string; spaceName: string; createdAt: string }[];
-  activeLendings: Lending[];
+  recentlyMoved: DashboardMovedItem[];
+  activeLendings: (Lending & { item_name: string })[];
   activeSession: { id: string; title: string; itemCount: number; checkedCount: number } | null;
   isEmpty: boolean;
 }
@@ -102,7 +104,7 @@ export default function HomePage() {
       const [name, dashboard, activeLendings, session] = await Promise.all([
         UserService.getName(),
         DashboardService.getFullDashboard(),
-        lendingService.getActiveLendings().catch(() => []),
+        lendingService.getActiveLendingsWithItemNames().catch(() => []),
         outsideService.getActiveSession().catch(() => null),
       ]);
 
@@ -112,6 +114,7 @@ export default function HomePage() {
       setData({
         stats: dashboard.stats,
         recentItems: dashboard.recentItems,
+        recentlyMoved: dashboard.recentlyMoved,
         activeLendings,
         activeSession: session
           ? { id: session.id, title: session.title, itemCount: session.itemCount, checkedCount: session.checkedCount }
@@ -253,7 +256,7 @@ export default function HomePage() {
                 </View>
                 <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
                   {data!.activeLendings.slice(0, 3).map((lending, index) => (
-                    <View
+                    <TouchableOpacity
                       key={lending.id}
                       style={[
                         styles.lendingRow,
@@ -262,6 +265,8 @@ export default function HomePage() {
                           borderBottomColor: borderColor,
                         },
                       ]}
+                      onPress={() => router.push(`/lending/${lending.id}` as any)}
+                      activeOpacity={0.7}
                     >
                       <View style={[styles.lendingDot, { backgroundColor: PRIMARY }]} />
                       <View style={styles.lendingContent}>
@@ -269,10 +274,11 @@ export default function HomePage() {
                           {lending.borrower_name}
                         </Text>
                         <Text style={[styles.lendingMeta, { color: subtleText }]} numberOfLines={1}>
-                          since {formatDate(lending.lent_at.toString())}
+                          {lending.item_name} · since {formatDate(lending.lent_at.toString())}
                         </Text>
                       </View>
-                    </View>
+                      <FontAwesomeIcon icon={faChevronRight} size={12} color={subtleText} />
+                    </TouchableOpacity>
                   ))}
                   {data!.activeLendings.length > 3 && (
                     <TouchableOpacity
@@ -299,7 +305,7 @@ export default function HomePage() {
                 </View>
                 <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
                   {data!.recentItems.map((item, index) => (
-                    <View
+                    <TouchableOpacity
                       key={item.id}
                       style={[
                         styles.recentRow,
@@ -308,6 +314,8 @@ export default function HomePage() {
                           borderBottomColor: borderColor,
                         },
                       ]}
+                      onPress={() => router.push(`/item/${item.id}` as any)}
+                      activeOpacity={0.7}
                     >
                       <View style={styles.recentContent}>
                         <Text style={[styles.recentName, { color: colors.text }]} numberOfLines={1}>
@@ -317,11 +325,72 @@ export default function HomePage() {
                           {item.spaceName}
                         </Text>
                       </View>
-                      <Text style={[styles.recentDate, { color: subtleText }]}>
-                        {formatDate(item.createdAt)}
-                      </Text>
-                    </View>
+                      <View style={styles.recentRight}>
+                        <Text style={[styles.recentDate, { color: subtleText }]}>
+                          {formatDate(item.createdAt)}
+                        </Text>
+                        <FontAwesomeIcon icon={faChevronRight} size={12} color={subtleText} style={{ marginLeft: 6 }} />
+                      </View>
+                    </TouchableOpacity>
                   ))}
+                </View>
+              </View>
+            )}
+
+            {/* ── Recently moved items ───────────────────────── */}
+            {(data?.recentlyMoved?.length ?? 0) > 0 && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Recently Moved</Text>
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/spaces' as any)}>
+                    <Text style={[styles.seeAll, { color: PRIMARY }]}>Spaces</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+                  {data!.recentlyMoved.map((item, index) => {
+                    const location = item.containerName
+                      ? `${item.spaceName} › ${item.containerName}`
+                      : item.spaceName;
+                    const route = item.kind === 'container'
+                      ? `/container/${item.id}`
+                      : `/item/${item.id}`;
+                    return (
+                      <TouchableOpacity
+                        key={`${item.kind}-${item.id}`}
+                        style={[
+                          styles.recentRow,
+                          index < data!.recentlyMoved.length - 1 && {
+                            borderBottomWidth: 1,
+                            borderBottomColor: borderColor,
+                          },
+                        ]}
+                        onPress={() => router.push(route as any)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.recentContent}>
+                          <View style={styles.recentNameRow}>
+                            <Text style={[styles.recentName, { color: colors.text }]} numberOfLines={1}>
+                              {item.name}
+                            </Text>
+                            {item.kind === 'container' && (
+                              <View style={[styles.kindPill, { backgroundColor: isDark ? '#2c2c2e' : '#e8eaed' }]}>
+                                <Text style={[styles.kindPillText, { color: subtleText }]}>Container</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={[styles.recentMeta, { color: subtleText }]} numberOfLines={1}>
+                            {location}
+                          </Text>
+                        </View>
+                        <View style={styles.recentRight}>
+                          <Text style={[styles.recentDate, { color: subtleText }]}>
+                            {formatDate(item.updatedAt)}
+                          </Text>
+                          <FontAwesomeIcon icon={faChevronRight} size={12} color={subtleText} style={{ marginLeft: 6 }} />
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
             )}
@@ -405,8 +474,12 @@ const styles = StyleSheet.create({
   // Recent items
   recentRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 14 },
   recentContent: { flex: 1 },
-  recentName: { fontSize: 15, fontWeight: '500' },
+  recentNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  recentName: { fontSize: 15, fontWeight: '500', flexShrink: 1 },
+  kindPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+  kindPillText: { fontSize: 11, fontWeight: '500' },
   recentMeta: { fontSize: 12, marginTop: 2 },
+  recentRight: { flexDirection: 'row', alignItems: 'center' },
   recentDate: { fontSize: 12 },
   // Empty state
   emptyCard: { borderRadius: 16, borderWidth: 1, padding: 32, alignItems: 'center', marginTop: 8 },

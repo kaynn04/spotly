@@ -55,6 +55,20 @@ export class LendingRepository {
     return results.map(this.rowToLending.bind(this));
   }
 
+  async getActiveLendingsWithItemNames(): Promise<(Lending & { item_name: string })[]> {
+    const results = await this.db.getAllAsync(
+      `SELECT l.*, COALESCE(i.name, 'Unknown Item') as item_name
+       FROM lendings l
+       LEFT JOIN items i ON l.item_id = i.id
+       WHERE l.status = 'ACTIVE'
+       ORDER BY l.lent_at DESC`
+    );
+    return results.map((row: any) => ({
+      ...this.rowToLending(row),
+      item_name: String(row.item_name || 'Unknown Item'),
+    }));
+  }
+
   /**
    * Get all lendings (both ACTIVE and RETURNED)
    *
