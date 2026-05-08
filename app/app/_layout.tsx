@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { initializeDatabase } from '@/src/db/migrations';
 import { isOnboardingDone } from './onboarding';
+import { ColorSchemeProvider } from '@/src/context/ColorSchemeContext';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -37,17 +38,43 @@ export default function RootLayout() {
 
   if (!dbReady) return null;
 
+  const isDark = colorScheme === 'dark';
+  const navBg = isDark ? '#000000' : '#f8f9fa';
+
+  const theme = {
+    ...(isDark ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(isDark ? DarkTheme : DefaultTheme).colors,
+      background: navBg,
+      card: navBg,
+    },
+  };
+
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-        <Stack.Screen name="space/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="container/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="item/[id]" options={{ headerShown: false }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <ColorSchemeProvider>
+      <ThemeProvider value={theme}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: navBg },
+            animation: 'slide_from_right',
+            animationDuration: 250,
+            navigationBarColor: navBg,
+          }}
+        >
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: true }} />
+          <Stack.Screen name="space/[id]" />
+          <Stack.Screen name="container/[id]" />
+          <Stack.Screen name="item/[id]" />
+          <Stack.Screen name="lending/[id]" />
+          <Stack.Screen name="lending/history" />
+          <Stack.Screen name="outside/[id]" />
+          <Stack.Screen name="outside/history" />
+        </Stack>
+        <StatusBar style="auto" />
+      </ThemeProvider>
+    </ColorSchemeProvider>
   );
 }

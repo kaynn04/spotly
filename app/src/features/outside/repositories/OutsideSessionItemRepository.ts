@@ -207,6 +207,26 @@ export class OutsideSessionItemRepository {
   }
 
   /**
+   * Get all item IDs that belong to the currently active session.
+   * Returns an empty array if no active session exists.
+   */
+  async getActiveSessionItemIds(): Promise<string[]> {
+    const db = getDatabase();
+    try {
+      const rows = await db.getAllAsync<{ item_id: string }>(
+        `SELECT osi.item_id
+         FROM outside_session_items osi
+         INNER JOIN outside_sessions os ON osi.session_id = os.id
+         WHERE os.status = 'ACTIVE'`
+      );
+      return (rows || []).map((r) => r.item_id);
+    } catch (error) {
+      console.error('✗ Error fetching active session item IDs:', error);
+      return [];
+    }
+  }
+
+  /**
    * Record that an item was moved to a different location during put-away
    */
   async recordMove(sessionId: string, itemId: string, spaceName: string, containerName: string | null): Promise<void> {

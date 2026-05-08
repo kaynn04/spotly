@@ -157,7 +157,7 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
   );
 
   return (
-    <Modal visible={true} transparent animationType="slide">
+    <Modal visible={true} animationType="slide" transparent statusBarTranslucent>
       <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
         {/* Header */}
         <View style={styles.header}>
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#e0e0e0',
   },
   closeButton: {
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   searchInput: {
-    borderWidth: 2,
+    borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -294,14 +294,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     alignItems: 'center',
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#e0e0e0',
   },
   checkbox: {
     width: 24,
     height: 24,
     borderRadius: 6,
-    borderWidth: 2,
+    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,

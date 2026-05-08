@@ -104,25 +104,11 @@ function TabItem({ icon, focused, onPress }: { icon: any; focused: boolean; onPr
     outputRange: [0.85, 1],
   });
 
-  const iconColor = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['#999999', PRIMARY],
-  });
-
   return (
     <Pressable onPress={onPress} style={styles.tab}>
-      <Animated.View
-        style={[
-          styles.iconBg,
-          {
-            transform: [{ scale }],
-            backgroundColor: anim.interpolate({
-              inputRange: [0, 1],
-              outputRange: ['transparent', `${PRIMARY}15`],
-            }),
-          },
-        ]}
-      >
+      <Animated.View style={[styles.iconBg, { transform: [{ scale }] }]}>
+        {/* Highlight circle — opacity-only animation avoids color-interpolation white flash */}
+        <Animated.View style={[styles.iconBgHighlight, { opacity: anim }]} />
         <FontAwesomeIcon
           icon={icon}
           size={18}
@@ -178,7 +164,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconBgActive: {
+  iconBgHighlight: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
     backgroundColor: `${PRIMARY}15`,
   },
   icon: {

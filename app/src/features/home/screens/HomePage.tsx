@@ -21,11 +21,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faBox } from '@fortawesome/free-solid-svg-icons';
+import { faBox, faSun, faMoon } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useToggleColorScheme } from '@/src/context/ColorSchemeContext';
 import { Colors } from '@/constants/theme';
 import { useScrollHide } from '@/hooks/use-scroll-hide';
 import { useTabBarPadding } from '@/hooks/use-tab-bar-padding';
@@ -68,6 +69,7 @@ export default function HomePage() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const toggleColorScheme = useToggleColorScheme();
   const insets = useSafeAreaInsets();
   const isDark = colorScheme === 'dark';
   const outsideService = useOutsideService();
@@ -146,6 +148,17 @@ export default function HomePage() {
               </Text>
             </View>
           </View>
+          <TouchableOpacity
+            onPress={toggleColorScheme}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={[styles.themeToggle, { backgroundColor: isDark ? '#2c2c2e' : '#e8eaed' }]}
+          >
+            <FontAwesomeIcon
+              icon={isDark ? faSun : faMoon}
+              size={15}
+              color={isDark ? '#fbbf24' : '#6b7f99'}
+            />
+          </TouchableOpacity>
         </View>
 
         {loading ? (
@@ -351,6 +364,13 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 16 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24, paddingTop: 4 },
   headerLeft: {},
+  themeToggle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   greetingText: { fontSize: 15, fontWeight: '500' },
   nameText: { fontSize: 30, fontWeight: '700', letterSpacing: -0.5, marginTop: 2 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 80 },

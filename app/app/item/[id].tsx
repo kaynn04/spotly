@@ -32,6 +32,7 @@ import { LendingRepository } from '@/src/features/lending/repositories/LendingRe
 import { ItemRepository } from '@/src/repositories/ItemRepository';
 import { Lending } from '@/src/features/lending/models/Lending';
 import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
+import { OutsideService } from '@/src/features/outside/services/OutsideService';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faBox, faHandshake, faCheck, faTrash, faMapPin, faFolder, faEllipsisVertical, faChevronLeft } from '@fortawesome/free-solid-svg-icons';
 
@@ -73,6 +74,9 @@ export default function ItemDetailScreen() {
     () => new LendingService(new LendingRepository(), new ItemRepository()),
     []
   );
+  const outsideService = useMemo(() => new OutsideService(), []);
+
+  const [activeOutsideSession, setActiveOutsideSession] = useState(false);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
@@ -88,12 +92,15 @@ export default function ItemDetailScreen() {
   async function loadItem() {
     setLoading(true);
     try {
-      const result = await ItemService.getItemById(itemId!);
+      const [result, lendings, outsideIds] = await Promise.all([
+        ItemService.getItemById(itemId!),
+        lendingService.getActiveLendings(),
+        outsideService.getActiveSessionItemIds(),
+      ]);
       setItem(result);
-      // Load active lending for this item
-      const lendings = await lendingService.getActiveLendings();
       const lending = lendings.find((l) => l.item_id === itemId);
       setActiveLending(lending ?? null);
+      setActiveOutsideSession(outsideIds.has(itemId!));
     } catch (err) {
       console.error('[ItemDetailScreen] loadItem:', err);
       Alert.alert('Error', 'Failed to load item');
@@ -254,9 +261,16 @@ export default function ItemDetailScreen() {
   }
 
   const isLent = !!activeLending;
+  const isOutside = activeOutsideSession;
   const locationText = item.container?.name
     ? `${item.space?.name ?? 'Unknown'} › ${item.container.name}`
     : item.space?.name ?? 'Unknown space';
+
+  const outsideGuard = () =>
+    Alert.alert(
+      'Item is Outside',
+      'This item is in an active outside session. Complete or remove it from the session before moving or lending it.'
+    );
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
@@ -279,6 +293,16 @@ export default function ItemDetailScreen() {
             <Text style={[styles.lendingBannerText, { color: PRIMARY }]}>
               Lent to {activeLending.borrower_name}
               {activeLending.lent_at ? ` · since ${new Date(activeLending.lent_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}
+            </Text>
+          </View>
+        )}
+
+        {/* Outside session badge */}
+        {isOutside && (
+          <View style={[styles.lendingBanner, { backgroundColor: '#e67e2215', borderColor: '#e67e2240' }]}>
+            <FontAwesomeIcon icon={faMapPin} size={16} color="#e67e22" />
+            <Text style={[styles.lendingBannerText, { color: '#e67e22' }]}>
+              In active outside session · Complete the session before moving or lending
             </Text>
           </View>
         )}
@@ -387,9 +411,12 @@ export default function ItemDetailScreen() {
       <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowMenu(false)}>
           <View style={[styles.menuDropdown, { backgroundColor: cardBg, borderColor, top: insets.top + 44 }]}>  
-            <TouchableOpacity style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]} onPress={() => { setShowMenu(false); openMoveModal(); }}>
-              <FontAwesomeIcon icon={faBox} size={18} color={PRIMARY} />
-              <Text style={[styles.menuItemText, { color: colors.text }]}>Move to...</Text>
+            <TouchableOpacity
+              style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]}
+              onPress={() => { setShowMenu(false); if (isOutside) { outsideGuard(); } else { openMoveModal(); } }}
+            >
+              <FontAwesomeIcon icon={faBox} size={18} color={isOutside ? '#e67e22' : PRIMARY} />
+              <Text style={[styles.menuItemText, { color: isOutside ? '#e67e22' : colors.text }]}>Move to...</Text>
             </TouchableOpacity>
             {isLent ? (
               <TouchableOpacity style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]} onPress={() => { setShowMenu(false); handleMarkReturned(); }}>
@@ -397,9 +424,12 @@ export default function ItemDetailScreen() {
                 <Text style={[styles.menuItemText, { color: colors.text }]}>Mark as returned</Text>
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]} onPress={() => { setShowMenu(false); setBorrowerName(''); setLendNote(''); setShowLendModal(true); }}>
-                <FontAwesomeIcon icon={faHandshake} size={18} color={PRIMARY} />
-                <Text style={[styles.menuItemText, { color: colors.text }]}>Lend item</Text>
+              <TouchableOpacity
+                style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]}
+                onPress={() => { setShowMenu(false); if (isOutside) { outsideGuard(); } else { setBorrowerName(''); setLendNote(''); setShowLendModal(true); } }}
+              >
+                <FontAwesomeIcon icon={faHandshake} size={18} color={isOutside ? '#e67e22' : PRIMARY} />
+                <Text style={[styles.menuItemText, { color: isOutside ? '#e67e22' : colors.text }]}>Lend item</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity style={styles.menuItem} onPress={() => { setShowMenu(false); handleDelete(); }}>

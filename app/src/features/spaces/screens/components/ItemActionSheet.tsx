@@ -25,7 +25,7 @@ import {
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import { faHandshake } from '@fortawesome/free-solid-svg-icons';
+import { faHandshake, faMapPin } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Lending } from '@/src/features/lending/models/Lending';
@@ -45,6 +45,7 @@ interface ItemActionSheetProps {
   visible: boolean;
   itemName: string;
   activeLending?: Lending | null;
+  activeOutsideSession?: boolean;
   actions: ItemAction[];
   onClose: () => void;
 }
@@ -53,6 +54,7 @@ export default function ItemActionSheet({
   visible,
   itemName,
   activeLending,
+  activeOutsideSession,
   actions,
   onClose,
 }: ItemActionSheetProps) {
@@ -110,6 +112,19 @@ export default function ItemActionSheet({
                   ? ` · since ${new Date(activeLending.lent_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
                   : ''}
                 {activeLending.note ? ` · "${activeLending.note}"` : ''}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Outside session banner */}
+        {activeOutsideSession && (
+          <View style={[styles.lentBanner, { backgroundColor: '#e67e2212', borderColor: '#e67e2230' }]}>
+            <FontAwesomeIcon icon={faMapPin} size={20} color="#e67e22" />
+            <View style={styles.lentBannerText}>
+              <Text style={[styles.lentBannerLabel, { color: '#e67e22' }]}>In active outside session</Text>
+              <Text style={[styles.lentBannerMeta, { color: subtleText }]}>
+                Complete the session before moving or lending
               </Text>
             </View>
           </View>

@@ -296,6 +296,20 @@ export class OutsideService {
   }
 
   /**
+   * Get a Set of all item IDs that are in the current active outside session.
+   * Returns an empty Set if there is no active session.
+   */
+  async getActiveSessionItemIds(): Promise<Set<string>> {
+    try {
+      const ids = await this.itemRepository.getActiveSessionItemIds();
+      return new Set(ids);
+    } catch (error) {
+      console.error('✗ Service: Error getting active session item IDs:', error);
+      return new Set();
+    }
+  }
+
+  /**
    * Delete a session
    */
   async deleteSession(sessionId: string): Promise<void> {

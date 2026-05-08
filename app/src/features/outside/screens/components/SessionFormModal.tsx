@@ -16,12 +16,12 @@ import {
   TouchableWithoutFeedback,
   Modal,
   ActivityIndicator,
-  KeyboardAvoidingView,
   Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 import { useOutsideService } from '../../services/OutsideService';
 
 interface SessionFormModalProps {
@@ -37,6 +37,7 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
   const outsideService = useOutsideService();
   const insets = useSafeAreaInsets();
   const isDark = colorScheme === 'dark';
+  const keyboardHeight = useKeyboardHeight();
 
   const [title, setTitle] = useState('');
   const [loading, setLoading] = useState(false);
@@ -83,11 +84,10 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
 
   return (
     <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={() => { Keyboard.dismiss(); handleCancel(); }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); handleCancel(); }}>
           <View style={styles.overlay}>
             <TouchableWithoutFeedback onPress={() => {}}>
-              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: Math.max(insets.bottom + 16, keyboardHeight) }]}>
                 {/* Handle */}
                 <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
@@ -153,7 +153,6 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
     </Modal>
   );
 }

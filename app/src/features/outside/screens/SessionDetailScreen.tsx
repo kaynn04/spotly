@@ -18,7 +18,7 @@ import {
   Modal,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faCheck, faTimes, faHome, faBox, faFolder, faChevronLeft, faMapPin } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faTimes, faHome, faBox, faFolder, faChevronLeft, faMapPin, faHandshake, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -31,6 +31,10 @@ import { ContainerService } from '@/src/services/ContainerService';
 import { ItemService } from '@/src/services/ItemService';
 import type { Space } from '@/src/models/Space';
 import type { Container } from '@/src/models/Container';
+import { LendingService } from '@/src/features/lending/services/LendingService';
+import { LendingRepository } from '@/src/features/lending/repositories/LendingRepository';
+import { ItemRepository } from '@/src/repositories/ItemRepository';
+import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
 import ItemPickerModal from './components/ItemPickerModal';
 
 const PRIMARY = '#6b7f99';
@@ -50,12 +54,24 @@ export default function SessionDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showItemPicker, setShowItemPicker] = useState(false);
 
-  // Put Away state
+  // Check Off state
   const [putAwayItem, setPutAwayItem] = useState<OutsideSessionItemWithContext | null>(null);
   const [showPutAwaySheet, setShowPutAwaySheet] = useState(false);
+
+  // Lending state
+  const [showLendModal, setShowLendModal] = useState(false);
+  const [borrowerName, setBorrowerName] = useState('');
+  const [lendNote, setLendNote] = useState('');
+  const [lendLoading, setLendLoading] = useState(false);
+
+  const lendingService = useMemo(
+    () => new LendingService(new LendingRepository(), new ItemRepository()),
+    []
+  );
   const [showMoveSheet, setShowMoveSheet] = useState(false);
   const [showUncheckSheet, setShowUncheckSheet] = useState(false);
   const [uncheckItem, setUncheckItem] = useState<OutsideSessionItemWithContext | null>(null);
+  const [uncheckItemHasLending, setUncheckItemHasLending] = useState(false);
   const [allSpaces, setAllSpaces] = useState<Space[]>([]);
   const [spaceContainers, setSpaceContainers] = useState<Record<string, Container[]>>({});
   const [currentItemSpaceId, setCurrentItemSpaceId] = useState<string | null>(null);
@@ -84,13 +100,19 @@ export default function SessionDetailScreen() {
   };
 
   const handleToggleItem = async (item: OutsideSessionItemWithContext) => {
+    // Completed sessions are read-only
+    if (session?.status !== 'ACTIVE') return;
     const checked = Boolean(item.is_checked);
     if (checked) {
-      // Show confirmation before unchecking
+      // Show confirmation before unchecking — check if item has active lending
       setUncheckItem(item);
+      setUncheckItemHasLending(false);
+      lendingService.getActiveLendingForItem(item.item_id).then((lending) => {
+        setUncheckItemHasLending(!!lending);
+      }).catch(() => {});
       setShowUncheckSheet(true);
     } else {
-      // Item is unchecked — show "Put Away" sheet to decide where it goes
+      // Item is unchecked — show check-off sheet to decide what to do
       setPutAwayItem(item);
       setShowPutAwaySheet(true);
     }
@@ -100,6 +122,11 @@ export default function SessionDetailScreen() {
     if (!uncheckItem) return;
     setShowUncheckSheet(false);
     try {
+      // If this item has an active lending, cancel it (mark as returned)
+      const activeLending = await lendingService.getActiveLendingForItem(uncheckItem.item_id);
+      if (activeLending) {
+        await lendingService.markAsReturned(activeLending.id);
+      }
       await outsideService.checkItem(id!, uncheckItem.item_id);
       await loadSession();
     } catch {
@@ -155,7 +182,12 @@ export default function SessionDetailScreen() {
     if (!putAwayItem) return;
     setShowMoveSheet(false);
     try {
-      await ItemService.moveItem(putAwayItem.item_id, currentItemSpaceId ?? '', spaceId);
+      if (spaceId === currentItemSpaceId) {
+        // Moving to root of the same space — just clear the container
+        await ItemService.moveItemToContainer(putAwayItem.item_id, spaceId, '');
+      } else {
+        await ItemService.moveItem(putAwayItem.item_id, currentItemSpaceId ?? '', spaceId);
+      }
       const spaceName = allSpaces.find(s => s.id === spaceId)?.name ?? 'Unknown';
       await outsideService.recordItemMove(id!, putAwayItem.item_id, spaceName, null);
       await outsideService.checkItem(id!, putAwayItem.item_id); // check as dealt with
@@ -201,6 +233,31 @@ export default function SessionDetailScreen() {
     ]);
   };
 
+  const handleLendSubmit = async () => {
+    if (!borrowerName.trim() || !putAwayItem) return;
+    setLendLoading(true);
+    try {
+      await lendingService.createLending({
+        item_id: putAwayItem.item_id,
+        borrower_name: borrowerName.trim(),
+        note: lendNote.trim() || undefined,
+      });
+      setShowLendModal(false);
+      setBorrowerName('');
+      setLendNote('');
+      // Check the item off since it's been dealt with
+      await outsideService.checkItem(id!, putAwayItem.item_id);
+      setPutAwayItem(null);
+      await loadSession();
+    } catch (err: any) {
+      Alert.alert('Error', err.code === 'DUPLICATE_ACTIVE_LENDING'
+        ? 'This item is already lent out'
+        : err.message || 'Failed to lend item');
+    } finally {
+      setLendLoading(false);
+    }
+  };
+
   const handleItemsSelected = async (itemIds: string[]) => {
     setShowItemPicker(false);
     try {
@@ -212,26 +269,70 @@ export default function SessionDetailScreen() {
     }
   };
 
-  const handleCompleteSession = () => {
+  const handleDeleteSession = () => {
     Alert.alert(
-      'Complete Session',
-      'All done? This will mark the session as completed.',
+      'Delete Session',
+      'This will permanently delete this session and remove all its items from the list. The items themselves will not be deleted.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Complete',
+          text: 'Delete',
+          style: 'destructive',
           onPress: async () => {
             try {
-              await outsideService.completeSession(id!);
-              router.replace('/outside/history');
+              await outsideService.deleteSession(id!);
+              router.replace('/(tabs)/outside');
             } catch (err) {
-              console.error('Error completing session:', err);
-              Alert.alert('Error', 'Failed to complete session');
+              console.error('Error deleting session:', err);
+              Alert.alert('Error', 'Failed to delete session');
             }
           },
         },
       ]
     );
+  };
+
+  const handleCompleteSession = () => {
+    const uncheckedCount = items.filter(item => !item.is_checked).length;
+
+    const doComplete = async () => {
+      try {
+        await outsideService.completeSession(id!);
+        router.replace('/outside/history');
+      } catch (err) {
+        console.error('Error completing session:', err);
+        Alert.alert('Error', 'Failed to complete session');
+      }
+    };
+
+    if (uncheckedCount > 0) {
+      Alert.alert(
+        'Unchecked Items',
+        `${uncheckedCount} item${uncheckedCount === 1 ? '' : 's'} ${uncheckedCount === 1 ? 'has' : 'have'} not been checked off and will remain in ${uncheckedCount === 1 ? 'its' : 'their'} original location. Complete anyway?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Complete Anyway', onPress: doComplete },
+        ]
+      );
+    } else if (items.length === 0) {
+      Alert.alert(
+        'No Items',
+        'This session has no items. Mark it as completed?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Complete', onPress: doComplete },
+        ]
+      );
+    } else {
+      Alert.alert(
+        'Complete Session',
+        'All items checked! Mark this session as completed?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Complete', onPress: doComplete },
+        ]
+      );
+    }
   };
 
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
@@ -323,14 +424,16 @@ export default function SessionDetailScreen() {
           )}
         </View>
 
-        {/* Remove */}
-        <TouchableOpacity
-          style={styles.removeBtn}
-          onPress={() => handleRemoveItem(item.item_id)}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <FontAwesomeIcon icon={faTimes} size={14} color={isDark ? '#48484a' : '#c7c7cc'} />
-        </TouchableOpacity>
+        {/* Remove — only for active sessions */}
+        {session?.status === 'ACTIVE' && (
+          <TouchableOpacity
+            style={styles.removeBtn}
+            onPress={() => handleRemoveItem(item.item_id)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <FontAwesomeIcon icon={faTimes} size={14} color={isDark ? '#48484a' : '#c7c7cc'} />
+          </TouchableOpacity>
+        )}
       </TouchableOpacity>
     );
   };
@@ -345,7 +448,9 @@ export default function SessionDetailScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
           {session.title}
         </Text>
-        <View style={{ width: 52 }} />
+        <TouchableOpacity onPress={handleDeleteSession} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ width: 52, alignItems: 'flex-end' }}>
+          <FontAwesomeIcon icon={faTrash} size={16} color="#d32f2f" />
+        </TouchableOpacity>
       </View>
 
       {/* Progress bar */}
@@ -389,30 +494,32 @@ export default function SessionDetailScreen() {
         )}
       </View>
 
-      {/* Bottom action bar */}
-      <View
-        style={[
-          styles.actionBar,
-          {
-            paddingBottom: insets.bottom + 8,
-            backgroundColor: cardBg,
-            borderTopColor: borderColor,
-          },
-        ]}
-      >
-        <TouchableOpacity
-          style={[styles.outlineButton, { borderColor: PRIMARY }]}
-          onPress={() => setShowItemPicker(true)}
+      {/* Bottom action bar — only for active sessions */}
+      {session.status === 'ACTIVE' && (
+        <View
+          style={[
+            styles.actionBar,
+            {
+              paddingBottom: insets.bottom + 8,
+              backgroundColor: cardBg,
+              borderTopColor: borderColor,
+            },
+          ]}
         >
-          <Text style={[styles.outlineButtonText, { color: PRIMARY }]}>+ Add Items</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.primaryButton, { flex: 1, backgroundColor: PRIMARY }]}
-          onPress={handleCompleteSession}
-        >
-          <Text style={styles.primaryButtonText}>Complete</Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={[styles.outlineButton, { borderColor: PRIMARY }]}
+            onPress={() => setShowItemPicker(true)}
+          >
+            <Text style={[styles.outlineButtonText, { color: PRIMARY }]}>+ Add Items</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.primaryButton, { flex: 1, backgroundColor: PRIMARY }]}
+            onPress={handleCompleteSession}
+          >
+            <Text style={styles.primaryButtonText}>Complete</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {showItemPicker && (
         <ItemPickerModal
@@ -428,7 +535,11 @@ export default function SessionDetailScreen() {
           <View style={[styles.uncheckSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
             <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
             <Text style={[styles.sheetTitle, { color: colors.text }]}>Uncheck item?</Text>
-            {uncheckItem?.moved_to_space_name ? (
+            {uncheckItemHasLending ? (
+              <Text style={[styles.sheetSubtitle, { color: subtleText }]}>
+                {`"${uncheckItem?.item_name}" is currently lent out. Unchecking will also cancel the lending.`}
+              </Text>
+            ) : uncheckItem?.moved_to_space_name ? (
               <Text style={[styles.sheetSubtitle, { color: subtleText }]}>
                 {`"${uncheckItem.item_name}" was moved to ${uncheckItem.moved_to_container_name ? `${uncheckItem.moved_to_space_name} › ${uncheckItem.moved_to_container_name}` : uncheckItem.moved_to_space_name}. Unchecking won't move it back.`}
               </Text>
@@ -457,16 +568,16 @@ export default function SessionDetailScreen() {
         </View>
       </Modal>
 
-      {/* Put Away Bottom Sheet */}
+      {/* Check Off Bottom Sheet */}
       <Modal visible={showPutAwaySheet} transparent animationType="slide" onRequestClose={() => { setShowPutAwaySheet(false); setPutAwayItem(null); }}>
         <TouchableWithoutFeedback onPress={() => { setShowPutAwaySheet(false); setPutAwayItem(null); }}>
           <View style={styles.sheetBackdrop} />
         </TouchableWithoutFeedback>
         <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
           <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
-          <Text style={[styles.sheetTitle, { color: colors.text }]}>Put Away</Text>
+          <Text style={[styles.sheetTitle, { color: colors.text }]}>Check Off</Text>
           <Text style={[styles.sheetSubtitle, { color: subtleText }]}>
-            Where do you want to put "{putAwayItem?.item_name}"?
+            What do you want to do with "{putAwayItem?.item_name}"?
           </Text>
           <View style={styles.sheetActions}>
             <TouchableOpacity
@@ -493,6 +604,22 @@ export default function SessionDetailScreen() {
               <View style={styles.sheetOptionText}>
                 <Text style={[styles.sheetOptionLabel, { color: colors.text }]}>Move to a different location</Text>
                 <Text style={[styles.sheetOptionDesc, { color: subtleText }]}>Choose a space or container</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sheetOption, { backgroundColor: isDark ? '#2c2c2e' : '#f8f9fa', borderColor }]}
+              onPress={() => {
+                setShowPutAwaySheet(false);
+                setBorrowerName('');
+                setLendNote('');
+                setShowLendModal(true);
+              }}
+              activeOpacity={0.7}
+            >
+              <FontAwesomeIcon icon={faHandshake} size={18} color={PRIMARY} />
+              <View style={styles.sheetOptionText}>
+                <Text style={[styles.sheetOptionLabel, { color: colors.text }]}>Lend to someone</Text>
+                <Text style={[styles.sheetOptionDesc, { color: subtleText }]}>Track who you're lending this to</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -575,6 +702,19 @@ export default function SessionDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Lend Modal */}
+      <LendingFormModal
+        visible={showLendModal}
+        item={putAwayItem ? { id: putAwayItem.item_id, name: putAwayItem.item_name } : null}
+        borrowerName={borrowerName}
+        onBorrowerNameChange={setBorrowerName}
+        note={lendNote}
+        onNoteChange={setLendNote}
+        onSubmit={handleLendSubmit}
+        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setPutAwayItem(null); }}
+        loading={lendLoading}
+      />
     </View>
   );
 }

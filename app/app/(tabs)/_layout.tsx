@@ -11,14 +11,22 @@ import React from 'react';
 import { Platform } from 'react-native';
 import FloatingTabBar from '@/components/ui/FloatingTabBar';
 import { ScrollHideProvider } from '@/hooks/use-scroll-hide';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabLayout() {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const bg = isDark ? '#000000' : '#f8f9fa';
+
   return (
     <ScrollHideProvider>
       <Tabs
         tabBar={(props) => <FloatingTabBar {...props} />}
         screenOptions={{
           headerShown: false,
+          sceneStyle: { backgroundColor: bg },
+          lazy: false,
+          animation: 'fade',
           // Make the navigator's tab bar wrapper invisible.
           // Our FloatingTabBar is position:absolute inside it,
           // so collapsing the wrapper means no background shows.

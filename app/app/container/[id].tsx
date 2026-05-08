@@ -39,6 +39,7 @@ import { LendingService } from '@/src/features/lending/services/LendingService';
 import { LendingRepository } from '@/src/features/lending/repositories/LendingRepository';
 import { ItemRepository } from '@/src/repositories/ItemRepository';
 import { Lending } from '@/src/features/lending/models/Lending';
+import { OutsideService } from '@/src/features/outside/services/OutsideService';
 import ItemFormModal from '@/src/features/spaces/screens/components/ItemFormModal';
 import ItemActionSheet from '@/src/features/spaces/screens/components/ItemActionSheet';
 import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
@@ -74,11 +75,13 @@ export default function ContainerDetailScreen() {
   const [lendNote, setLendNote] = useState('');
   const [lendLoading, setLendLoading] = useState(false);
   const [activeLendingMap, setActiveLendingMap] = useState<Record<string, Lending>>({});
+  const [activeOutsideItemIds, setActiveOutsideItemIds] = useState<Set<string>>(new Set());
 
   const lendingService = useMemo(
     () => new LendingService(new LendingRepository(), new ItemRepository()),
     []
   );
+  const outsideService = useMemo(() => new OutsideService(), []);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
@@ -88,7 +91,7 @@ export default function ContainerDetailScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (container?.id) { loadItems(); loadAllSpaces(); loadActiveLendings(); }
+      if (container?.id) { loadItems(); loadAllSpaces(); loadActiveLendings(); loadActiveOutsideItems(); }
     }, [container?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   );
 
@@ -136,6 +139,13 @@ export default function ContainerDetailScreen() {
       const map: Record<string, Lending> = {};
       active.forEach((l) => { map[l.item_id] = l; });
       setActiveLendingMap(map);
+    } catch {}
+  }
+
+  async function loadActiveOutsideItems() {
+    try {
+      const ids = await outsideService.getActiveSessionItemIds();
+      setActiveOutsideItemIds(ids);
     } catch {}
   }
 
@@ -303,14 +313,15 @@ export default function ContainerDetailScreen() {
           renderItem={({ item }) => {
             const activeLending = activeLendingMap[item.id];
             const isLent = !!activeLending;
+            const isOutside = activeOutsideItemIds.has(item.id);
             return (
               <TouchableOpacity
-                style={[styles.itemCard, { backgroundColor: cardBg, borderColor: isLent ? `${PRIMARY}40` : borderColor }]}
+                style={[styles.itemCard, { backgroundColor: cardBg, borderColor: isOutside ? '#e67e2240' : isLent ? `${PRIMARY}40` : borderColor }]}
                 onPress={() => router.push({ pathname: '../item/[id]' as any, params: { id: item.id } })}
                 onLongPress={() => handleItemPress(item)}
                 activeOpacity={0.7}
               >
-                <View style={[styles.itemDot, { backgroundColor: isLent ? PRIMARY : isDark ? '#48484a' : '#c7c7cc' }]} />
+                <View style={[styles.itemDot, { backgroundColor: isOutside ? '#e67e22' : isLent ? PRIMARY : isDark ? '#48484a' : '#c7c7cc' }]} />
                 <View style={styles.itemTextWrap}>
                   <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={1}>
                     {item.name}
@@ -320,8 +331,18 @@ export default function ContainerDetailScreen() {
                       Lent to {activeLending.borrower_name}
                     </Text>
                   )}
+                  {isOutside && !isLent && (
+                    <Text style={[styles.itemLentMeta, { color: '#e67e22' }]} numberOfLines={1}>
+                      In outside session
+                    </Text>
+                  )}
                 </View>
-                {isLent && (
+                {isOutside && (
+                  <View style={[styles.lentBadge, { backgroundColor: '#e67e2215' }]}>
+                    <Text style={[styles.lentBadgeText, { color: '#e67e22' }]}>Outside</Text>
+                  </View>
+                )}
+                {!isOutside && isLent && (
                   <View style={[styles.lentBadge, { backgroundColor: `${PRIMARY}15` }]}>
                     <Text style={[styles.lentBadgeText, { color: PRIMARY }]}>Lent</Text>
                   </View>
@@ -488,18 +509,25 @@ export default function ContainerDetailScreen() {
         visible={actionSheetItem !== null}
         itemName={actionSheetItem?.name ?? ''}
         activeLending={actionSheetItem ? (activeLendingMap[actionSheetItem.id] ?? null) : null}
+        activeOutsideSession={actionSheetItem ? activeOutsideItemIds.has(actionSheetItem.id) : false}
         onClose={() => setActionSheetItem(null)}
         actions={(() => {
           const item = actionSheetItem;
           if (!item) return [];
           const lending = activeLendingMap[item.id];
           const isLent = !!lending;
+          const isOutside = activeOutsideItemIds.has(item.id);
+          const outsideGuard = () =>
+            Alert.alert(
+              'Item is Outside',
+              'This item is in an active outside session. Complete or remove it from the session before moving or lending it.'
+            );
           return [
             {
               icon: faBox,
               label: 'Move',
-              description: 'Move to another space or container',
-              onPress: () => { setSelectedMoveItemId(item.id); setShowMoveModal(true); },
+              description: isOutside ? 'In active outside session' : 'Move to another space or container',
+              onPress: isOutside ? outsideGuard : () => { setSelectedMoveItemId(item.id); setShowMoveModal(true); },
             },
             isLent
               ? {
@@ -511,13 +539,13 @@ export default function ContainerDetailScreen() {
               : {
                   icon: faHandshake,
                   label: 'Lend',
-                  description: 'Track who you lent this item to',
-                  onPress: () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setShowLendModal(true); },
+                  description: isOutside ? 'In active outside session' : 'Track who you lent this item to',
+                  onPress: isOutside ? outsideGuard : () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setShowLendModal(true); },
                 },
             {
               icon: faTrash,
               label: 'Delete',
-              description: isLent ? 'Item is currently lent out' : 'Permanently remove this item',
+              description: isLent ? 'Item is currently lent out' : isOutside ? 'In active outside session' : 'Permanently remove this item',
               destructive: true,
               onPress: () => confirmDeleteItem(item.id, item.name),
             },

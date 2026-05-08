@@ -13,12 +13,12 @@ import {
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  KeyboardAvoidingView,
   Keyboard,
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 
 const PRIMARY = '#6b7f99';
 
@@ -33,6 +33,7 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const isDark = colorScheme === 'dark';
+  const keyboardHeight = useKeyboardHeight();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -83,11 +84,10 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
       statusBarTranslucent
       onRequestClose={handleCancel}
     >
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <TouchableWithoutFeedback onPress={handleCancel}>
           <View style={styles.overlay}>
             <TouchableWithoutFeedback onPress={() => {}}>
-              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: Math.max(insets.bottom + 16, keyboardHeight) }]}>
                 {/* Handle */}
                 <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
@@ -197,7 +197,6 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
     </Modal>
   );
 }
