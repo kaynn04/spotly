@@ -24,6 +24,7 @@ import { Colors } from '@/constants/theme';
 import { useScrollHide } from '@/hooks/use-scroll-hide';
 import { useTabBarPadding } from '@/hooks/use-tab-bar-padding';
 import type { Space } from '@/src/models/Space';
+import type { SpaceWithCount } from '@/src/models/Space';
 import type { Item } from '@/src/models/Item';
 import type { Container } from '@/src/models/Container';
 import { SpaceService } from '@/src/services/SpaceService';
@@ -59,7 +60,7 @@ export default function SpacesPage() {
 
   const { openCreate } = useLocalSearchParams<{ openCreate?: string }>();
 
-  const [spaces, setSpaces] = useState<Space[]>([]);
+  const [spaces, setSpaces] = useState<SpaceWithCount[]>([]);
   const [loading, setLoading] = useState(false);
   const [formVisible, setFormVisible] = useState(false);
 
@@ -90,7 +91,7 @@ export default function SpacesPage() {
   const loadSpaces = async () => {
     setLoading(true);
     try {
-      const result = await SpaceService.getAllSpaces();
+      const result = await SpaceService.getAllSpacesWithCounts();
       setSpaces(result);
     } catch (err) {
       console.error('[SpacesPage] Error loading spaces:', err);
@@ -194,7 +195,13 @@ export default function SpacesPage() {
       year: 'numeric',
     });
 
-  const renderSpace = ({ item, index }: { item: Space; index: number }) => (
+  const renderSpace = ({ item, index }: { item: SpaceWithCount; index: number }) => {
+    const metaParts: string[] = [];
+    if (item.containerCount > 0) metaParts.push(`${item.containerCount} container${item.containerCount !== 1 ? 's' : ''}`);
+    if (item.itemCount > 0) metaParts.push(`${item.itemCount} item${item.itemCount !== 1 ? 's' : ''}`);
+    const meta = metaParts.length > 0 ? metaParts.join(' · ') : 'Empty';
+
+    return (
     <TouchableOpacity
       style={[styles.spaceCard, { backgroundColor: cardBg, borderColor }]}
       onPress={() =>
@@ -208,12 +215,13 @@ export default function SpacesPage() {
           {item.name}
         </Text>
         <Text style={[styles.spaceDate, { color: subtleText }]}>
-          Created {formatDate(item.createdAt)}
+          {meta}
         </Text>
       </View>
       <FontAwesomeIcon icon={faChevronRight} size={16} color={subtleText} />
     </TouchableOpacity>
   );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>

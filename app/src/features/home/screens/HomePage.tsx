@@ -28,8 +28,8 @@ import {
   faChevronRight, 
   faGear,
   faHandHoldingDollar,
-  faHand,
-  faMapLocationDot,
+  faHandshake,
+  faSuitcase,
 } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -254,13 +254,16 @@ export default function HomePage() {
                 activeOpacity={0.7}
               >
                 <View style={styles.guidanceCardContent}>
-                  <View>
+                  <View style={[styles.guidanceIconBox, { backgroundColor: `${PRIMARY}18` }]}>
+                    <FontAwesomeIcon icon={faHandshake} size={20} color={PRIMARY} />
+                  </View>
+                  <View style={styles.guidanceTextBlock}>
                     <Text style={[styles.guidanceTitle, { color: colors.text }]}>Lend an item</Text>
                     <Text style={[styles.guidanceSubtitle, { color: subtleText }]}>
                       Share your items with friends and track who has what
                     </Text>
                   </View>
-                  <FontAwesomeIcon icon={faHand} size={24} color={PRIMARY} />
+                  <FontAwesomeIcon icon={faChevronRight} size={13} color={subtleText} />
                 </View>
               </TouchableOpacity>
             )}
@@ -273,13 +276,16 @@ export default function HomePage() {
                 activeOpacity={0.7}
               >
                 <View style={styles.guidanceCardContent}>
-                  <View>
+                  <View style={[styles.guidanceIconBox, { backgroundColor: `${PRIMARY}18` }]}>
+                    <FontAwesomeIcon icon={faSuitcase} size={20} color={PRIMARY} />
+                  </View>
+                  <View style={styles.guidanceTextBlock}>
                     <Text style={[styles.guidanceTitle, { color: colors.text }]}>Start an outside session</Text>
                     <Text style={[styles.guidanceSubtitle, { color: subtleText }]}>
                       List items you need to bring for your errands and check them off
                     </Text>
                   </View>
-                  <FontAwesomeIcon icon={faMapLocationDot} size={24} color={PRIMARY} />
+                  <FontAwesomeIcon icon={faChevronRight} size={13} color={subtleText} />
                 </View>
               </TouchableOpacity>
             )}
@@ -484,13 +490,16 @@ export default function HomePage() {
                   activeOpacity={0.7}
                 >
                   <View style={styles.guidanceCardContent}>
-                    <View style={{ flex: 1 }}>
+                    <View style={[styles.guidanceIconBox, { backgroundColor: `${PRIMARY}18` }]}>
+                      <FontAwesomeIcon icon={faBox} size={20} color={PRIMARY} />
+                    </View>
+                    <View style={styles.guidanceTextBlock}>
                       <Text style={[styles.guidanceTitle, { color: colors.text }]}>Add your first item</Text>
                       <Text style={[styles.guidanceSubtitle, { color: subtleText }]}>
-                        Start tracking by adding an item to your spaces
+                        Add items to your spaces to unlock lending, outside sessions, and more
                       </Text>
                     </View>
-                    <FontAwesomeIcon icon={faChevronRight} size={16} color={subtleText} />
+                    <FontAwesomeIcon icon={faChevronRight} size={13} color={subtleText} />
                   </View>
                 </TouchableOpacity>
               </View>
@@ -593,9 +602,11 @@ const styles = StyleSheet.create({
   // Guidance card (feature onboarding)
   guidanceCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 16 },
   guidanceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  guidanceCardContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
-  guidanceTitle: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
-  guidanceSubtitle: { fontSize: 13, fontWeight: '400' },
+  guidanceCardContent: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  guidanceIconBox: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  guidanceTextBlock: { flex: 1 },
+  guidanceTitle: { fontSize: 15, fontWeight: '600', marginBottom: 3 },
+  guidanceSubtitle: { fontSize: 13, fontWeight: '400', lineHeight: 18 },
   // Empty state
   emptyCard: { borderRadius: 16, borderWidth: 1, padding: 32, alignItems: 'center', marginTop: 8 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },

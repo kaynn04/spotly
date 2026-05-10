@@ -8,7 +8,7 @@
  * Implementation: T002 - Create app/src/repositories/SpaceRepository.ts
  */
 
-import type { Space, SpaceRow, ServiceError } from '../models/Space';
+import type { Space, SpaceWithCount, SpaceRow, ServiceError } from '../models/Space';
 import { getDatabase } from '../db/client';
 import { generateUUID } from '../utils/uuid';
 
@@ -87,6 +87,31 @@ return (result as any[]).map((row: SpaceRow) => ({
     } catch (error) {
       console.error('[SpaceRepository.getAllSpaces] Database error:', error);
       throw new Error('Failed to retrieve spaces');
+    }
+  }
+
+  static async getAllSpacesWithCounts(): Promise<SpaceWithCount[]> {
+    try {
+      const db = getDatabase();
+      const result = await db.getAllAsync(`
+        SELECT
+          s.*,
+          (SELECT COUNT(*) FROM items i WHERE i.space_id = s.id AND i.container_id IS NULL) AS direct_item_count,
+          (SELECT COUNT(*) FROM containers c WHERE c.space_id = s.id) AS container_count
+        FROM spaces s
+        ORDER BY s.created_at DESC
+      `);
+      return (result as any[]).map((row: any) => ({
+        id: String(row.id),
+        name: row.name,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        itemCount: row.direct_item_count ?? 0,
+        containerCount: row.container_count ?? 0,
+      }));
+    } catch (error) {
+      console.error('[SpaceRepository.getAllSpacesWithCounts] Database error:', error);
+      throw new Error('Failed to retrieve spaces with counts');
     }
   }
 

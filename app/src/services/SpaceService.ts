@@ -7,7 +7,7 @@
  * Implementation: T004 - Create app/src/services/SpaceService.ts
  */
 
-import type { Space, ServiceError } from '../models/Space';
+import type { Space, SpaceWithCount, ServiceError } from '../models/Space';
 import { SpaceRepository } from '../repositories/SpaceRepository';
 
 /**
@@ -79,6 +79,10 @@ export class SpaceService {
    */
   static async getAllSpaces(): Promise<Space[]> {
     return SpaceRepository.getAllSpaces();
+  }
+
+  static async getAllSpacesWithCounts(): Promise<SpaceWithCount[]> {
+    return SpaceRepository.getAllSpacesWithCounts();
   }
 
   /**
