@@ -21,7 +21,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faBox, faSun, faMoon, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+import { faBox, faSun, faMoon, faChevronRight, faGear } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -151,17 +151,26 @@ export default function HomePage() {
               </Text>
             </View>
           </View>
-          <TouchableOpacity
-            onPress={toggleColorScheme}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={[styles.themeToggle, { backgroundColor: isDark ? '#2c2c2e' : '#e8eaed' }]}
-          >
-            <FontAwesomeIcon
-              icon={isDark ? faSun : faMoon}
-              size={15}
-              color={isDark ? '#fbbf24' : '#6b7f99'}
-            />
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              onPress={toggleColorScheme}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={[styles.themeToggle, { backgroundColor: isDark ? '#2c2c2e' : '#e8eaed' }]}
+            >
+              <FontAwesomeIcon
+                icon={isDark ? faSun : faMoon}
+                size={15}
+                color={isDark ? '#fbbf24' : '#6b7f99'}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push('/settings' as any)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={[styles.themeToggle, { backgroundColor: isDark ? '#2c2c2e' : '#e8eaed' }]}
+            >
+              <FontAwesomeIcon icon={faGear} size={15} color={PRIMARY} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {loading ? (
@@ -405,7 +414,7 @@ export default function HomePage() {
                 </Text>
                 <TouchableOpacity
                   style={[styles.emptyBtn, { backgroundColor: PRIMARY }]}
-                  onPress={() => router.push('/(tabs)/spaces' as any)}
+                  onPress={() => router.push({ pathname: '/(tabs)/spaces' as any, params: { openCreate: '1' } })}
                 >
                   <Text style={styles.emptyBtnText}>Create a Space</Text>
                 </TouchableOpacity>
@@ -433,6 +442,7 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 16 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24, paddingTop: 4 },
   headerLeft: {},
+  headerRight: { flexDirection: 'row', gap: 8 },
   themeToggle: {
     width: 34,
     height: 34,

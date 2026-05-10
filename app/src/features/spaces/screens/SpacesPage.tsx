@@ -4,7 +4,7 @@
  * Main Spaces tab -- minimalist redesign uniform with Outside feature
  */
 
-import React, { useCallback, useState, useMemo, useRef } from 'react';
+import React, { useCallback, useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faFileAlt, faFileArchive } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { useScrollHide } from '@/hooks/use-scroll-hide';
@@ -57,9 +57,17 @@ export default function SpacesPage() {
   const { handleScroll } = useScrollHide();
   const tabBarPadding = useTabBarPadding();
 
+  const { openCreate } = useLocalSearchParams<{ openCreate?: string }>();
+
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [loading, setLoading] = useState(false);
   const [formVisible, setFormVisible] = useState(false);
+
+  useEffect(() => {
+    if (openCreate === '1') {
+      setFormVisible(true);
+    }
+  }, [openCreate]);
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<SectionedSearchItem[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);

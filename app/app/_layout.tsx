@@ -22,19 +22,37 @@ export default function RootLayout() {
 
   // Effect 1: Initialize DB — blocks rendering until done
   useEffect(() => {
-    initializeDatabase()
-      .catch((err) => console.error('Failed to initialize database:', err))
-      .finally(() => setDbReady(true));
+    const init = async () => {
+      try {
+        await initializeDatabase();
+        console.log('✓ Database initialized');
+      } catch (err) {
+        console.error('✗ Database init failed:', err);
+        // Still allow app to load even if DB fails
+      } finally {
+        setDbReady(true);
+      }
+    };
+    init();
   }, []);
 
   // Effect 2: Check onboarding only after Stack is mounted (dbReady = true)
   useEffect(() => {
     if (!dbReady) return;
-    isOnboardingDone().then((done) => {
-      if (!done) router.replace('/onboarding');
-      setNavChecked(true);
-    });
-  }, [dbReady]);
+    const checkOnboarding = async () => {
+      try {
+        const done = await isOnboardingDone();
+        if (!done) {
+          router.replace('/onboarding');
+        }
+      } catch (err) {
+        console.error('✗ Onboarding check failed:', err);
+      } finally {
+        setNavChecked(true);
+      }
+    };
+    checkOnboarding();
+  }, [dbReady, router]);
 
   if (!dbReady) return null;
 
@@ -72,6 +90,7 @@ export default function RootLayout() {
           <Stack.Screen name="lending/history" />
           <Stack.Screen name="outside/[id]" />
           <Stack.Screen name="outside/history" />
+          <Stack.Screen name="settings" />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>

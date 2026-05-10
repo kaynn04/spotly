@@ -22,7 +22,8 @@
       },
       "backgroundColor": "#000000",
       "edgeToEdgeEnabled": false,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.kaynn04.spotly"
     },
     "web": {
       "output": "static",
@@ -41,11 +42,18 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "07662434-d2e3-4e2a-88e9-99e819911e89"
+      }
     }
   }
 }
