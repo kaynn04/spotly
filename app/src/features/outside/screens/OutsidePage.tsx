@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faSuitcase, faChevronRight, faCheckCircle, faClockRotateLeft } from '@fortawesome/free-solid-svg-icons';
@@ -26,6 +27,7 @@ import { useTabBarPadding } from '@/hooks/use-tab-bar-padding';
 import { useOutsideService } from '../services/OutsideService';
 import { OutsideSessionItemWithContext } from '../models/OutsideSessionItem';
 import SessionFormModal from './components/SessionFormModal';
+import { ItemRepository } from '@/src/repositories/ItemRepository';
 
 interface SessionCardState {
   loading: boolean;
@@ -114,7 +116,22 @@ export default function OutsidePage() {
   const handleViewHistory = () => router.push('/outside/history');
   const handleOpenSession = () => activeSessionId && router.push(`/outside/${activeSessionId}`);
   const handleCompleteSession = () => activeSessionId && router.push(`/outside/${activeSessionId}`);
-  const handleCreateSession = () => setFormVisible(true);
+  const handleCreateSession = async () => {
+    try {
+      const items = await new ItemRepository().getAll();
+      if (items.length === 0) {
+        Alert.alert(
+          'No Items Yet',
+          'Add items to your spaces first before starting an outside session.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+    } catch {
+      // If check fails, allow through
+    }
+    setFormVisible(true);
+  };
 
   const previewItems = sessionItems.slice(0, 5);
   const progressPercent =
@@ -261,7 +278,7 @@ export default function OutsidePage() {
               style={[styles.primaryButton, { backgroundColor: PRIMARY, alignSelf: 'stretch' }]}
               onPress={handleCreateSession}
             >
-              <Text style={styles.primaryButtonText}>Start New Session</Text>
+              <Text style={styles.primaryButtonText}>+ Start New Session</Text>
             </TouchableOpacity>
           </View>
         )}

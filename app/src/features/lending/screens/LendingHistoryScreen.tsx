@@ -129,7 +129,7 @@ export default function LendingHistoryScreen() {
   };
 
   const headerBar = (
-    <View style={[styles.headerBar, { borderBottomColor: borderColor }]}>
+    <View style={[styles.headerBar, { borderBottomColor: borderColor, backgroundColor: isDark ? '#1c1c1e' : '#ffffff' }]}>
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
         <Text style={[styles.backBtnText, { color: PRIMARY }]}>{'< Back'}</Text>
       </TouchableOpacity>

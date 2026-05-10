@@ -481,7 +481,7 @@ export default function HomePage() {
             )}
 
             {/* ── Empty state (no spaces) ────────────────────── */}
-            {data?.isEmpty && (
+            {data?.isEmpty && !data?.activeSession && !(data?.activeLendings?.length > 0) && (
               <View style={[styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
                 <FontAwesomeIcon icon={faBox} size={40} color={PRIMARY} />
                 <Text style={[styles.emptyTitle, { color: colors.text }]}>Nothing here yet</Text>
@@ -492,7 +492,7 @@ export default function HomePage() {
                   style={[styles.emptyBtn, { backgroundColor: PRIMARY }]}
                   onPress={() => router.push({ pathname: '/(tabs)/spaces' as any, params: { openCreate: '1' } })}
                 >
-                  <Text style={styles.emptyBtnText}>Create a Space</Text>
+                  <Text style={styles.emptyBtnText}>+ Create a Space</Text>
                 </TouchableOpacity>
               </View>
             )}

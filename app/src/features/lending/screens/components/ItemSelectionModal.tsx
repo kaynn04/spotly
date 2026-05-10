@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { ItemRepository } from '../../../../repositories/ItemRepository';
+import { OutsideSessionItemRepository } from '../../../outside/repositories/OutsideSessionItemRepository';
 
 interface ItemSelectionModalProps {
   visible: boolean;
@@ -44,6 +45,7 @@ export default function ItemSelectionModal({
   onItemSelected,
 }: ItemSelectionModalProps) {
   const itemRepository = useMemo(() => new ItemRepository(), []);
+  const outsideSessionItemRepository = useMemo(() => new OutsideSessionItemRepository(), []);
 
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -58,8 +60,12 @@ export default function ItemSelectionModal({
     setLoading(true);
     setError(null);
     try {
-      const result = await itemRepository.getAll();
-      setItems(result || []);
+      const [result, activeSessionItemIds] = await Promise.all([
+        itemRepository.getAll(),
+        outsideSessionItemRepository.getActiveSessionItemIds(),
+      ]);
+      const activeSet = new Set(activeSessionItemIds);
+      setItems((result || []).filter((item: any) => !activeSet.has(item.id)));
     } catch (err: any) {
       setError('Failed to load items');
       console.error('Error loading items:', err);

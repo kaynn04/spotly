@@ -6,7 +6,7 @@
  * Feature: 009 - Lending Tracker
  */
 
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,8 @@ import {
   Keyboard,
   ScrollView,
   ActivityIndicator,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -59,6 +61,31 @@ export default function LendingFormModal({
 
   const isValid = borrowerName.trim().length > 0;
 
+  const sheetTranslateY = useRef(new Animated.Value(0)).current;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, { dy }) => dy > 5,
+      onPanResponderMove: (_, { dy }) => {
+        if (dy > 0) sheetTranslateY.setValue(dy);
+      },
+      onPanResponderRelease: (_, { dy, vy }) => {
+        if (dy > 80 || vy > 0.5) {
+          Animated.timing(sheetTranslateY, { toValue: 600, duration: 200, useNativeDriver: true }).start(() => {
+            sheetTranslateY.setValue(0);
+            onCancel();
+          });
+        } else {
+          Animated.spring(sheetTranslateY, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+    })
+  ).current;
+
+  useEffect(() => {
+    if (!visible) sheetTranslateY.setValue(0);
+  }, [visible]);
+
   const handleCancel = () => {
     Keyboard.dismiss();
     onCancel();
@@ -74,9 +101,11 @@ export default function LendingFormModal({
         <TouchableWithoutFeedback onPress={handleCancel}>
           <View style={styles.overlay}>
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+              <Animated.View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16, transform: [{ translateY: sheetTranslateY }] }]}>
                 {/* Handle */}
-                <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+                <View style={styles.handleArea} {...panResponder.panHandlers}>
+                  <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+                </View>
 
                 {/* Title */}
                 <Text style={[styles.sheetTitle, { color: textColor }]}>Lend Item</Text>
@@ -155,7 +184,7 @@ export default function LendingFormModal({
                     )}
                   </TouchableOpacity>
                 </View>
-              </View>
+              </Animated.View>
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
@@ -177,12 +206,11 @@ const styles = StyleSheet.create({
     maxHeight: '85%',
   },
   scrollContent: { flexGrow: 0 },
+  handleArea: { paddingVertical: 12, alignItems: 'center' },
   handle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 20,
   },
   sheetTitle: {
     fontSize: 20,

@@ -156,7 +156,7 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
   );
 
   return (
-    <Modal visible={true} animationType="slide" transparent statusBarTranslucent>
+    <Modal visible={true} animationType="slide" transparent statusBarTranslucent onRequestClose={onClose}>
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>

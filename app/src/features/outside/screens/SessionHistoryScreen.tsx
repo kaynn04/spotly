@@ -131,7 +131,6 @@ export default function SessionHistoryScreen() {
         style={[
           styles.header,
           {
-            paddingTop: 0,
             backgroundColor: isDark ? '#1c1c1e' : '#ffffff',
             borderBottomColor: borderColor,
           },
@@ -264,6 +263,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
   },

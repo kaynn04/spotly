@@ -6,18 +6,21 @@
  * Feature: 009 - Lending Tracker
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   ScrollView,
   FlatList,
   Modal,
   ActivityIndicator,
   Alert,
   TextInput,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faMagnifyingGlass, faTimes, faChevronRight, faHandshake, faPlus, faMapPin, faFolder } from '@fortawesome/free-solid-svg-icons';
@@ -34,6 +37,7 @@ import { ItemRepository } from '../../../repositories/ItemRepository';
 import { Lending } from '../models/Lending';
 import type { Item } from '../../../models/Item';
 import LendingFormModal from './components/LendingFormModal';
+import { OutsideSessionItemRepository } from '../../outside/repositories/OutsideSessionItemRepository';
 
 const PRIMARY = '#6b7f99';
 
@@ -49,6 +53,7 @@ export default function LendingPage() {
   const repositories = useMemo(() => ({
     lendingRepository: new LendingRepository(),
     itemRepository: new ItemRepository(),
+    outsideSessionItemRepository: new OutsideSessionItemRepository(),
   }), []);
 
   const lendingService = useMemo(() =>
@@ -71,6 +76,32 @@ export default function LendingPage() {
   const [borrowerName, setBorrowerName] = useState('');
   const [lendNote, setLendNote] = useState('');
   const [lendLoading, setLendLoading] = useState(false);
+
+  const pickerTranslateY = useRef(new Animated.Value(0)).current;
+  const pickerPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, { dy }) => dy > 5,
+      onPanResponderMove: (_, { dy }) => {
+        if (dy > 0) pickerTranslateY.setValue(dy);
+      },
+      onPanResponderRelease: (_, { dy, vy }) => {
+        if (dy > 80 || vy > 0.5) {
+          Animated.timing(pickerTranslateY, { toValue: 600, duration: 200, useNativeDriver: true }).start(() => {
+            setShowItemPicker(false);
+            pickerTranslateY.setValue(0);
+          });
+        } else {
+          Animated.spring(pickerTranslateY, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+    })
+  ).current;
+
+  const closeItemPicker = useCallback(() => {
+    pickerTranslateY.setValue(0);
+    setShowItemPicker(false);
+  }, [pickerTranslateY]);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
@@ -106,9 +137,13 @@ export default function LendingPage() {
     setItemPickerSearch('');
     setShowItemPicker(true);
     try {
-      const items = await repositories.itemRepository.getAll();
+      const [items, activeSessionItemIds] = await Promise.all([
+        repositories.itemRepository.getAll(),
+        repositories.outsideSessionItemRepository.getActiveSessionItemIds(),
+      ]);
       const activeLentIds = new Set(lendings.map((l) => l.item_id));
-      setAllItems(items.filter((i) => !activeLentIds.has(i.id)));
+      const activeOutsideIds = new Set(activeSessionItemIds);
+      setAllItems(items.filter((i) => !activeLentIds.has(i.id) && !activeOutsideIds.has(i.id)));
     } catch {
       Alert.alert('Error', 'Failed to load items');
       setShowItemPicker(false);
@@ -289,24 +324,36 @@ export default function LendingPage() {
             <Text style={[styles.emptySubtitle, { color: subtleText }]}>
               Lend an item from any space to start tracking
             </Text>
+            <TouchableOpacity
+              style={[styles.primaryButton, { backgroundColor: PRIMARY, alignSelf: 'stretch' }]}
+              onPress={openItemPicker}
+            >
+              <Text style={styles.primaryButtonText}>+ Choose an Item to Lend</Text>
+            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
-      {/* FAB */}
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: PRIMARY, bottom: insets.bottom + 84 }]}
-        onPress={openItemPicker}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
+      {/* FAB — only shown when lendings exist */}
+      {lendings.length > 0 && (
+        <TouchableOpacity
+          style={[styles.fab, { backgroundColor: PRIMARY, bottom: insets.bottom + 84 }]}
+          onPress={openItemPicker}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.fabText}>+</Text>
+        </TouchableOpacity>
+      )}
 
       {/* Item Picker Modal */}
-      <Modal visible={showItemPicker} transparent animationType="slide" onRequestClose={() => setShowItemPicker(false)}>
-        <View style={styles.pickerOverlay}>
-          <View style={[styles.pickerSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
-            <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
-            <Text style={[styles.pickerTitle, { color: colors.text }]}>Choose an Item to Lend</Text>
+      <Modal visible={showItemPicker} transparent animationType="slide" onRequestClose={closeItemPicker}>
+        <TouchableWithoutFeedback onPress={closeItemPicker}>
+          <View style={styles.pickerOverlay}>
+            <TouchableWithoutFeedback>
+              <Animated.View style={[styles.pickerSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16, transform: [{ translateY: pickerTranslateY }] }]}>
+                <View style={styles.handleArea} {...pickerPanResponder.panHandlers}>
+                  <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+                </View>
+                <Text style={[styles.pickerTitle, { color: colors.text }]}>Choose an Item to Lend</Text>
             {/* Search */}
             <View style={[styles.pickerSearchWrapper, { backgroundColor: isDark ? '#2c2c2e' : '#f8f9fa', borderColor }]}>
               <FontAwesomeIcon icon={faMagnifyingGlass} size={13} color={subtleText} />
@@ -366,14 +413,16 @@ export default function LendingPage() {
                 })}
               </ScrollView>
             )}
-            <TouchableOpacity
-              style={[styles.pickerCancel, { borderColor }]}
-              onPress={() => setShowItemPicker(false)}
-            >
-              <Text style={[styles.pickerCancelText, { color: subtleText }]}>Cancel</Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.pickerCancel, { borderColor }]}
+                  onPress={closeItemPicker}
+                >
+                  <Text style={[styles.pickerCancelText, { color: subtleText }]}>Cancel</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Lend Form Modal */}
@@ -488,8 +537,9 @@ const styles = StyleSheet.create({
   fabText: { color: '#fff', fontSize: 28, fontWeight: '300', lineHeight: 32 },
 
   pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  pickerSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '80%' },
-  sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  pickerSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 0, maxHeight: '80%' },
+  handleArea: { paddingVertical: 12, alignItems: 'center' },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2 },
   pickerTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.3, marginBottom: 14 },
   pickerSearchWrapper: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, height: 40, gap: 8, marginBottom: 12 },
   pickerSearchInput: { flex: 1, fontSize: 15 },
