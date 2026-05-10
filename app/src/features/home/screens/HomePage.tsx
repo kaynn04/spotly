@@ -21,7 +21,16 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faBox, faSun, faMoon, faChevronRight, faGear } from '@fortawesome/free-solid-svg-icons';
+import { 
+  faBox, 
+  faSun, 
+  faMoon, 
+  faChevronRight, 
+  faGear,
+  faHandHoldingDollar,
+  faHand,
+  faMapLocationDot,
+} from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -212,6 +221,68 @@ export default function HomePage() {
                 <Text style={[styles.statLabel, { color: subtleText }]}>Containers</Text>
               </TouchableOpacity>
             </View>
+
+            {/* ── Money owed to you (if has lendings) ────────── */}
+            {(data?.activeLendings?.length ?? 0) > 0 && (
+              <TouchableOpacity
+                style={[styles.receivablesCard, { backgroundColor: cardBg, borderColor }]}
+                onPress={() => router.push('/(tabs)/lending' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.receivablesHeader}>
+                  <View>
+                    <Text style={[styles.receivablesLabel, { color: subtleText }]}>
+                      MONEY OWED TO YOU
+                    </Text>
+                    <Text style={[styles.receivablesCount, { color: colors.text }]}>
+                      {data!.activeLendings.length} {data!.activeLendings.length === 1 ? 'RECEIVABLE' : 'RECEIVABLES'}
+                    </Text>
+                  </View>
+                  <FontAwesomeIcon icon={faHandHoldingDollar} size={28} color={PRIMARY} />
+                </View>
+                <TouchableOpacity style={[styles.receivablesBtn, { backgroundColor: PRIMARY }]}>
+                  <Text style={styles.receivablesBtnText}>View All</Text>
+                </TouchableOpacity>
+              </TouchableOpacity>
+            )}
+
+            {/* ── Lend guidance (if has items but no lendings) ─ */}
+            {data && !data.isEmpty && data.stats.totalItems > 0 && (data?.activeLendings?.length ?? 0) === 0 && (
+              <TouchableOpacity
+                style={[styles.guidanceCard, { backgroundColor: cardBg, borderColor }]}
+                onPress={() => router.push('/(tabs)/lending' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.guidanceCardContent}>
+                  <View>
+                    <Text style={[styles.guidanceTitle, { color: colors.text }]}>Lend an item</Text>
+                    <Text style={[styles.guidanceSubtitle, { color: subtleText }]}>
+                      Share your items with friends and track who has what
+                    </Text>
+                  </View>
+                  <FontAwesomeIcon icon={faHand} size={24} color={PRIMARY} />
+                </View>
+              </TouchableOpacity>
+            )}
+
+            {/* ── Outside guidance (if has items but no session) */}
+            {data && !data.isEmpty && data.stats.totalItems > 0 && !data?.activeSession && (
+              <TouchableOpacity
+                style={[styles.guidanceCard, { backgroundColor: cardBg, borderColor }]}
+                onPress={() => router.push('/(tabs)/outside' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.guidanceCardContent}>
+                  <View>
+                    <Text style={[styles.guidanceTitle, { color: colors.text }]}>Start an outside session</Text>
+                    <Text style={[styles.guidanceSubtitle, { color: subtleText }]}>
+                      List items you need to bring for your errands and check them off
+                    </Text>
+                  </View>
+                  <FontAwesomeIcon icon={faMapLocationDot} size={24} color={PRIMARY} />
+                </View>
+              </TouchableOpacity>
+            )}
 
             {/* ── Active outside session ─────────────────────── */}
             {data?.activeSession && (
@@ -412,8 +483,8 @@ export default function HomePage() {
                   onPress={() => router.push('/(tabs)/spaces' as any)}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.guidanceHeader}>
-                    <View>
+                  <View style={styles.guidanceCardContent}>
+                    <View style={{ flex: 1 }}>
                       <Text style={[styles.guidanceTitle, { color: colors.text }]}>Add your first item</Text>
                       <Text style={[styles.guidanceSubtitle, { color: subtleText }]}>
                         Start tracking by adding an item to your spaces
@@ -512,9 +583,17 @@ const styles = StyleSheet.create({
   recentMeta: { fontSize: 12, marginTop: 2 },
   recentRight: { flexDirection: 'row', alignItems: 'center' },
   recentDate: { fontSize: 12 },
-  // Guidance card (empty items state)
-  guidanceCard: { borderRadius: 14, borderWidth: 1, padding: 16 },
+  // Receivables card (money owed)
+  receivablesCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 20 },
+  receivablesHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+  receivablesLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5 },
+  receivablesCount: { fontSize: 20, fontWeight: '700', marginTop: 4 },
+  receivablesBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, alignItems: 'center' },
+  receivablesBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  // Guidance card (feature onboarding)
+  guidanceCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 16 },
   guidanceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  guidanceCardContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   guidanceTitle: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
   guidanceSubtitle: { fontSize: 13, fontWeight: '400' },
   // Empty state
