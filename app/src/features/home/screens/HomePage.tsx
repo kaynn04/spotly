@@ -404,7 +404,28 @@ export default function HomePage() {
               </View>
             )}
 
-            {/* ── Empty state ────────────────────────────────── */}
+            {/* ── No items guidance state ─────────────────────── */}
+            {data && !data.isEmpty && data.stats.totalItems === 0 && (
+              <View style={styles.section}>
+                <TouchableOpacity
+                  style={[styles.guidanceCard, { backgroundColor: cardBg, borderColor }]}
+                  onPress={() => router.push('/(tabs)/spaces' as any)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.guidanceHeader}>
+                    <View>
+                      <Text style={[styles.guidanceTitle, { color: colors.text }]}>Add your first item</Text>
+                      <Text style={[styles.guidanceSubtitle, { color: subtleText }]}>
+                        Start tracking by adding an item to your spaces
+                      </Text>
+                    </View>
+                    <FontAwesomeIcon icon={faChevronRight} size={16} color={subtleText} />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* ── Empty state (no spaces) ────────────────────── */}
             {data?.isEmpty && (
               <View style={[styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
                 <FontAwesomeIcon icon={faBox} size={40} color={PRIMARY} />
@@ -491,6 +512,11 @@ const styles = StyleSheet.create({
   recentMeta: { fontSize: 12, marginTop: 2 },
   recentRight: { flexDirection: 'row', alignItems: 'center' },
   recentDate: { fontSize: 12 },
+  // Guidance card (empty items state)
+  guidanceCard: { borderRadius: 14, borderWidth: 1, padding: 16 },
+  guidanceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  guidanceTitle: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
+  guidanceSubtitle: { fontSize: 13, fontWeight: '400' },
   // Empty state
   emptyCard: { borderRadius: 16, borderWidth: 1, padding: 32, alignItems: 'center', marginTop: 8 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
