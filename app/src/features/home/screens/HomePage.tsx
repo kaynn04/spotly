@@ -27,7 +27,6 @@ import {
   faMoon, 
   faChevronRight, 
   faGear,
-  faHandHoldingDollar,
   faHandshake,
   faSuitcase,
 } from '@fortawesome/free-solid-svg-icons';
@@ -222,30 +221,6 @@ export default function HomePage() {
               </TouchableOpacity>
             </View>
 
-            {/* ── Money owed to you (if has lendings) ────────── */}
-            {(data?.activeLendings?.length ?? 0) > 0 && (
-              <TouchableOpacity
-                style={[styles.receivablesCard, { backgroundColor: cardBg, borderColor }]}
-                onPress={() => router.push('/(tabs)/lending' as any)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.receivablesHeader}>
-                  <View>
-                    <Text style={[styles.receivablesLabel, { color: subtleText }]}>
-                      MONEY OWED TO YOU
-                    </Text>
-                    <Text style={[styles.receivablesCount, { color: colors.text }]}>
-                      {data!.activeLendings.length} {data!.activeLendings.length === 1 ? 'RECEIVABLE' : 'RECEIVABLES'}
-                    </Text>
-                  </View>
-                  <FontAwesomeIcon icon={faHandHoldingDollar} size={28} color={PRIMARY} />
-                </View>
-                <TouchableOpacity style={[styles.receivablesBtn, { backgroundColor: PRIMARY }]}>
-                  <Text style={styles.receivablesBtnText}>View All</Text>
-                </TouchableOpacity>
-              </TouchableOpacity>
-            )}
-
             {/* ── Lend guidance (if has items but no lendings) ─ */}
             {data && !data.isEmpty && data.stats.totalItems > 0 && (data?.activeLendings?.length ?? 0) === 0 && (
               <TouchableOpacity
@@ -335,7 +310,7 @@ export default function HomePage() {
             {(data?.activeLendings?.length ?? 0) > 0 && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Lent Out</Text>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Lending</Text>
                   <TouchableOpacity onPress={() => router.push('/(tabs)/lending' as any)}>
                     <Text style={[styles.seeAll, { color: PRIMARY }]}>See all</Text>
                   </TouchableOpacity>
@@ -357,10 +332,10 @@ export default function HomePage() {
                       <View style={[styles.lendingDot, { backgroundColor: PRIMARY }]} />
                       <View style={styles.lendingContent}>
                         <Text style={[styles.lendingBorrower, { color: colors.text }]} numberOfLines={1}>
-                          {lending.borrower_name}
+                          {lending.item_name}
                         </Text>
                         <Text style={[styles.lendingMeta, { color: subtleText }]} numberOfLines={1}>
-                          {lending.item_name} · since {formatDate(lending.lent_at.toString())}
+                          Lent to {lending.borrower_name} · {formatDate(lending.lent_at.toString())}
                         </Text>
                       </View>
                       <FontAwesomeIcon icon={faChevronRight} size={12} color={subtleText} />
@@ -592,13 +567,6 @@ const styles = StyleSheet.create({
   recentMeta: { fontSize: 12, marginTop: 2 },
   recentRight: { flexDirection: 'row', alignItems: 'center' },
   recentDate: { fontSize: 12 },
-  // Receivables card (money owed)
-  receivablesCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 20 },
-  receivablesHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  receivablesLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5 },
-  receivablesCount: { fontSize: 20, fontWeight: '700', marginTop: 4 },
-  receivablesBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, alignItems: 'center' },
-  receivablesBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
   // Guidance card (feature onboarding)
   guidanceCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 16 },
   guidanceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

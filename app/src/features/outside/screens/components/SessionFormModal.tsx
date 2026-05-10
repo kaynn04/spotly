@@ -15,13 +15,13 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   Modal,
+  ScrollView,
   ActivityIndicator,
   Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 import { useOutsideService } from '../../services/OutsideService';
 
 interface SessionFormModalProps {
@@ -37,7 +37,6 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
   const outsideService = useOutsideService();
   const insets = useSafeAreaInsets();
   const isDark = colorScheme === 'dark';
-  const keyboardHeight = useKeyboardHeight();
 
   const [title, setTitle] = useState('');
   const [loading, setLoading] = useState(false);
@@ -83,46 +82,54 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
   const isValid = title.trim().length > 0;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={() => { Keyboard.dismiss(); handleCancel(); }}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => { Keyboard.dismiss(); handleCancel(); }}>
         <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); handleCancel(); }}>
           <View style={styles.overlay}>
-            <TouchableWithoutFeedback onPress={() => {}}>
-              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: Math.max(insets.bottom + 16, keyboardHeight) }]}>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
                 {/* Handle */}
                 <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
                 {/* Title */}
                 <Text style={[styles.sheetTitle, { color: textColor }]}>New Session</Text>
-                <Text style={[styles.sheetSubtitle, { color: subtleText }]}>
-                  Name this tracking session
-                </Text>
 
-                {/* Input */}
-                <View style={[styles.inputWrapper, { backgroundColor: inputBg, borderColor: error ? '#d32f2f' : borderColor }]}>
-                  <TextInput
-                    style={[styles.input, { color: textColor }]}
-                    placeholder="e.g., Grocery run, Airport trip"
-                    placeholderTextColor={subtleText}
-                    value={title}
-                    onChangeText={(t) => { setTitle(t); setError(null); }}
-                    maxLength={100}
-                    editable={!loading}
-                    autoFocus
-                    returnKeyType="done"
-                    onSubmitEditing={handleCreateSession}
-                  />
-                </View>
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                  bounces={false}
+                  style={styles.scrollContent}
+                >
+                  <Text style={[styles.sheetSubtitle, { color: subtleText }]}>
+                    Name this tracking session
+                  </Text>
 
-                <View style={styles.inputMeta}>
-                  {error ? (
-                    <Text style={styles.errorText}>{error}</Text>
-                  ) : (
-                    <Text style={[styles.hint, { color: subtleText }]}>Press Create to start tracking</Text>
-                  )}
-                  <Text style={[styles.charCount, { color: subtleText }]}>{title.length}/100</Text>
-                </View>
+                  {/* Input */}
+                  <View style={[styles.inputWrapper, { backgroundColor: inputBg, borderColor: error ? '#d32f2f' : borderColor }]}>
+                    <TextInput
+                      style={[styles.input, { color: textColor }]}
+                      placeholder="e.g., Grocery run, Airport trip"
+                      placeholderTextColor={subtleText}
+                      value={title}
+                      onChangeText={(t) => { setTitle(t); setError(null); }}
+                      maxLength={100}
+                      editable={!loading}
+                      autoFocus
+                      returnKeyType="done"
+                      onSubmitEditing={handleCreateSession}
+                    />
+                  </View>
 
-                {/* Buttons */}
+                  <View style={styles.inputMeta}>
+                    {error ? (
+                      <Text style={styles.errorText}>{error}</Text>
+                    ) : (
+                      <Text style={[styles.hint, { color: subtleText }]}>Press Create to start tracking</Text>
+                    )}
+                    <Text style={[styles.charCount, { color: subtleText }]}>{title.length}/100</Text>
+                  </View>
+                </ScrollView>
+
+                {/* Buttons - fixed at bottom */}
                 <View style={styles.buttonRow}>
                   <TouchableOpacity
                     style={[styles.cancelBtn, { borderColor }]}
@@ -168,7 +175,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
     paddingTop: 12,
+    maxHeight: '85%',
   },
+  scrollContent: { flexGrow: 0 },
   handle: {
     width: 36,
     height: 4,

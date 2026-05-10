@@ -4,6 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as SystemUI from 'expo-system-ui';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { initializeDatabase } from '@/src/db/migrations';
@@ -19,6 +21,14 @@ export default function RootLayout() {
   const router = useRouter();
   const [dbReady, setDbReady] = useState(false);
   const [navChecked, setNavChecked] = useState(false);
+
+  const isDark = colorScheme === 'dark';
+  const navBg = isDark ? '#000000' : '#f8f9fa';
+
+  // Keep system bar backgrounds in sync with color scheme
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(navBg);
+  }, [navBg]);
 
   // Effect 1: Initialize DB — blocks rendering until done
   useEffect(() => {
@@ -56,9 +66,6 @@ export default function RootLayout() {
 
   if (!dbReady) return null;
 
-  const isDark = colorScheme === 'dark';
-  const navBg = isDark ? '#000000' : '#f8f9fa';
-
   const theme = {
     ...(isDark ? DarkTheme : DefaultTheme),
     colors: {
@@ -69,6 +76,7 @@ export default function RootLayout() {
   };
 
   return (
+    <SafeAreaProvider>
     <ColorSchemeProvider>
       <ThemeProvider value={theme}>
         <Stack
@@ -92,8 +100,9 @@ export default function RootLayout() {
           <Stack.Screen name="outside/history" />
           <Stack.Screen name="settings" />
         </Stack>
-        <StatusBar style="auto" />
+        <StatusBar style="auto" backgroundColor={navBg} translucent={false} />
       </ThemeProvider>
     </ColorSchemeProvider>
+    </SafeAreaProvider>
   );
 }

@@ -16,11 +16,11 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   Keyboard,
+  ScrollView,
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 
 const PRIMARY = '#6b7f99';
 
@@ -50,7 +50,6 @@ export default function LendingFormModal({
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const isDark = colorScheme === 'dark';
-  const keyboardHeight = useKeyboardHeight();
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const inputBg = isDark ? '#2c2c2e' : '#f8f9fa';
@@ -70,60 +69,67 @@ export default function LendingFormModal({
       visible={visible}
       transparent
       animationType="slide"
-      statusBarTranslucent
       onRequestClose={handleCancel}
     >
         <TouchableWithoutFeedback onPress={handleCancel}>
           <View style={styles.overlay}>
-            <TouchableWithoutFeedback onPress={() => {}}>
-              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: Math.max(insets.bottom + 16, keyboardHeight) }]}>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
                 {/* Handle */}
                 <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
                 {/* Title */}
                 <Text style={[styles.sheetTitle, { color: textColor }]}>Lend Item</Text>
-                {item && (
-                  <View style={[styles.itemPill, { backgroundColor: inputBg, borderColor }]}>
-                    <Text style={[styles.itemPillText, { color: subtleText }]}>Item: </Text>
-                    <Text style={[styles.itemPillName, { color: textColor }]} numberOfLines={1}>{item.name}</Text>
+
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                  bounces={false}
+                  style={styles.scrollContent}
+                >
+                  {item && (
+                    <View style={[styles.itemPill, { backgroundColor: inputBg, borderColor }]}>
+                      <Text style={[styles.itemPillText, { color: subtleText }]}>Item: </Text>
+                      <Text style={[styles.itemPillName, { color: textColor }]} numberOfLines={1}>{item.name}</Text>
+                    </View>
+                  )}
+
+                  {/* Borrower Name */}
+                  <Text style={[styles.fieldLabel, { color: subtleText }]}>Borrower Name *</Text>
+                  <View style={[styles.inputWrapper, { backgroundColor: inputBg, borderColor }]}>
+                    <TextInput
+                      style={[styles.input, { color: textColor }]}
+                      placeholder="Who are you lending to?"
+                      placeholderTextColor={subtleText}
+                      value={borrowerName}
+                      onChangeText={onBorrowerNameChange}
+                      maxLength={100}
+                      editable={!loading}
+                      autoFocus
+                      returnKeyType="next"
+                    />
                   </View>
-                )}
 
-                {/* Borrower Name */}
-                <Text style={[styles.fieldLabel, { color: subtleText }]}>Borrower Name *</Text>
-                <View style={[styles.inputWrapper, { backgroundColor: inputBg, borderColor }]}>
-                  <TextInput
-                    style={[styles.input, { color: textColor }]}
-                    placeholder="Who are you lending to?"
-                    placeholderTextColor={subtleText}
-                    value={borrowerName}
-                    onChangeText={onBorrowerNameChange}
-                    maxLength={100}
-                    editable={!loading}
-                    autoFocus
-                    returnKeyType="next"
-                  />
-                </View>
+                  {/* Note */}
+                  <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 12 }]}>Note (optional)</Text>
+                  <View style={[styles.inputWrapper, styles.noteWrapper, { backgroundColor: inputBg, borderColor }]}>
+                    <TextInput
+                      style={[styles.input, styles.noteInput, { color: textColor }]}
+                      placeholder="Add any notes about this lending"
+                      placeholderTextColor={subtleText}
+                      value={note}
+                      onChangeText={onNoteChange}
+                      multiline
+                      numberOfLines={3}
+                      editable={!loading}
+                      maxLength={500}
+                      textAlignVertical="top"
+                    />
+                  </View>
+                  <Text style={[styles.charCount, { color: subtleText }]}>{note.length}/500</Text>
+                </ScrollView>
 
-                {/* Note */}
-                <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 12 }]}>Note (optional)</Text>
-                <View style={[styles.inputWrapper, styles.noteWrapper, { backgroundColor: inputBg, borderColor }]}>
-                  <TextInput
-                    style={[styles.input, styles.noteInput, { color: textColor }]}
-                    placeholder="Add any notes about this lending"
-                    placeholderTextColor={subtleText}
-                    value={note}
-                    onChangeText={onNoteChange}
-                    multiline
-                    numberOfLines={3}
-                    editable={!loading}
-                    maxLength={500}
-                    textAlignVertical="top"
-                  />
-                </View>
-                <Text style={[styles.charCount, { color: subtleText }]}>{note.length}/500</Text>
-
-                {/* Buttons */}
+                {/* Buttons - fixed at bottom */}
                 <View style={styles.buttonRow}>
                   <TouchableOpacity
                     style={[styles.cancelBtn, { borderColor }]}
@@ -168,7 +174,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
     paddingTop: 12,
+    maxHeight: '85%',
   },
+  scrollContent: { flexGrow: 0 },
   handle: {
     width: 36,
     height: 4,
