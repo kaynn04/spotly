@@ -16,7 +16,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { LendingService } from '../services/LendingService';
@@ -129,7 +129,7 @@ export default function LendingHistoryScreen() {
   };
 
   const headerBar = (
-    <View style={[styles.headerBar, { borderBottomColor: borderColor, paddingTop: insets.top }]}>
+    <View style={[styles.headerBar, { borderBottomColor: borderColor }]}>
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
         <Text style={[styles.backBtnText, { color: PRIMARY }]}>{'< Back'}</Text>
       </TouchableOpacity>
@@ -140,18 +140,18 @@ export default function LendingHistoryScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top', 'bottom']}>
         {headerBar}
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={PRIMARY} />
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (error) {
     return (
-      <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top', 'bottom']}>
         {headerBar}
         <View style={styles.centerContainer}>
           <Text style={[styles.errorText, { color: '#d32f2f' }]}>{error}</Text>
@@ -159,12 +159,12 @@ export default function LendingHistoryScreen() {
             <Text style={styles.primaryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top', 'bottom']}>
       {headerBar}
 
       {/* Filter Pills */}
@@ -206,7 +206,7 @@ export default function LendingHistoryScreen() {
           contentContainerStyle={styles.listContent}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 

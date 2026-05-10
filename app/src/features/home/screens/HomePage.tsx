@@ -30,7 +30,7 @@ import {
   faHandshake,
   faSuitcase,
 } from '@fortawesome/free-solid-svg-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -142,9 +142,9 @@ export default function HomePage() {
       : 0;
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top']}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8, paddingBottom: tabBarPadding }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: 8, paddingBottom: tabBarPadding }]}
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
@@ -509,7 +509,7 @@ export default function HomePage() {
           setShowNamePrompt(false);
         }}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -527,6 +527,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   greetingText: { fontSize: 15, fontWeight: '500' },
+  greetingRow: {},
   nameText: { fontSize: 30, fontWeight: '700', letterSpacing: -0.5, marginTop: 2 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 80 },
   // Stats row

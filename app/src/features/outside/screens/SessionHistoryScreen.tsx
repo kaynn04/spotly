@@ -14,7 +14,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -116,7 +116,7 @@ export default function SessionHistoryScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#f8f9fa', paddingTop: insets.top }]}>
+      <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#f8f9fa' }]}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={PRIMARY} />
         </View>
@@ -125,13 +125,13 @@ export default function SessionHistoryScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top', 'bottom']}>
       {/* Header */}
       <View
         style={[
           styles.header,
           {
-            paddingTop: insets.top,
+            paddingTop: 0,
             backgroundColor: isDark ? '#1c1c1e' : '#ffffff',
             borderBottomColor: borderColor,
           },
@@ -251,7 +251,7 @@ export default function SessionHistoryScreen() {
           }}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 

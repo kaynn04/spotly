@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faFileAlt, faFileArchive } from '@fortawesome/free-solid-svg-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -224,7 +224,7 @@ export default function SpacesPage() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top']}>
       <FlatList
         data={isSearching ? searchResults : spaces}
         keyExtractor={(item) => {
@@ -277,7 +277,7 @@ export default function SpacesPage() {
             </TouchableOpacity>
           );
         } : renderSpace}
-        contentContainerStyle={[styles.listContent, { paddingTop: insets.top + 8, paddingBottom: tabBarPadding }]}
+        contentContainerStyle={[styles.listContent, { paddingTop: 8, paddingBottom: tabBarPadding }]}
         showsVerticalScrollIndicator={false}
         onScroll={isSearching ? undefined : handleScroll}
         scrollEventThrottle={16}
@@ -380,7 +380,7 @@ export default function SpacesPage() {
         onClose={() => setFormVisible(false)}
         onSubmit={handleCreateSpace}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
