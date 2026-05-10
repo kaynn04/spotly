@@ -86,6 +86,7 @@ export default function RootLayout() {
             animation: 'slide_from_right',
             animationDuration: 250,
             navigationBarColor: navBg,
+            gestureEnabled: true,
           }}
         >
           <Stack.Screen name="(tabs)" />
