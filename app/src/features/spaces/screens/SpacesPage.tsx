@@ -13,9 +13,11 @@ import {
   FlatList,
   ActivityIndicator,
   TextInput,
+  Alert,
 } from 'react-native';
+import ItemActionSheet from './components/ItemActionSheet';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faFileAlt, faFileArchive } from '@fortawesome/free-solid-svg-icons';
+import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faFileAlt, faFileArchive, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -63,6 +65,7 @@ export default function SpacesPage() {
   const [spaces, setSpaces] = useState<SpaceWithCount[]>([]);
   const [loading, setLoading] = useState(false);
   const [formVisible, setFormVisible] = useState(false);
+  const [actionSheetSpace, setActionSheetSpace] = useState<SpaceWithCount | null>(null);
 
   useEffect(() => {
     if (openCreate === '1') {
@@ -188,6 +191,30 @@ export default function SpacesPage() {
     await loadSpaces();
   };
 
+  const confirmDeleteSpace = (space: SpaceWithCount) => {
+    const parts: string[] = [];
+    if (space.containerCount > 0) parts.push(`${space.containerCount} container${space.containerCount !== 1 ? 's' : ''}`);
+    if (space.itemCount > 0) parts.push(`${space.itemCount} item${space.itemCount !== 1 ? 's' : ''}`);
+    const msg = parts.length > 0
+      ? `Delete "${space.name}" and its ${parts.join(' and ')}? This cannot be undone.`
+      : `Delete "${space.name}"? This cannot be undone.`;
+    Alert.alert('Delete Space', msg, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await SpaceService.deleteSpace(space.id);
+            await loadSpaces();
+          } catch {
+            Alert.alert('Error', 'Failed to delete space');
+          }
+        },
+      },
+    ]);
+  };
+
   const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleDateString(undefined, {
       month: 'short',
@@ -207,6 +234,7 @@ export default function SpacesPage() {
       onPress={() =>
         router.push({ pathname: '/space/[id]' as any, params: { id: item.id } })
       }
+      onLongPress={() => setActionSheetSpace(item)}
       activeOpacity={0.7}
     >
       <View style={[styles.spaceDot, { backgroundColor: PRIMARY }]} />
@@ -379,6 +407,30 @@ export default function SpacesPage() {
         visible={formVisible}
         onClose={() => setFormVisible(false)}
         onSubmit={handleCreateSpace}
+      />
+      <ItemActionSheet
+        visible={actionSheetSpace !== null}
+        itemName={actionSheetSpace?.name ?? ''}
+        onClose={() => setActionSheetSpace(null)}
+        actions={(() => {
+          const s = actionSheetSpace;
+          if (!s) return [];
+          const parts: string[] = [];
+          if (s.containerCount > 0) parts.push(`${s.containerCount} container${s.containerCount !== 1 ? 's' : ''}`);
+          if (s.itemCount > 0) parts.push(`${s.itemCount} item${s.itemCount !== 1 ? 's' : ''}`);
+          const description = parts.length > 0
+            ? `Will delete ${parts.join(' and ')} inside`
+            : 'Remove this empty space';
+          return [
+            {
+              icon: faTrash,
+              label: 'Delete',
+              description,
+              destructive: true,
+              onPress: () => confirmDeleteSpace(s),
+            },
+          ];
+        })()}
       />
     </SafeAreaView>
   );

@@ -11,6 +11,7 @@ import { getDatabase } from './client';
 import { createLendingsTable, dropLendingsTable } from './migrations/003-create-lendings-table';
 import { createOutsideSessionsTables, dropOutsideSessionsTables } from './migrations/004-create-outside-tables';
 import { addItemsUpdatedAt } from './migrations/005-add-items-updated-at';
+import { addItemsForeignKeys } from './migrations/006-add-items-foreign-keys';
 
 /**
  * Initialize the database schema
@@ -122,6 +123,13 @@ export async function initializeDatabase() {
       await addItemsUpdatedAt(db);
     } catch (err) {
       console.error('⚠ Items updated_at migration failed:', err);
+    }
+
+    // Add foreign keys to items table (Migration 006)
+    try {
+      await addItemsForeignKeys(db);
+    } catch (err) {
+      console.error('⚠ Items foreign keys migration failed:', err);
     }
 
     console.log('✓ Database initialized (migrations completed with possible non-critical errors)');

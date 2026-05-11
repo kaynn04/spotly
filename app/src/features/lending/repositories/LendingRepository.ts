@@ -28,10 +28,8 @@ import { generateUUID } from '../../../utils/uuid';
  * Error handling: Throws native SQLite errors; Service layer translates to domain errors
  */
 export class LendingRepository {
-  private db: any;
-
-  constructor() {
-    this.db = getDatabase();
+  private get db() {
+    return getDatabase();
   }
 
   /**

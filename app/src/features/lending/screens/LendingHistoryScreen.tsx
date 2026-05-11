@@ -25,6 +25,7 @@ import { ItemRepository } from '../../../repositories/ItemRepository';
 import { Lending } from '../models/Lending';
 
 const PRIMARY = '#6b7f99';
+const LENDING = '#9b72cb';
 const SUCCESS = '#6b9e7a';
 
 type FilterType = 'ALL' | 'ACTIVE' | 'RETURNED';
@@ -95,7 +96,7 @@ export default function LendingHistoryScreen() {
 
   const renderLendingItem = ({ item, index }: { item: Lending & { itemName?: string }, index: number }) => {
     const isActive = item.status === 'ACTIVE';
-    const dotColor = isActive ? PRIMARY : SUCCESS;
+    const dotColor = isActive ? LENDING : SUCCESS;
 
     return (
       <TouchableOpacity
@@ -115,8 +116,8 @@ export default function LendingHistoryScreen() {
             Lent to {item.borrower_name}
           </Text>
           <View style={styles.metaRow}>
-            <View style={[styles.statusPill, { backgroundColor: isActive ? `${PRIMARY}18` : `${SUCCESS}18` }]}>
-              <Text style={[styles.statusPillText, { color: isActive ? PRIMARY : SUCCESS }]}>
+            <View style={[styles.statusPill, { backgroundColor: isActive ? `${LENDING}18` : `${SUCCESS}18` }]}>
+              <Text style={[styles.statusPillText, { color: isActive ? LENDING : SUCCESS }]}>
                 {isActive ? 'Active' : 'Returned'}
               </Text>
             </View>
@@ -131,7 +132,7 @@ export default function LendingHistoryScreen() {
   const headerBar = (
     <View style={[styles.headerBar, { borderBottomColor: borderColor, backgroundColor: isDark ? '#1c1c1e' : '#ffffff' }]}>
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Text style={[styles.backBtnText, { color: PRIMARY }]}>{'< Back'}</Text>
+        <Text style={[styles.backBtnText, { color: PRIMARY }]}>{'‹ Back'}</Text>
       </TouchableOpacity>
       <Text style={[styles.headerTitle, { color: colors.text }]}>History</Text>
       <View style={styles.headerSpacer} />
@@ -218,12 +219,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
-  backBtn: { paddingVertical: 8, paddingRight: 8 },
+  backBtn: { paddingVertical: 8, paddingRight: 8, width: 60 },
   backBtnText: { fontSize: 17, fontWeight: '600' },
-  headerTitle: { fontSize: 17, fontWeight: '700' },
+  headerTitle: { fontSize: 17, fontWeight: '700', flex: 1, textAlign: 'center' },
   headerSpacer: { width: 60 },
 
   filterRow: {

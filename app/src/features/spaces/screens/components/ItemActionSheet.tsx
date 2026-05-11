@@ -31,6 +31,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Lending } from '@/src/features/lending/models/Lending';
 
 const PRIMARY = '#6b7f99';
+const LENDING = '#9b72cb';
 const DESTRUCTIVE = '#d32f2f';
 
 export interface ItemAction {
@@ -102,10 +103,10 @@ export default function ItemActionSheet({
 
         {/* Lent status banner */}
         {activeLending && (
-          <View style={[styles.lentBanner, { backgroundColor: `${PRIMARY}12`, borderColor: `${PRIMARY}30` }]}>
-            <FontAwesomeIcon icon={faHandshake} size={20} color={PRIMARY} />
+          <View style={[styles.lentBanner, { backgroundColor: `${LENDING}12`, borderColor: `${LENDING}30` }]}>
+            <FontAwesomeIcon icon={faHandshake} size={20} color={LENDING} />
             <View style={styles.lentBannerText}>
-              <Text style={[styles.lentBannerLabel, { color: PRIMARY }]}>Currently lent out</Text>
+              <Text style={[styles.lentBannerLabel, { color: LENDING }]}>Currently lent out</Text>
               <Text style={[styles.lentBannerMeta, { color: subtleText }]}>
                 {activeLending.borrower_name}
                 {activeLending.lent_at

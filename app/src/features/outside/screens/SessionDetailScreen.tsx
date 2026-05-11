@@ -38,8 +38,7 @@ import LendingFormModal from '@/src/features/lending/screens/components/LendingF
 import ItemPickerModal from './components/ItemPickerModal';
 
 const PRIMARY = '#6b7f99';
-
-export default function SessionDetailScreen() {
+const LENDING = '#9b72cb';
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -372,13 +371,23 @@ export default function SessionDetailScreen() {
   const renderItem = ({ item, index }: { item: OutsideSessionItemWithContext; index: number }) => {
     const checked = Boolean(item.is_checked);
     const wasMoved = checked && !!item.moved_to_space_name;
+    const isLent = !!item.active_borrower_name;
     const spaceName = item.space_name && item.space_name !== 'Unknown Space' ? item.space_name : null;
     const containerName = item.container_name ?? null;
     const originalLocation = containerName ? `${spaceName ?? ''} › ${containerName}` : spaceName;
     const movedLocation = item.moved_to_container_name
       ? `${item.moved_to_space_name} › ${item.moved_to_container_name}`
       : item.moved_to_space_name;
-    const locationLine = wasMoved ? `→ ${movedLocation}` : originalLocation;
+    const locationLine = isLent
+      ? `Lent to ${item.active_borrower_name}`
+      : wasMoved
+      ? `→ ${movedLocation}`
+      : originalLocation;
+    const locationColor = isLent
+      ? LENDING
+      : wasMoved
+      ? (isDark ? '#4ade80' : '#6b9e7a')
+      : subtleText;
     const checkColor = wasMoved ? (isDark ? '#4ade80' : '#6b9e7a') : PRIMARY;
 
     return (
@@ -416,7 +425,7 @@ export default function SessionDetailScreen() {
           </Text>
           {locationLine && (
             <Text
-              style={[styles.itemLocation, { color: wasMoved ? (isDark ? '#4ade80' : '#6b9e7a') : subtleText }]}
+              style={[styles.itemLocation, { color: locationColor }]}
               numberOfLines={1}
             >
               {locationLine}

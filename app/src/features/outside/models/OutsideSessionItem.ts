@@ -27,6 +27,7 @@ export interface OutsideSessionItemWithContext extends OutsideSessionItem {
   container_name: string | null;
   moved_to_space_name: string | null;
   moved_to_container_name: string | null;
+  active_borrower_name: string | null;
 }
 
 /**

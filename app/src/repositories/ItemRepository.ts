@@ -46,8 +46,8 @@ export class ItemRepository {
 
       // Execute parameterized INSERT query (handle optional containerId)
       await db.runAsync(
-        'INSERT INTO items (id, name, space_id, container_id, description, quantity, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [id, name, spaceId, containerId ?? null, description ?? null, qty, now]
+        'INSERT INTO items (id, name, space_id, container_id, description, quantity, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, name, spaceId, containerId ?? null, description ?? null, qty, now, now]
       );
 
       // Return the created Item object
@@ -179,18 +179,10 @@ export class ItemRepository {
       const db = getDatabase();
 
       const now = new Date().toISOString();
-      try {
-        await db.runAsync(
-          'UPDATE items SET space_id = ?, container_id = NULL, updated_at = ? WHERE id = ?',
-          [newSpaceId, now, itemId]
-        );
-      } catch {
-        // updated_at column may not exist yet (migration pending restart)
-        await db.runAsync(
-          'UPDATE items SET space_id = ?, container_id = NULL WHERE id = ?',
-          [newSpaceId, itemId]
-        );
-      }
+      await db.runAsync(
+        'UPDATE items SET space_id = ?, container_id = NULL, updated_at = ? WHERE id = ?',
+        [newSpaceId, now, itemId]
+      );
     } catch (error) {
       // Convert database error to ServiceError
       const serviceError: ServiceError = {
@@ -223,17 +215,10 @@ export class ItemRepository {
       const db = getDatabase();
 
       const now = new Date().toISOString();
-      try {
-        await db.runAsync(
-          'UPDATE items SET container_id = ?, updated_at = ? WHERE id = ?',
-          [containerId || null, now, itemId]
-        );
-      } catch {
-        await db.runAsync(
-          'UPDATE items SET container_id = ? WHERE id = ?',
-          [containerId || null, itemId]
-        );
-      }
+      await db.runAsync(
+        'UPDATE items SET container_id = ?, updated_at = ? WHERE id = ?',
+        [containerId || null, now, itemId]
+      );
     } catch (error) {
       // Convert database error to ServiceError
       const serviceError: ServiceError = {
@@ -260,17 +245,10 @@ export class ItemRepository {
     try {
       const db = getDatabase();
       const now = new Date().toISOString();
-      try {
-        await db.runAsync(
-          'UPDATE items SET space_id = ?, container_id = ?, updated_at = ? WHERE id = ?',
-          [newSpaceId, newContainerId || null, now, itemId]
-        );
-      } catch {
-        await db.runAsync(
-          'UPDATE items SET space_id = ?, container_id = ? WHERE id = ?',
-          [newSpaceId, newContainerId || null, itemId]
-        );
-      }
+      await db.runAsync(
+        'UPDATE items SET space_id = ?, container_id = ?, updated_at = ? WHERE id = ?',
+        [newSpaceId, newContainerId || null, now, itemId]
+      );
     } catch (error) {
       const serviceError: ServiceError = {
         code: 'DB_ERROR',
@@ -532,6 +510,8 @@ export class ItemRepository {
       if (updates.quantity !== undefined) { fields.push('quantity = ?'); values.push(updates.quantity); }
 
       if (fields.length === 0) return;
+      fields.push('updated_at = ?');
+      values.push(new Date().toISOString());
       values.push(id);
 
       await db.runAsync(`UPDATE items SET ${fields.join(', ')} WHERE id = ?`, values);

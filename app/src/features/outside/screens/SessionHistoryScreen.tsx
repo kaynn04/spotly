@@ -14,7 +14,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -30,7 +30,6 @@ export default function SessionHistoryScreen() {
   const colorScheme = useColorScheme();
   const outsideService = useOutsideService();
   const colors = Colors[colorScheme ?? 'light'];
-  const insets = useSafeAreaInsets();
   const isDark = colorScheme === 'dark';
 
   const [sessions, setSessions] = useState<OutsideSession[]>([]);
@@ -43,6 +42,7 @@ export default function SessionHistoryScreen() {
   useFocusEffect(
     useCallback(() => {
       loadSessions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   );
 
@@ -114,34 +114,30 @@ export default function SessionHistoryScreen() {
   const subtleText = isDark ? '#8e8e93' : '#a0aec0';
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
 
+  const headerBar = (
+    <View style={[styles.headerBar, { borderBottomColor: borderColor, backgroundColor: isDark ? '#1c1c1e' : '#ffffff' }]}>
+      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <Text style={[styles.backBtnText, { color: PRIMARY }]}>{'\u2039 Back'}</Text>
+      </TouchableOpacity>
+      <Text style={[styles.headerTitle, { color: colors.text }]}>History</Text>
+      <View style={styles.headerSpacer} />
+    </View>
+  );
+
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#f8f9fa' }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top', 'bottom']}>
+        {headerBar}
         <View style={styles.center}>
           <ActivityIndicator size="large" color={PRIMARY} />
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top', 'bottom']}>
-      {/* Header */}
-      <View
-        style={[
-          styles.header,
-          {
-            backgroundColor: isDark ? '#1c1c1e' : '#ffffff',
-            borderBottomColor: borderColor,
-          },
-        ]}
-      >
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={[styles.backText, { color: PRIMARY }]}>‹ Back</Text>
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>History</Text>
-        <View style={{ width: 52 }} />
-      </View>
+      {headerBar}
 
       {/* Error state */}
       {error ? (
@@ -258,7 +254,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
 
-  header: {
+  headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -267,8 +263,10 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
-  backText: { fontSize: 17, fontWeight: '600', width: 52 },
+  backBtn: { paddingVertical: 8, paddingRight: 8, width: 60 },
+  backBtnText: { fontSize: 17, fontWeight: '600' },
   headerTitle: { fontSize: 17, fontWeight: '700', flex: 1, textAlign: 'center' },
+  headerSpacer: { width: 60 },
 
   listContent: { marginTop: 16, marginHorizontal: 16, borderRadius: 16, overflow: 'hidden' },
 
