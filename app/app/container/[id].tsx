@@ -46,6 +46,8 @@ import LendingFormModal from '@/src/features/lending/screens/components/LendingF
 
 const PRIMARY = '#6b7f99';
 const LENDING = '#9b72cb';
+
+export default function ContainerDetailScreen() {
   const router = useRouter();
   const { id: containerId } = useLocalSearchParams<{ id: string }>();
   const colorScheme = useColorScheme();

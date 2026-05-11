@@ -39,6 +39,8 @@ import ItemPickerModal from './components/ItemPickerModal';
 
 const PRIMARY = '#6b7f99';
 const LENDING = '#9b72cb';
+
+export default function SessionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const colorScheme = useColorScheme();

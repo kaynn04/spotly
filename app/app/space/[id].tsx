@@ -49,6 +49,8 @@ import ItemActionSheet from '@/src/features/spaces/screens/components/ItemAction
 
 const PRIMARY = '#6b7f99';
 const LENDING = '#9b72cb';
+
+type ListEntry =
   | { type: 'container'; data: Container }
   | { type: 'item'; data: Item };
 

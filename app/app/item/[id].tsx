@@ -38,6 +38,8 @@ import { faBox, faHandshake, faCheck, faTrash, faMapPin, faFolder, faEllipsisVer
 
 const PRIMARY = '#6b7f99';
 const LENDING = '#9b72cb';
+
+export default function ItemDetailScreen() {
   const { id: itemId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const colorScheme = useColorScheme();
