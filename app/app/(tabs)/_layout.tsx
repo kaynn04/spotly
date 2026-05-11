@@ -7,21 +7,24 @@
  */
 
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useRef } from 'react';
 import { Platform } from 'react-native';
-import FloatingTabBar from '@/components/ui/FloatingTabBar';
+import FloatingTabBar, { type TabBarHandle } from '@/components/ui/FloatingTabBar';
 import { ScrollHideProvider } from '@/hooks/use-scroll-hide';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { WalkthroughProvider } from '@/src/features/walkthrough/context/WalkthroughContext';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const bg = isDark ? '#000000' : '#f8f9fa';
+  const tabBarRef = useRef<TabBarHandle>(null);
 
   return (
+    <WalkthroughProvider tabBarRef={tabBarRef}>
     <ScrollHideProvider>
       <Tabs
-        tabBar={(props) => <FloatingTabBar {...props} />}
+        tabBar={(props) => <FloatingTabBar {...props} ref={tabBarRef} />}
         screenOptions={{
           headerShown: false,
           sceneStyle: { backgroundColor: bg },
@@ -50,5 +53,6 @@ export default function TabLayout() {
         <Tabs.Screen name="outside" options={{ title: 'Outside' }} />
       </Tabs>
     </ScrollHideProvider>
+    </WalkthroughProvider>
   );
 }

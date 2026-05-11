@@ -51,11 +51,14 @@ export type VoiceSessionState =
   | { phase: 'idle' }
   | { phase: 'listening' }
   | { phase: 'processing' }
-  | { phase: 'confirming'; parsed: ParsedVoiceCommand; itemNames?: string[] }
+  | { phase: 'confirming'; parsed: ParsedVoiceCommand; itemNames?: string[]; editedItemName?: string }
   | { phase: 'confirming-space'; spaceName: string }
   | { phase: 'confirming-container'; containerName: string; spaceResult: MatchResult<Space> }
   | { phase: 'confirming-lend'; itemName: string; borrowerName: string; matchedItem: import('@/src/models/Item').Item | null }
   | { phase: 'confirming-return'; lendingId: string; itemName: string; borrowerName: string }
   | { phase: 'success'; action: VoiceAction; itemName: string; location: string }
   | { phase: 'found'; items: import('@/src/models/Item').Item[] }
-  | { phase: 'error'; message: string };
+  | { phase: 'error'; message: string; transcript?: string; detectedAction?: VoiceAction }
+  | { phase: 'needs-permission' }
+  | { phase: 'needs-install' }
+  | { phase: 'needs-language' };

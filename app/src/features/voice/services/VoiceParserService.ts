@@ -48,13 +48,14 @@ export class VoiceParserService {
   private static readonly FIND_VERBS = /^(?:find|search|search for|where is|where's|locate|look for)\s+/i;
   private static readonly CREATE_SPACE_VERBS = /^(?:create|new|make|add)\s+(?:a\s+)?(?:space|room|area|location|place)(?:\s+(?:called|named))?\s+/i;
   private static readonly CREATE_CONTAINER_VERBS = /^(?:create|new|make|add)\s+(?:a\s+)?(?:container|box|shelf|bin|drawer|cabinet|bag|basket|folder)(?:\s+(?:called|named))?\s+/i;
-  private static readonly LEND_VERBS = /^(?:lend|loan|borrow|give)\s+/i;
+  private static readonly LEND_VERBS = /^(?:lend|lent|loan|loaned|borrow|borrowed|give|gave|giving|lending|loaning)\s+/i;
   private static readonly RETURN_VERBS = /^(?:return|returned|mark|got back|back)\s+/i;
   private static readonly PREPOSITION = /\s+(?:to|in|into|inside|at)\s+/i;
 
   static parse(transcript: string, knownSpaceNames: string[] = []): RawParsedParts {
     const raw = transcript;
-    const text = transcript.trim();
+    // Strip common leading filler words that speech recognition adds
+    const text = transcript.trim().replace(/^(?:I\s+|please\s+|can you\s+|could you\s+|hey\s+|ok\s+|okay\s+)/i, '').trim();
 
     // Determine action from leading verb
     let action: VoiceAction;
@@ -79,7 +80,9 @@ export class VoiceParserService {
     }
 
     if (this.LEND_VERBS.test(text)) {      // Pattern: "lend [item] to [borrower]"
-      const rest = text.replace(this.LEND_VERBS, '').trim();
+      let rest = text.replace(this.LEND_VERBS, '').trim();
+      // Strip leading "my" / "the" / "a"
+      rest = rest.replace(/^(?:my|the|a)\s+/i, '');
       const prepMatch = this.PREPOSITION.exec(rest);
       if (!prepMatch) {
         // No borrower mentioned — item name only
@@ -89,6 +92,12 @@ export class VoiceParserService {
       const borrowerName = rest.slice(prepMatch.index + prepMatch[0].length).trim() || null;
       // Reuse spokenSpace field to carry borrower name
       return { raw, action: 'lend', itemName, spokenSpace: borrowerName, spokenContainer: null };
+    }
+
+    // Pattern: "let [borrower] borrow [item]" / "let [borrower] have [item]"
+    const letBorrowMatch = text.match(/^let\s+(.+?)\s+(?:borrow|have|take|use)\s+(?:my\s+|the\s+|a\s+)?(.+)$/i);
+    if (letBorrowMatch) {
+      return { raw, action: 'lend', itemName: letBorrowMatch[2].trim(), spokenSpace: letBorrowMatch[1].trim(), spokenContainer: null };
     }
 
     // Pattern: "return [item]" / "returned [item]" / "[item] is back" / "[item] returned"

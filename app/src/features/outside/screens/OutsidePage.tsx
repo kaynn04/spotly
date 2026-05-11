@@ -4,7 +4,7 @@
  * Main Outside tab — modern minimalist redesign
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faSuitcase, faChevronRight, faCheckCircle, faClockRotateLeft } from '@fortawesome/free-solid-svg-icons';
@@ -76,6 +77,15 @@ export default function OutsidePage() {
       loadRecentSessions();
     }, [])
   );
+
+  // Listen for refresh events from voice feature or other sources
+  useEffect(() => {
+    const handleRefresh = async () => {
+      await Promise.all([loadActiveSession(), loadRecentSessions()]);
+    };
+    const subscription = DeviceEventEmitter.addListener('spotly:refresh-home', handleRefresh);
+    return () => subscription.remove();
+  }, []);
 
   const loadActiveSession = async () => {
     setSessionCard({ loading: true, error: null, itemCount: 0, checkedCount: 0 });

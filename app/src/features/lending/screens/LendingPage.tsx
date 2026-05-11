@@ -6,7 +6,7 @@
  * Feature: 009 - Lending Tracker
  */
 
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import {
   TextInput,
   Animated,
   PanResponder,
+  DeviceEventEmitter,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faMagnifyingGlass, faTimes, faChevronRight, faHandshake, faPlus, faMapPin, faFolder } from '@fortawesome/free-solid-svg-icons';
@@ -131,6 +132,12 @@ export default function LendingPage() {
   }, [lendingService, repositories.itemRepository]);
 
   useFocusEffect(useCallback(() => { loadLendings(); }, [loadLendings]));
+
+  // Listen for refresh events from voice feature or other sources
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('spotly:refresh-home', loadLendings);
+    return () => subscription.remove();
+  }, [loadLendings]);
 
   const openItemPicker = async () => {
     setItemPickerLoading(true);

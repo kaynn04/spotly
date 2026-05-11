@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   TextInput,
   Alert,
+  DeviceEventEmitter,
 } from 'react-native';
 import ItemActionSheet from './components/ItemActionSheet';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
@@ -90,6 +91,12 @@ export default function SpacesPage() {
       loadSpaces();
     }, [])
   );
+
+  // Listen for refresh events from voice feature or other sources
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('spotly:refresh-home', loadSpaces);
+    return () => subscription.remove();
+  }, []);
 
   const loadSpaces = async () => {
     setLoading(true);

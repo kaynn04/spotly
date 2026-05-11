@@ -21,6 +21,8 @@ import {
   Alert,
   ScrollView,
   TextInput,
+  Linking,
+  Platform,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import {
@@ -50,6 +52,7 @@ import { LendingService } from '@/src/features/lending/services/LendingService';
 import { LendingRepository } from '@/src/features/lending/repositories/LendingRepository';
 import { ItemRepository } from '@/src/repositories/ItemRepository';
 import { OutsideService } from '@/src/features/outside/services/OutsideService';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const PRIMARY = '#6b7f99';
 const SUCCESS = '#6b9e7a';
@@ -68,6 +71,9 @@ interface Props {
 }
 
 export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateToItem, onSpaceCreated }: Props) {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const styles = buildStyles(isDark);
   const [sessionState, setSessionState] = useState<VoiceSessionState>({ phase: 'idle' });
 
   // Confirmation-phase mutable state (overrides for unresolved fields)
@@ -79,6 +85,8 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
   const [showSpacePicker, setShowSpacePicker] = useState(false);
   const [showContainerPicker, setShowContainerPicker] = useState(false);
   const [itemNameOverride, setItemNameOverride] = useState<string | null>(null);
+  // Ref to always hold the latest edited item name (avoids closure issues)
+  const itemNameRef = useRef<string>('');
   // For multi-add: array of item names
   const [itemNamesOverride, setItemNamesOverride] = useState<string[]>([]);
   // For create-space: editable space name
@@ -127,11 +135,17 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
       setSessionState({ phase: 'error', message: "Didn't catch anything — tap to try again" });
       return;
     }
+    // Language pack not yet downloaded
+    const msg = event.message || event.error || '';
+    if (msg.toLowerCase().includes('not yet downloaded') || event.error === 'language-not-supported') {
+      ExpoSpeechRecognitionModule.abort()?.catch(() => {});
+      setSessionState({ phase: 'needs-language' });
+      return;
+    }
 
     // For any other error, stop the recognizer to clear audio feedback
     ExpoSpeechRecognitionModule.abort()?.catch(() => {});
-    const msg = event.message || event.error || 'Unknown error — try again';
-    setSessionState({ phase: 'error', message: msg });
+    setSessionState({ phase: 'error', message: msg || 'Unknown error — try again' });
   });
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -149,13 +163,13 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
     try {
       const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
       if (!granted) {
-        setSessionState({ phase: 'error', message: 'Microphone permission denied — enable it in Settings' });
+        setSessionState({ phase: 'needs-permission' });
         return;
       }
 
       const available = ExpoSpeechRecognitionModule.isRecognitionAvailable();
       if (!available) {
-        setSessionState({ phase: 'error', message: 'Speech recognition not available on this device. Please install/update Google app or Speech Services.' });
+        setSessionState({ phase: 'needs-install' });
         return;
       }
 
@@ -181,6 +195,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
     setConfirmedSpaceId(null);
     setConfirmedContainerId(undefined);
     setItemNameOverride(null);
+    itemNameRef.current = '';
     setItemNamesOverride([]);
     setSpaceNameOverride('');
     setContainerNameOverride('');
@@ -212,7 +227,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
       if (parts.action === 'create-space') {
         const name = parts.spokenSpace ?? '';
         if (!name) {
-          setSessionState({ phase: 'error', message: "Couldn't catch the space name — try again" });
+          setSessionState({ phase: 'error', message: "Couldn't catch the space name — try again", transcript, detectedAction: 'create-space' });
           return;
         }
         // Capitalise first letter of each word
@@ -223,7 +238,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
       }
 
       if (!parts.itemName && !parts.itemNames) {
-        setSessionState({ phase: 'error', message: "Couldn't understand the item — try again" });
+        setSessionState({ phase: 'error', message: "Couldn't understand — try saying it differently", transcript, detectedAction: parts.action });
         return;
       }
 
@@ -249,13 +264,13 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
         if (foundItem) {
           const activeLendings = await lendingService.getActiveLendings();
           if (activeLendings.some(l => l.item_id === foundItem!.id)) {
-            setSessionState({ phase: 'error', message: `"${foundItem.name}" is already lent out — mark as returned first` });
+            setSessionState({ phase: 'error', message: `"${foundItem.name}" is already lent out — mark as returned first`, transcript, detectedAction: 'lend' });
             return;
           }
           const outsideService = new OutsideService();
           const outsideIds = await outsideService.getActiveSessionItemIds();
           if (outsideIds.has(foundItem.id)) {
-            setSessionState({ phase: 'error', message: `"${foundItem.name}" is in an active outside session` });
+            setSessionState({ phase: 'error', message: `"${foundItem.name}" is in an active outside session`, transcript, detectedAction: 'lend' });
             return;
           }
         }
@@ -272,12 +287,12 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
       if (parts.action === 'return') {
         const spokenItem = parts.itemName ?? '';
         if (!spokenItem) {
-          setSessionState({ phase: 'error', message: "Couldn't catch the item name — try again" });
+          setSessionState({ phase: 'error', message: "Couldn't catch the item name — try again", transcript, detectedAction: 'return' });
           return;
         }
         const activeLendings = await lendingService.getActiveLendingsWithItemNames();
         if (activeLendings.length === 0) {
-          setSessionState({ phase: 'error', message: 'No items are currently lent out' });
+          setSessionState({ phase: 'error', message: 'No items are currently lent out', transcript, detectedAction: 'return' });
           return;
         }
         // Exact match first
@@ -288,7 +303,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
           if (results.length > 0) matched = results[0].obj;
         }
         if (!matched) {
-          setSessionState({ phase: 'error', message: `No active lending found for "${spokenItem}"` });
+          setSessionState({ phase: 'error', message: `No active lending found for "${spokenItem}"`, transcript, detectedAction: 'return' });
           return;
         }
         setReturnLendingId(matched.id);
@@ -302,7 +317,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
       if (parts.action === 'create-container') {
         const containerName = parts.itemName;
         if (!containerName) {
-          setSessionState({ phase: 'error', message: "Couldn't catch the container name — try again" });
+          setSessionState({ phase: 'error', message: "Couldn't catch the container name — try again", transcript, detectedAction: 'create-container' });
           return;
         }
         const formatted = containerName.replace(/\b\w/g, c => c.toUpperCase());
@@ -346,7 +361,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
           return;
         }
 
-        setSessionState({ phase: 'error', message: `No items matching "${parts.itemName}" found` });
+        setSessionState({ phase: 'error', message: `No items matching "${parts.itemName}" found`, transcript, detectedAction: 'find' });
         return;
       }
 
@@ -365,7 +380,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
           if (results.length > 0) {
             foundItem = results[0].obj;
           } else {
-            setSessionState({ phase: 'error', message: `Item "${parts.itemName}" not found \u2014 try again` });
+            setSessionState({ phase: 'error', message: `Item "${parts.itemName}" not found \u2014 try again`, transcript, detectedAction: 'move' });
             return;
           }
         }
@@ -418,9 +433,12 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
         ? parts.itemNames
         : undefined;
       if (multiItemNames) setItemNamesOverride(multiItemNames);
-      setSessionState({ phase: 'confirming', parsed, itemNames: multiItemNames });
+      // Initialize the ref with the parsed item name for single-item edits
+      itemNameRef.current = parsed.itemName ?? '';
+      setItemNameOverride(parsed.itemName);
+      setSessionState({ phase: 'confirming', parsed, itemNames: multiItemNames, editedItemName: parsed.itemName ?? undefined });
     } catch {
-      setSessionState({ phase: 'error', message: 'Something went wrong — try again' });
+      setSessionState({ phase: 'error', message: 'Something went wrong — try again', transcript, detectedAction: parts.action });
     }
   };
 
@@ -501,8 +519,8 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
       confirmedContainerId === undefined ? null : confirmedContainerId;
 
     try {
-      // Check if this is multi-add — prefer session state itemNames as source of truth
-      const multiItems = sessionState.itemNames ?? (itemNamesOverride.length > 0 ? itemNamesOverride : null);
+      // Check if this is multi-add — prefer itemNamesOverride (user-edited) over sessionState.itemNames (original)
+      const multiItems = itemNamesOverride.length > 0 ? itemNamesOverride : (sessionState.itemNames ?? null);
       const isMultiAdd = (multiItems?.length ?? 0) > 0;
       if (isMultiAdd) {
         // Add multiple items
@@ -521,8 +539,8 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
         return;
       }
 
-      // Single item flow
-      const finalItemName = itemNameOverride ?? parsed.itemName;
+      // Single item flow — read from ref to avoid stale closure issues
+      const finalItemName = itemNameRef.current.trim() || parsed.itemName;
       if (!finalSpaceId || !finalItemName) return;
 
       if (parsed.action === 'move' && matchedItem) {
@@ -666,6 +684,92 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
             </View>
           )}
 
+          {/* ── NEEDS PERMISSION ─────────────────────────────── */}
+          {sessionState.phase === 'needs-permission' && (
+            <View style={styles.guideCard}>
+              <View style={[styles.guideIconCircle, { backgroundColor: `${PRIMARY}18` }]}>
+                <FontAwesomeIcon icon={faMicrophone} size={28} color={PRIMARY} />
+              </View>
+              <Text style={[styles.guideTitle, { color: isDark ? '#ffffff' : '#1a1a1a' }]}>
+                Microphone access needed
+              </Text>
+              <Text style={styles.guideBody}>
+                Spotly needs microphone access to hear your voice commands. Tap below to open Settings and enable it.
+              </Text>
+              <TouchableOpacity style={styles.primaryButton} onPress={() => Linking.openSettings()}>
+                <Text style={styles.primaryButtonText}>Open Settings</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.cancelLink} onPress={handleCancel}>
+                <Text style={styles.cancelLinkText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* ── NEEDS INSTALL ────────────────────────────────── */}
+          {sessionState.phase === 'needs-install' && (
+            <View style={styles.guideCard}>
+              <View style={[styles.guideIconCircle, { backgroundColor: `${PRIMARY}18` }]}>
+                <FontAwesomeIcon icon={faMicrophone} size={28} color={PRIMARY} />
+              </View>
+              <Text style={[styles.guideTitle, { color: isDark ? '#ffffff' : '#1a1a1a' }]}>
+                Speech recognition not available
+              </Text>
+              <Text style={styles.guideBody}>
+                Voice input requires{' '}
+                <Text style={{ fontWeight: '700' }}>Speech Recognition &amp; Synthesis</Text>{' '}
+                to be installed on your device.
+              </Text>
+              <View style={styles.guideSteps}>
+                <Text style={styles.guideStep}>1. Open the Play Store</Text>
+                <Text style={styles.guideStep}>2. Search “Speech Recognition &amp; Synthesis”</Text>
+                <Text style={styles.guideStep}>3. Install or update, then come back</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={() => Linking.openURL('https://play.google.com/store/search?q=Speech+Recognition+%26+Synthesis&c=apps')}
+              >
+                <Text style={styles.primaryButtonText}>Open Play Store</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.cancelLink} onPress={handleCancel}>
+                <Text style={styles.cancelLinkText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* ── NEEDS LANGUAGE ──────────────────────────────── */}
+          {sessionState.phase === 'needs-language' && (
+            <View style={styles.guideCard}>
+              <View style={[styles.guideIconCircle, { backgroundColor: `${PRIMARY}18` }]}>
+                <FontAwesomeIcon icon={faMicrophone} size={28} color={PRIMARY} />
+              </View>
+              <Text style={[styles.guideTitle, { color: isDark ? '#ffffff' : '#1a1a1a' }]}>
+                Voice setup required
+              </Text>
+              <Text style={styles.guideBody}>
+                {'Follow these steps to enable voice input on your device:'}
+              </Text>
+              <View style={styles.guideSteps}>
+                <Text style={styles.guideStep}>{'1. Install \u201cSpeech Recognition & Synthesis\u201d from the Play Store'}</Text>
+                <Text style={styles.guideStep}>{'2. Open your device Settings \u2192 Apps'}</Text>
+                <Text style={styles.guideStep}>{'3. Find \u201cSpeech Recognition & Synthesis\u201d'}</Text>
+                <Text style={styles.guideStep}>{'4. Tap Permissions \u2192 Microphone \u2192 Allow while using'}</Text>
+                <Text style={styles.guideStep}>{'5. Come back and tap \u201cTry Again\u201d'}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={() => Linking.openURL('https://play.google.com/store/search?q=Speech+Recognition+%26+Synthesis&c=apps')}
+              >
+                <Text style={styles.primaryButtonText}>Open Play Store</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.primaryButton, { backgroundColor: 'transparent', borderWidth: 1, borderColor: PRIMARY, marginTop: 0 }]} onPress={handleRetry}>
+                <Text style={[styles.primaryButtonText, { color: PRIMARY }]}>Try Again</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.cancelLink} onPress={handleCancel}>
+                <Text style={styles.cancelLinkText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* ── ERROR ────────────────────────────────────────── */}
           {sessionState.phase === 'error' && (
             <View style={styles.centeredContent}>
@@ -673,9 +777,68 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
                 <FontAwesomeIcon icon={faTimes} size={28} color="#fff" />
               </View>
               <Text style={styles.errorText}>{sessionState.message}</Text>
+              {sessionState.transcript ? (
+                <Text style={{ color: isDark ? '#8e8e93' : '#666', fontSize: 13, marginTop: 4, marginBottom: 16, textAlign: 'center', fontStyle: 'italic' }}>
+                  Heard: "{sessionState.transcript}"
+                </Text>
+              ) : null}
               <TouchableOpacity style={styles.primaryButton} onPress={handleRetry}>
                 <Text style={styles.primaryButtonText}>Try Again</Text>
               </TouchableOpacity>
+
+              {/* Context-aware suggestions based on detected action */}
+              <View style={{ marginTop: 24, width: '100%' }}>
+                <Text style={{ color: isDark ? '#8e8e93' : '#666', fontSize: 13, marginBottom: 12, textAlign: 'center' }}>
+                  Try saying something like:
+                </Text>
+                {(() => {
+                  const action = sessionState.detectedAction;
+                  if (action === 'lend') return [
+                    { text: '"Lend drill to John"', color: '#8b6db8' },
+                    { text: '"Loan charger to Sarah"', color: '#8b6db8' },
+                    { text: '"Give scissors to Mike"', color: '#8b6db8' },
+                    { text: '"Let John borrow my drill"', color: '#8b6db8' },
+                  ];
+                  if (action === 'return') return [
+                    { text: '"Drill is back"', color: '#8b6db8' },
+                    { text: '"Return drill"', color: '#8b6db8' },
+                    { text: '"Charger returned"', color: '#8b6db8' },
+                    { text: '"Got back my scissors"', color: '#8b6db8' },
+                  ];
+                  if (action === 'move') return [
+                    { text: '"Move drill to Garage"', color: '#6b7f99' },
+                    { text: '"Move scissors to Kitchen"', color: '#6b7f99' },
+                    { text: '"Transfer charger to Bedroom"', color: '#6b7f99' },
+                  ];
+                  if (action === 'find') return [
+                    { text: '"Where is my drill?"', color: '#6b7f99' },
+                    { text: '"Find charger"', color: '#6b7f99' },
+                    { text: '"Locate my scissors"', color: '#6b7f99' },
+                  ];
+                  if (action === 'create-space') return [
+                    { text: '"Create space Garage"', color: '#c08b4a' },
+                    { text: '"New space Kitchen"', color: '#c08b4a' },
+                    { text: '"Make room Tool Shed"', color: '#c08b4a' },
+                  ];
+                  if (action === 'create-container') return [
+                    { text: '"New shelf in Garage"', color: '#c08b4a' },
+                    { text: '"Create box in Kitchen"', color: '#c08b4a' },
+                    { text: '"Add drawer in Bedroom"', color: '#c08b4a' },
+                  ];
+                  // Default: show all actions (add or unknown)
+                  return [
+                    { text: '"Add pen to Garage"', color: '#6b9e7a' },
+                    { text: '"Lend drill to John"', color: '#8b6db8' },
+                    { text: '"Move scissors to Kitchen"', color: '#6b7f99' },
+                    { text: '"Where is my charger?"', color: '#6b7f99' },
+                    { text: '"Drill is back"', color: '#8b6db8' },
+                    { text: '"Create space Tool Shed"', color: '#c08b4a' },
+                  ];
+                })().map(({ text, color }) => (
+                  <Text key={text} style={{ color, fontSize: 14, marginBottom: 8, textAlign: 'center' }}>{text}</Text>
+                ))}
+              </View>
+
               <TouchableOpacity style={styles.cancelLink} onPress={handleCancel}>
                 <Text style={styles.cancelLinkText}>Cancel</Text>
               </TouchableOpacity>
@@ -698,7 +861,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
                   <View>
                     <Text style={styles.fieldLabel} style={{marginBottom: 8}}>Items</Text>
                     {itemNamesOverride.map((name, idx) => (
-                      <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#f5f5f5', borderRadius: 8 }}>
+                      <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: isDark ? '#2c2c2e' : '#f5f5f5', borderRadius: 8 }}>
                         <Text style={{marginRight: 8, fontWeight: 'bold', color: '#999'}}>{idx + 1}.</Text>
                         <TextInput
                           value={name}
@@ -707,17 +870,34 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
                             updated[idx] = text;
                             setItemNamesOverride(updated);
                           }}
-                          style={{flex: 1, paddingVertical: 6, paddingHorizontal: 8, backgroundColor: 'white', borderRadius: 4, color: '#000'}}
+                          style={{flex: 1, paddingVertical: 6, paddingHorizontal: 8, backgroundColor: isDark ? '#3a3a3c' : '#ffffff', borderRadius: 4, color: isDark ? '#ffffff' : '#000000'}}
                           placeholderTextColor="#999"
                         />
                       </View>
                     ))}
                   </View>
                 ) : (
-                  // Single item: show existing field
-                  <View style={styles.fieldRow}>
+                  // Single item: editable field (same as multi-add items)
+                  <View>
                     <Text style={styles.fieldLabel}>Item</Text>
-                    <Text style={styles.fieldValue}>{itemNameOverride ?? parsed.itemName ?? '—'}</Text>
+                    <TextInput
+                      value={itemNameOverride ?? parsed.itemName ?? ''}
+                      onChangeText={(text) => {
+                        itemNameRef.current = text;
+                        setItemNameOverride(text);
+                      }}
+                      style={{
+                        paddingVertical: 12,
+                        paddingHorizontal: 12,
+                        backgroundColor: isDark ? '#3a3a3c' : '#ffffff',
+                        borderRadius: 8,
+                        color: isDark ? '#ffffff' : '#000000',
+                        fontSize: 16,
+                        marginBottom: 16,
+                      }}
+                      placeholder="Item name"
+                      placeholderTextColor={isDark ? '#999' : '#ccc'}
+                    />
                   </View>
                 )}
 
@@ -1044,6 +1224,9 @@ interface SpaceFieldProps {
 function SpaceField({
   parsed, confirmedSpaceId, allSpaces, showPicker, onTogglePicker, onAcceptFuzzy, onPickSpace,
 }: SpaceFieldProps) {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const styles = buildStyles(isDark);
   const { space } = parsed;
   const isResolved = !!confirmedSpaceId;
   const resolvedSpace = allSpaces.find(s => s.id === confirmedSpaceId);
@@ -1118,6 +1301,9 @@ interface ContainerFieldProps {
 function ContainerField({
   parsed, confirmedContainerId, spaceContainers, showPicker, onTogglePicker, onAcceptFuzzy, onPickContainer, onSkip,
 }: ContainerFieldProps) {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const styles = buildStyles(isDark);
   const container = parsed.container;
   const isResolved = confirmedContainerId !== undefined && confirmedContainerId !== null;
   const isSkipped = confirmedContainerId === null;
@@ -1203,8 +1389,13 @@ function ContainerField({
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#f8f9fa' },
+function buildStyles(isDark: boolean) {
+  const bg = isDark ? '#000000' : '#f8f9fa';
+  const cardBg = isDark ? '#1c1c1e' : '#ffffff';
+  const border = isDark ? '#2c2c2e' : '#e2e6ea';
+  const textPrimary = isDark ? '#ffffff' : '#1a1a1a';
+  return StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: bg },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1212,9 +1403,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e6ea',
+    borderBottomColor: border,
   },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a1a' },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: textPrimary },
   body: { flexGrow: 1, paddingHorizontal: 20, paddingVertical: 24 },
   centeredContent: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingTop: 40 },
   micButton: {
@@ -1242,7 +1433,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  listeningText: { fontSize: 20, fontWeight: '700', color: '#1a1a1a' },
+  listeningText: { fontSize: 20, fontWeight: '700', color: textPrimary },
   hintText: { fontSize: 14, color: '#8e8e93', textAlign: 'center' },
   exampleText: { fontSize: 13, color: '#a0aec0', textAlign: 'center', fontStyle: 'italic' },
   idleContent: { alignItems: 'center', paddingTop: 8, paddingBottom: 16, width: '100%' },
@@ -1277,11 +1468,11 @@ const styles = StyleSheet.create({
   cancelLinkText: { fontSize: 14, color: '#8e8e93' },
   // Confirm card
   confirmCard: { gap: 4 },
-  confirmTitle: { fontSize: 20, fontWeight: '700', color: '#1a1a1a', marginBottom: 12 },
+  confirmTitle: { fontSize: 20, fontWeight: '700', color: textPrimary, marginBottom: 12 },
   fieldRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
-  fieldSection: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#e2e6ea' },
+  fieldSection: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: border },
   fieldLabel: { fontSize: 12, fontWeight: '600', color: '#8e8e93', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  fieldValue: { fontSize: 17, fontWeight: '600', color: '#1a1a1a' },
+  fieldValue: { fontSize: 17, fontWeight: '600', color: textPrimary },
   didYouMeanLabel: { fontSize: 13, color: '#8e8e93', marginBottom: 6 },
   suggestionRow: {
     paddingVertical: 10,
@@ -1302,37 +1493,74 @@ const styles = StyleSheet.create({
     marginTop: 4,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e6ea',
+    borderColor: border,
     overflow: 'hidden',
   },
   pickerItem: {
     paddingVertical: 13,
     paddingHorizontal: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e6ea',
-    backgroundColor: '#fff',
+    borderBottomColor: border,
+    backgroundColor: cardBg,
   },
-  pickerItemText: { fontSize: 15, color: '#1a1a1a' },
+  pickerItemText: { fontSize: 15, color: textPrimary },
   // Name input for create-space confirmation
   nameInput: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: textPrimary,
     borderBottomWidth: 2,
     borderBottomColor: PRIMARY,
     paddingVertical: 6,
     marginTop: 4,
   },
   // Found items (search results)
+  guideCard: {
+    alignItems: 'center',
+    paddingTop: 32,
+    gap: 12,
+  },
+  guideIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  guideTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  guideBody: {
+    fontSize: 15,
+    color: '#8e8e93',
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: 8,
+  },
+  guideSteps: {
+    alignSelf: 'stretch',
+    backgroundColor: isDark ? '#1c1c1e' : '#f0f1f3',
+    borderRadius: 12,
+    padding: 16,
+    gap: 8,
+  },
+  guideStep: {
+    fontSize: 14,
+    color: isDark ? '#ebebf5cc' : '#374151',
+    lineHeight: 20,
+  },
   foundItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
     paddingHorizontal: 14,
     borderRadius: 12,
-    backgroundColor: '#fff',
+    backgroundColor: cardBg,
     borderWidth: 1,
-    borderColor: '#e2e6ea',
+    borderColor: border,
     marginBottom: 8,
   },
   foundLocationRow: {
@@ -1342,4 +1570,5 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   foundLocationText: { fontSize: 13, color: '#8e8e93' },
-});
+  });
+}

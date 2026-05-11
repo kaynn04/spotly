@@ -27,6 +27,7 @@ import {
   faTrash,
   faInfoCircle,
   faChevronRight,
+  faRotateRight,
 } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -39,6 +40,7 @@ import { ImportService } from '@/src/services/ImportService';
 import type { ImportMode } from '@/src/services/ImportService';
 import { resetDatabase, initializeDatabase } from '@/src/db/migrations';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { WalkthroughService } from '@/src/features/walkthrough/services/WalkthroughService';
 
 const PRIMARY = '#6b7f99';
 const DANGER = '#d32f2f';
@@ -57,6 +59,11 @@ export default function SettingsScreen() {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [resetting, setResetting] = useState(false);
+
+  const handleRestartWalkthrough = async () => {
+    await WalkthroughService.reset();
+    router.replace('/(tabs)');
+  };
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
@@ -334,7 +341,11 @@ export default function SettingsScreen() {
             danger: true,
           })}
         </View>
-
+        {/* ── App ────────────────────────────────────── */}
+        <Text style={[styles.sectionLabel, { color: subtleText }]}>APP</Text>
+        <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+          {renderRow(faRotateRight, PRIMARY, 'Restart Walkthrough', handleRestartWalkthrough)}
+        </View>
         {/* ── About ──────────────────────────────────── */}
         <Text style={[styles.sectionLabel, { color: subtleText }]}>ABOUT</Text>
         <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>

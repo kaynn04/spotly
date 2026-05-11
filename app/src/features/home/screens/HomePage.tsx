@@ -11,7 +11,7 @@
  *   - Recently added items
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  DeviceEventEmitter,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { 
@@ -47,6 +48,10 @@ import { LendingRepository } from '@/src/features/lending/repositories/LendingRe
 import { useOutsideService } from '@/src/features/outside/services/OutsideService';
 import { Lending } from '@/src/features/lending/models/Lending';
 import NamePromptModal from './components/NamePromptModal';
+import { WalkthroughService } from '@/src/features/walkthrough/services/WalkthroughService';
+import { WALKTHROUGH_STEPS, type SpotlightRect } from '@/src/features/walkthrough/models/WalkthroughStep';
+import { useWalkthroughContext } from '@/src/features/walkthrough/context/WalkthroughContext';
+import WalkthroughOverlay from '@/src/features/walkthrough/components/WalkthroughOverlay';
 
 const PRIMARY = '#6b7f99';
 const SUCCESS = '#6b9e7a';
@@ -92,6 +97,14 @@ export default function HomePage() {
   const [userName, setUserName] = useState<string | null>(null);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
 
+  // Walkthrough
+  const { tabBarRef } = useWalkthroughContext();
+  const dashboardRef = useRef<View>(null);
+  const settingsRef = useRef<View>(null);
+  const [walkthroughVisible, setWalkthroughVisible] = useState(false);
+  const [walkthroughIndex, setWalkthroughIndex] = useState(0);
+  const [spotlightRect, setSpotlightRect] = useState<SpotlightRect | null>(null);
+
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
   const subtleText = isDark ? '#8e8e93' : '#a0aec0';
@@ -101,6 +114,78 @@ export default function HomePage() {
       loadAll();
     }, [])
   );
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('spotly:refresh-home', loadAll);
+    return () => sub.remove();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      const check = async () => {
+        const done = await WalkthroughService.isDone();
+        if (!done && !cancelled) {
+          setTimeout(() => {
+            if (!cancelled) startWalkthrough();
+          }, 600);
+        }
+      };
+      check();
+      return () => { cancelled = true; };
+    }, [])
+  );
+
+  const measureStep = async (index: number): Promise<SpotlightRect | null> => {
+    const step = WALKTHROUGH_STEPS[index];
+    if (!step) return null;
+    try {
+      if (step.targetRef === 'dashboard') {
+        return await new Promise<SpotlightRect>((resolve, reject) => {
+          dashboardRef.current?.measure((_, __, width, height, pageX, pageY) => {
+            resolve({ x: pageX, y: pageY, width, height });
+          }) ?? reject(new Error('no ref'));
+        });
+      }
+      if (step.targetRef === 'settings') {
+        return await new Promise<SpotlightRect>((resolve, reject) => {
+          settingsRef.current?.measure((_, __, width, height, pageX, pageY) => {
+            resolve({ x: pageX, y: pageY, width, height });
+          }) ?? reject(new Error('no ref'));
+        });
+      }
+      if (tabBarRef.current) {
+        return await tabBarRef.current.measureTab(step.targetRef);
+      }
+    } catch {
+      // If measurement fails, return null — overlay will use default center
+    }
+    return null;
+  };
+
+  const startWalkthrough = async () => {
+    const rect = await measureStep(0);
+    setSpotlightRect(rect);
+    setWalkthroughIndex(0);
+    setWalkthroughVisible(true);
+  };
+
+  const handleWalkthroughNext = async () => {
+    const nextIndex = walkthroughIndex + 1;
+    if (nextIndex >= WALKTHROUGH_STEPS.length) {
+      await WalkthroughService.markDone();
+      setWalkthroughVisible(false);
+      return;
+    }
+    const rect = await measureStep(nextIndex);
+    setSpotlightRect(rect);
+    setWalkthroughIndex(nextIndex);
+  };
+
+  const handleWalkthroughSkip = async () => {
+    await WalkthroughService.markDone();
+    setWalkthroughVisible(false);
+  };
 
   const loadAll = async () => {
     setLoading(true);
@@ -168,6 +253,7 @@ export default function HomePage() {
               />
             </TouchableOpacity>
             <TouchableOpacity
+              ref={settingsRef}
               onPress={() => router.push('/settings' as any)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={[styles.themeToggle, { backgroundColor: isDark ? '#2c2c2e' : '#e8eaed' }]}
@@ -184,7 +270,7 @@ export default function HomePage() {
         ) : (
           <>
             {/* ── Inventory overview ──────────────────────────── */}
-            <View style={styles.statsRow}>
+            <View ref={dashboardRef} style={styles.statsRow}>
               <TouchableOpacity
                 style={[styles.statCard, { backgroundColor: cardBg, borderColor }]}
                 onPress={() => router.push('/(tabs)/spaces' as any)}
@@ -510,6 +596,15 @@ export default function HomePage() {
           setUserName(name);
           setShowNamePrompt(false);
         }}
+      />
+
+      <WalkthroughOverlay
+        visible={walkthroughVisible}
+        step={WALKTHROUGH_STEPS[walkthroughIndex] ?? null}
+        spotlightRect={spotlightRect}
+        currentIndex={walkthroughIndex}
+        onNext={handleWalkthroughNext}
+        onSkip={handleWalkthroughSkip}
       />
     </SafeAreaView>
   );

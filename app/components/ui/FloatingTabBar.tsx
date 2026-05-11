@@ -9,14 +9,16 @@
  * background bleeds through.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import {
   Animated,
   View,
   Pressable,
   StyleSheet,
   Platform,
+  DeviceEventEmitter,
 } from 'react-native';
+import type { SpotlightRect } from '@/src/features/walkthrough/models/WalkthroughStep';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faHome, faBook, faHandshake, faSuitcase, faMicrophone } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,6 +29,10 @@ import { useRouter } from 'expo-router';
 import VoiceModal from '@/src/features/voice/screens/components/VoiceModal';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
+export interface TabBarHandle {
+  measureTab(key: string): Promise<SpotlightRect>;
+}
+
 const PRIMARY = '#6b7f99';
 
 const TAB_ICONS: Record<string, any> = {
@@ -36,7 +42,7 @@ const TAB_ICONS: Record<string, any> = {
   outside: faSuitcase,
 };
 
-export default function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
+const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function FloatingTabBar({ state, navigation }, ref) {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -50,6 +56,26 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
 
   // Insert mic button in the center (after index 1 = Spaces)
   const centerIndex = 2;
+
+  const tabRefs = useRef<Record<string, View | null>>({});
+  const micRef = useRef<View | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    measureTab(key: string): Promise<SpotlightRect> {
+      return new Promise((resolve, reject) => {
+        let target: View | null = null;
+        if (key === 'tab-mic') target = micRef.current;
+        else if (key === 'tab-spaces') target = tabRefs.current['spaces'];
+        else if (key === 'tab-lending') target = tabRefs.current['lending'];
+        else if (key === 'tab-outside') target = tabRefs.current['outside'];
+        else if (key === 'tab-home') target = tabRefs.current['index'];
+        if (!target) { reject(new Error(`No ref for key: ${key}`)); return; }
+        target.measure((_, __, width, height, pageX, pageY) => {
+          resolve({ x: pageX, y: pageY, width, height });
+        });
+      });
+    },
+  }));
 
   return (
     <>
@@ -74,6 +100,7 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
               key={route.key}
               icon={icon}
               focused={focused}
+              tabRef={(el) => { tabRefs.current[route.name] = el; }}
               onPress={() => {
                 if (Platform.OS === 'ios') {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -94,7 +121,7 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
           if (idx === centerIndex) {
             return (
               <React.Fragment key={`mic-${route.key}`}>
-                <MicButton onPress={() => setShowVoiceModal(true)} />
+                <MicButton onPress={() => setShowVoiceModal(true)} micRef={micRef} />
                 {tabItem}
               </React.Fragment>
             );
@@ -108,12 +135,11 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
         visible={showVoiceModal}
         onClose={() => setShowVoiceModal(false)}
         onItemAdded={() => {
-          // Navigate back to home to refresh if not already there
-          if (state.routes[state.index]?.name === 'index') {
-            navigation.emit({ type: 'tabPress', target: state.routes[0].key, canPreventDefault: false });
-          }
+          DeviceEventEmitter.emit('spotly:refresh-home');
         }}
-        onSpaceCreated={() => {}}
+        onSpaceCreated={() => {
+          DeviceEventEmitter.emit('spotly:refresh-home');
+        }}
         onNavigateToItem={(itemId) => {
           setShowVoiceModal(false);
           router.push({ pathname: '../item/[id]' as any, params: { id: itemId } });
@@ -121,13 +147,15 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
       />
     </>
   );
-}
+});
+
+export default FloatingTabBar;
 
 /** Center mic button — raised above the pill */
-function MicButton({ onPress }: { onPress: () => void }) {
+function MicButton({ onPress, micRef }: { onPress: () => void; micRef?: React.RefObject<View | null> }) {
   return (
     <Pressable onPress={onPress} style={styles.micTab}>
-      <View style={styles.micButton}>
+      <View ref={micRef} style={styles.micButton}>
         <FontAwesomeIcon icon={faMicrophone} size={20} color="#fff" />
       </View>
     </Pressable>
@@ -135,7 +163,7 @@ function MicButton({ onPress }: { onPress: () => void }) {
 }
 
 /** Animated tab item with smooth scale + opacity transitions */
-function TabItem({ icon, focused, onPress }: { icon: any; focused: boolean; onPress: () => void }) {
+function TabItem({ icon, focused, onPress, tabRef }: { icon: any; focused: boolean; onPress: () => void; tabRef?: (el: View | null) => void }) {
   const anim = useRef(new Animated.Value(focused ? 1 : 0)).current;
 
   useEffect(() => {
@@ -153,7 +181,7 @@ function TabItem({ icon, focused, onPress }: { icon: any; focused: boolean; onPr
   });
 
   return (
-    <Pressable onPress={onPress} style={styles.tab}>
+    <Pressable ref={tabRef} onPress={onPress} style={styles.tab}>
       <Animated.View style={[styles.iconBg, { transform: [{ scale }] }]}>
         {/* Highlight circle — opacity-only animation avoids color-interpolation white flash */}
         <Animated.View style={[styles.iconBgHighlight, { opacity: anim }]} />
