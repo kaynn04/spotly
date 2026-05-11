@@ -172,7 +172,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
                     <Text style={[styles.sectionLabel, { color: subtleText }]}>LOCATION</Text>
                     <Text style={[styles.sectionValue, { color: colors.text }]}>
                       {item.container
-                        ? `${item.space?.name ?? 'Unknown Space'} › ${item.container}`
+                        ? `${item.space?.name ?? 'Unknown Space'} › ${item.container?.name ?? 'Unknown Container'}`
                         : item.space?.name ?? 'Unknown Space'}
                     </Text>
                   </>

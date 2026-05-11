@@ -69,12 +69,11 @@ export class OutsideSessionItemRepository {
           COALESCE(s.name, 'Unknown Space') as space_name,
           i.container_id,
           c.name as container_name,
-          l.borrower_name as active_borrower_name
+          (SELECT l.borrower_name FROM lendings l WHERE l.item_id = osi.item_id AND l.status = 'ACTIVE' LIMIT 1) as active_borrower_name
         FROM outside_session_items osi
         LEFT JOIN items i ON osi.item_id = i.id
         LEFT JOIN spaces s ON i.space_id = s.id
         LEFT JOIN containers c ON i.container_id = c.id
-        LEFT JOIN lendings l ON l.item_id = osi.item_id AND l.status = 'ACTIVE'
         WHERE osi.session_id = ?
         ORDER BY i.name ASC
         `,

@@ -125,8 +125,8 @@ export default function HomePage() {
           : null,
         isEmpty: dashboard.isEmpty,
       });
-    } catch (err) {
-      console.error('[HomePage] loadAll error:', err);
+    } catch {
+      // Silently handle load errors; UI will show loading state
     } finally {
       setLoading(false);
     }
@@ -578,7 +578,39 @@ const styles = StyleSheet.create({
   guidanceTextBlock: { flex: 1 },
   guidanceTitle: { fontSize: 15, fontWeight: '600', marginBottom: 3 },
   guidanceSubtitle: { fontSize: 13, fontWeight: '400', lineHeight: 18 },
+  // FAB
+  fab: {
+    position: 'absolute',
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
   // Empty state
+  // FAB
+  fab: {
+    position: 'absolute',
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
   emptyCard: { borderRadius: 16, borderWidth: 1, padding: 32, alignItems: 'center', marginTop: 8 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },

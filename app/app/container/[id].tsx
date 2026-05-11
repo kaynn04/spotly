@@ -328,12 +328,12 @@ export default function ContainerDetailScreen() {
                     {item.name}
                   </Text>
                   {isLent && (
-                    <Text style={[styles.itemLentMeta, { color: PRIMARY }]} numberOfLines={1}>
+                    <Text style={[styles.itemLentMeta, { color: LENDING }]} numberOfLines={1}>
                       Lent to {activeLending.borrower_name}
                     </Text>
                   )}
                   {isOutside && !isLent && (
-                    <Text style={[styles.itemLentMeta, { color: LENDING }]} numberOfLines={1}>
+                    <Text style={[styles.itemLentMeta, { color: '#e67e22' }]} numberOfLines={1}>
                       In outside session
                     </Text>
                   )}

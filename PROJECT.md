@@ -194,8 +194,9 @@ Database (SQLite via expo-sqlite)
 ### Colors
 ```typescript
 PRIMARY = '#6b7f99'        // Muted blue-grey (brand)
+LENDING = '#9b72cb'        // Purple (active lending status)
+SUCCESS = '#6b9e7a'        // Green (complete/success, returned status)
 DESTRUCTIVE = '#e53e3e'    // Red (delete/danger)
-SUCCESS = '#6b9e7a'        // Green (complete/success)
 
 // Dark mode colors
 Dark Background: '#000000'
@@ -270,15 +271,27 @@ npm run reset-project
 
 ## 📱 Current Branch & Workflow
 
-**Active Branch**: `022-outside-mainscreen-enhancement`
+**Active Branch**: `031-overall-improvements`
 
-### Recent Changes (Session Notes)
-- Fixed DB race condition: return `null` in `_layout.tsx` until DB is ready
-- Fixed onboarding navigation: two-effect pattern (DB init → onboarding check)
-- Improved move modal UX: current location shown inline as disabled, all destinations visible
-- Redesigned Outside main screen: single tappable session card + recent sessions list
-- Fixed item picker to exclude already-added items in Outside sessions
-- Full code audit: 24 issues found, 6 critical/high priority fixed
+### Recent Changes (Session Notes - May 11, 2026)
+
+#### Dashboard Navigation Improvements
+- Recently Added items now show **current location** (space › container) instead of creation location
+- Recently Added items navigate to container or space based on current location
+- Query updated: `ItemRepository.getRecentItems()` now joins containers table to fetch current container name
+- Matches Recently Moved section design pattern for consistency
+
+#### Outside Sessions Auto-Return Behavior
+- When completing a session with unchecked items, they are now **automatically returned to original locations**
+- Items are moved back to their original space/container, then checked off
+- Alert message updated: "Return Unchecked Items — will be returned to its/their original location(s). Continue?"
+- OutsideSessionItemWithContext now includes `spaceId` and `containerId` for original location tracking
+
+#### Database & Service Architecture Fixes
+- Fixed DashboardService initialization error: changed from type-only imports to runtime imports
+- Removed `initialize()` method from DashboardService; now calls repository static methods directly
+- Added retry logic to `db/client.ts` to handle stale database handles in development
+- Resolved "The 2nd argument cannot be cast to expo.modules.sqlite.NativeStatement" error
 
 ---
 
@@ -397,6 +410,6 @@ type Space = { id: string; name: string; ... }
 
 ---
 
-**Last Updated**: May 7, 2026  
+**Last Updated**: May 11, 2026  
 **Active Developers**: You  
-**Current Focus**: Outside feature enhancements, move modal UX refinement
+**Current Focus**: Dashboard navigation improvements, outside session enhancements, Play Store submission polish

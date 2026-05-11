@@ -9,7 +9,7 @@
  * background bleeds through.
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   View,
@@ -18,11 +18,13 @@ import {
   Platform,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faHome, faBook, faHandshake, faSuitcase } from '@fortawesome/free-solid-svg-icons';
+import { faHome, faBook, faHandshake, faSuitcase, faMicrophone } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScrollHide } from '@/hooks/use-scroll-hide';
+import { useRouter } from 'expo-router';
+import VoiceModal from '@/src/features/voice/screens/components/VoiceModal';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
 const PRIMARY = '#6b7f99';
@@ -39,50 +41,96 @@ export default function FloatingTabBar({ state, navigation }: BottomTabBarProps)
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const { translateY } = useScrollHide();
+  const router = useRouter();
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
 
   const bg = isDark ? '#1c1c1e' : '#ffffff';
   const border = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
   const shadow = isDark ? '#000' : '#64748b';
 
-  return (
-    <Animated.View
-      style={[
-        styles.pill,
-        {
-          bottom: insets.bottom + 12,
-          backgroundColor: bg,
-          borderColor: border,
-          shadowColor: shadow,
-          transform: [{ translateY }],
-        },
-      ]}
-    >
-      {state.routes.map((route, idx) => {
-        const focused = state.index === idx;
-        const icon = TAB_ICONS[route.name];
+  // Insert mic button in the center (after index 1 = Spaces)
+  const centerIndex = 2;
 
-        return (
-          <TabItem
-            key={route.key}
-            icon={icon}
-            focused={focused}
-            onPress={() => {
-              if (Platform.OS === 'ios') {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              }
-              const event = navigation.emit({
-                type: 'tabPress',
-                target: route.key,
-                canPreventDefault: true,
-              });
-              if (!focused && !event.defaultPrevented) {
-                navigation.navigate(route.name);
-              }
-            }}
-          />
-        );
-      })}
-    </Animated.View>
+  return (
+    <>
+      <Animated.View
+        style={[
+          styles.pill,
+          {
+            bottom: insets.bottom + 12,
+            backgroundColor: bg,
+            borderColor: border,
+            shadowColor: shadow,
+            transform: [{ translateY }],
+          },
+        ]}
+      >
+        {state.routes.map((route, idx) => {
+          const focused = state.index === idx;
+          const icon = TAB_ICONS[route.name];
+
+          const tabItem = (
+            <TabItem
+              key={route.key}
+              icon={icon}
+              focused={focused}
+              onPress={() => {
+                if (Platform.OS === 'ios') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }
+                const event = navigation.emit({
+                  type: 'tabPress',
+                  target: route.key,
+                  canPreventDefault: true,
+                });
+                if (!focused && !event.defaultPrevented) {
+                  navigation.navigate(route.name);
+                }
+              }}
+            />
+          );
+
+          // Insert mic button before the centerIndex tab
+          if (idx === centerIndex) {
+            return (
+              <React.Fragment key={`mic-${route.key}`}>
+                <MicButton onPress={() => setShowVoiceModal(true)} />
+                {tabItem}
+              </React.Fragment>
+            );
+          }
+
+          return tabItem;
+        })}
+      </Animated.View>
+
+      <VoiceModal
+        visible={showVoiceModal}
+        onClose={() => setShowVoiceModal(false)}
+        onItemAdded={() => {
+          // Navigate back to home to refresh if not already there
+          if (state.routes[state.index]?.name === 'index') {
+            navigation.emit({ type: 'tabPress', target: state.routes[0].key, canPreventDefault: false });
+          }
+        }}
+        onSpaceCreated={() => {}}
+        onNavigateToItem={(itemId) => {
+          setShowVoiceModal(false);
+          router.push({ pathname: '../item/[id]' as any, params: { id: itemId } });
+        }}
+      />
+    </>
+  );
+}
+
+/** Center mic button — raised above the pill */
+function MicButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={styles.micTab}>
+      <View style={styles.micButton}>
+        <FontAwesomeIcon icon={faMicrophone} size={20} color="#fff" />
+      </View>
+    </Pressable>
   );
 }
 
@@ -156,6 +204,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     height: '100%',
     gap: 4,
+  },
+  micTab: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    paddingHorizontal: 4,
+  },
+  micButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 6,
   },
   iconBg: {
     width: 40,
