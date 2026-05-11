@@ -330,7 +330,7 @@ export class ItemRepository {
    */
   static async getRecentItems(
     limit: number = 5
-  ): Promise<Array<{ id: string; name: string; spaceName: string; createdAt: string }>> {
+  ): Promise<Array<{ id: string; name: string; spaceName: string; containerName: string | null; spaceId: string; containerId: string | null; createdAt: string }>> {
     try {
       const db = getDatabase();
 
@@ -338,9 +338,10 @@ export class ItemRepository {
       const sanitizedLimit = Math.max(1, Math.min(1000, Math.floor(limit)));
 
       const result = await db.getAllAsync(
-        `SELECT items.id, items.name, items.created_at, spaces.name as space_name
+        `SELECT items.id, items.name, items.created_at, items.space_id, items.container_id, spaces.name as space_name, containers.name as container_name
          FROM items
          JOIN spaces ON items.space_id = spaces.id
+         LEFT JOIN containers ON items.container_id = containers.id
          ORDER BY items.created_at DESC
          LIMIT ?`,
         [sanitizedLimit]
@@ -350,6 +351,9 @@ export class ItemRepository {
         id: row.id,
         name: row.name,
         spaceName: row.space_name,
+        containerName: row.container_name ?? null,
+        spaceId: row.space_id,
+        containerId: row.container_id ?? null,
         createdAt: row.created_at,
       }));
     } catch (error) {

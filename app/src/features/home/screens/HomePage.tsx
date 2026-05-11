@@ -42,8 +42,6 @@ import { DashboardService } from '@/src/services/DashboardService';
 import type { DashboardMovedItem } from '@/src/services/DashboardService';
 import { UserService } from '@/src/services/UserService';
 import { ItemRepository } from '@/src/repositories/ItemRepository';
-import { SpaceRepository } from '@/src/repositories/SpaceRepository';
-import { ContainerRepository } from '@/src/repositories/ContainerRepository';
 import { LendingService } from '@/src/features/lending/services/LendingService';
 import { LendingRepository } from '@/src/features/lending/repositories/LendingRepository';
 import { useOutsideService } from '@/src/features/outside/services/OutsideService';
@@ -66,14 +64,12 @@ function formatDate(dateString: string) {
 
 interface DashboardData {
   stats: { totalItems: number; totalSpaces: number; totalContainers: number };
-  recentItems: { id: string; name: string; spaceName: string; createdAt: string }[];
+  recentItems: { id: string; name: string; spaceName: string; containerName: string | null; spaceId: string; containerId: string | null; createdAt: string }[];
   recentlyMoved: DashboardMovedItem[];
   activeLendings: (Lending & { item_name: string })[];
   activeSession: { id: string; title: string; itemCount: number; checkedCount: number } | null;
   isEmpty: boolean;
 }
-
-DashboardService.initialize(ItemRepository, SpaceRepository, ContainerRepository);
 
 export default function HomePage() {
   const router = useRouter();
@@ -365,35 +361,41 @@ export default function HomePage() {
                   </TouchableOpacity>
                 </View>
                 <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
-                  {data!.recentItems.map((item, index) => (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={[
-                        styles.recentRow,
-                        index < data!.recentItems.length - 1 && {
-                          borderBottomWidth: 1,
-                          borderBottomColor: borderColor,
-                        },
-                      ]}
-                      onPress={() => router.push(`/item/${item.id}` as any)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.recentContent}>
-                        <Text style={[styles.recentName, { color: colors.text }]} numberOfLines={1}>
-                          {item.name}
-                        </Text>
-                        <Text style={[styles.recentMeta, { color: subtleText }]}>
-                          {item.spaceName}
-                        </Text>
-                      </View>
-                      <View style={styles.recentRight}>
-                        <Text style={[styles.recentDate, { color: subtleText }]}>
-                          {formatDate(item.createdAt)}
-                        </Text>
-                        <FontAwesomeIcon icon={faChevronRight} size={12} color={subtleText} style={{ marginLeft: 6 }} />
-                      </View>
-                    </TouchableOpacity>
-                  ))}
+                  {data!.recentItems.map((item, index) => {
+                    const route = item.containerId ? `/container/${item.containerId}` : `/space/${item.spaceId}`;
+                    const location = item.containerName
+                      ? `${item.spaceName} › ${item.containerName}`
+                      : item.spaceName;
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={[
+                          styles.recentRow,
+                          index < data!.recentItems.length - 1 && {
+                            borderBottomWidth: 1,
+                            borderBottomColor: borderColor,
+                          },
+                        ]}
+                        onPress={() => router.push(route as any)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.recentContent}>
+                          <Text style={[styles.recentName, { color: colors.text }]} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                          <Text style={[styles.recentMeta, { color: subtleText }]} numberOfLines={1}>
+                            {location}
+                          </Text>
+                        </View>
+                        <View style={styles.recentRight}>
+                          <Text style={[styles.recentDate, { color: subtleText }]}>
+                            {formatDate(item.createdAt)}
+                          </Text>
+                          <FontAwesomeIcon icon={faChevronRight} size={12} color={subtleText} style={{ marginLeft: 6 }} />
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
             )}

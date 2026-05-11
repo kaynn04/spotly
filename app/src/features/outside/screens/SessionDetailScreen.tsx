@@ -294,10 +294,31 @@ export default function SessionDetailScreen() {
   };
 
   const handleCompleteSession = () => {
-    const uncheckedCount = items.filter(item => !item.is_checked).length;
+    const uncheckedItems = items.filter(item => !item.is_checked);
+    const uncheckedCount = uncheckedItems.length;
 
     const doComplete = async () => {
       try {
+        // Auto-return unchecked items to original locations
+        if (uncheckedCount > 0) {
+          for (const item of uncheckedItems) {
+            try {
+              // Move item back to original location
+              if (item.space_id) {
+                await ItemService.moveItemToContainer(
+                  item.item_id,
+                  item.space_id,
+                  item.container_id || ''
+                );
+              }
+              // Check the item off
+              await outsideService.checkItem(id!, item.item_id);
+            } catch (err) {
+              console.error(`Error returning item ${item.item_id}:`, err);
+            }
+          }
+        }
+        
         await outsideService.completeSession(id!);
         router.replace('/outside/history');
       } catch (err) {
@@ -308,11 +329,11 @@ export default function SessionDetailScreen() {
 
     if (uncheckedCount > 0) {
       Alert.alert(
-        'Unchecked Items',
-        `${uncheckedCount} item${uncheckedCount === 1 ? '' : 's'} ${uncheckedCount === 1 ? 'has' : 'have'} not been checked off and will remain in ${uncheckedCount === 1 ? 'its' : 'their'} original location. Complete anyway?`,
+        'Return Unchecked Items',
+        `${uncheckedCount} item${uncheckedCount === 1 ? '' : 's'} will be returned to ${uncheckedCount === 1 ? 'its' : 'their'} original location${uncheckedCount === 1 ? '' : 's'}. Continue?`,
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Complete Anyway', onPress: doComplete },
+          { text: 'Return & Complete', onPress: doComplete },
         ]
       );
     } else if (items.length === 0) {

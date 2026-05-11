@@ -65,7 +65,9 @@ export class OutsideSessionItemRepository {
           osi.moved_to_space_name,
           osi.moved_to_container_name,
           COALESCE(i.name, 'Unknown Item') as item_name,
+          i.space_id,
           COALESCE(s.name, 'Unknown Space') as space_name,
+          i.container_id,
           c.name as container_name,
           l.borrower_name as active_borrower_name
         FROM outside_session_items osi
@@ -88,7 +90,9 @@ export class OutsideSessionItemRepository {
         is_checked: Number(row.is_checked),
         checked_at: row.checked_at,
         item_name: String(row.item_name || 'Unknown Item'),
+        space_id: row.space_id ? String(row.space_id) : null,
         space_name: String(row.space_name || 'Unknown Space'),
+        container_id: row.container_id ? String(row.container_id) : null,
         container_name: row.container_name ? String(row.container_name) : null,
         moved_to_space_name: row.moved_to_space_name ? String(row.moved_to_space_name) : null,
         moved_to_container_name: row.moved_to_container_name ? String(row.moved_to_container_name) : null,
