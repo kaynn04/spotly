@@ -198,14 +198,15 @@ export class LendingRepository {
       console.log('[LendingRepository.create] Executing INSERT...');
       await this.db.runAsync(
         `INSERT INTO lendings (
-          id, item_id, borrower_name, note, lent_at, returned_at, status, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          id, item_id, borrower_name, note, lent_at, due_date, returned_at, status, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           input.item_id,
           input.borrower_name,
           input.note || null,
           now,
+          input.due_date ? input.due_date.toISOString() : null,
           null,
           LendingStatus.ACTIVE,
           now,
@@ -266,6 +267,13 @@ export class LendingRepository {
     return updated;
   }
 
+  async setReminderId(id: string, reminderId: string | null): Promise<void> {
+    await this.db.runAsync(
+      `UPDATE lendings SET reminder_id = ?, updated_at = ? WHERE id = ?`,
+      [reminderId, new Date().toISOString(), id]
+    );
+  }
+
   /**
    * Convert database row to Lending domain object
    *
@@ -282,8 +290,10 @@ export class LendingRepository {
       borrower_name: row.borrower_name,
       note: row.note || undefined,
       lent_at: new Date(row.lent_at),
+      due_date: row.due_date ? new Date(row.due_date) : null,
       returned_at: row.returned_at ? new Date(row.returned_at) : null,
       status: row.status as LendingStatus,
+      reminder_id: row.reminder_id || undefined,
       created_at: new Date(row.created_at),
       updated_at: new Date(row.updated_at),
     };
