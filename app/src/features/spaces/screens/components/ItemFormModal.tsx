@@ -4,7 +4,7 @@
  * Bottom sheet -- add a new item to a space or container
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -31,9 +31,14 @@ interface ItemFormModalProps {
   onClose: () => void;
   onSubmit: (name: string, description?: string, quantity?: number, photoUri?: string | null) => Promise<void>;
   contextLabel?: string;
+  editMode?: boolean;
+  initialName?: string;
+  initialDescription?: string;
+  initialQuantity?: number;
+  initialPhotoUri?: string | null;
 }
 
-export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel }: ItemFormModalProps) {
+export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel, editMode, initialName, initialDescription, initialQuantity, initialPhotoUri }: ItemFormModalProps) {
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const isDark = colorScheme === 'dark';
@@ -45,6 +50,20 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
   const [error, setError] = useState<string | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [showPhotoPicker, setShowPhotoPicker] = useState(false);
+
+  useEffect(() => {
+    if (visible && editMode) {
+      setName(initialName ?? '');
+      setDescription(initialDescription ?? '');
+      setQuantity(String(initialQuantity ?? 1));
+      setPhotoUri(initialPhotoUri ?? null);
+    } else if (visible && !editMode) {
+      setName('');
+      setDescription('');
+      setQuantity('1');
+      setPhotoUri(null);
+    }
+  }, [visible]);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const inputBg = isDark ? '#2c2c2e' : '#f8f9fa';
@@ -98,7 +117,7 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
                 <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
                 {/* Title */}
-                <Text style={[styles.sheetTitle, { color: textColor }]}>Add Item</Text>
+                <Text style={[styles.sheetTitle, { color: textColor }]}>{editMode ? 'Edit Item' : 'Add Item'}</Text>
 
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
@@ -223,7 +242,7 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
                     {loading ? (
                       <ActivityIndicator color="#fff" size="small" />
                     ) : (
-                      <Text style={[styles.createBtnText, { color: isValid ? '#fff' : subtleText }]}>Add Item</Text>
+                      <Text style={[styles.createBtnText, { color: isValid ? '#fff' : subtleText }]}>{editMode ? 'Save' : 'Add Item'}</Text>
                     )}
                   </TouchableOpacity>
                 </View>
