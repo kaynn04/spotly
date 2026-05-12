@@ -190,7 +190,7 @@ export class ItemService {
   static async deleteItem(itemId: string): Promise<void> {
     try {
       // Fetch item to get the stored photoUri before deleting
-      const item = await ItemRepository.getById(itemId);
+      const item = await ItemRepository.getItemById(itemId);
       if (item?.photoUri) {
         await PhotoService.deletePhoto(item.photoUri);
       }

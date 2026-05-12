@@ -4,7 +4,7 @@
  * Bottom sheet -- create a new space, uniform with SessionFormModal
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -30,9 +30,12 @@ interface SpaceFormModalProps {
   visible: boolean;
   onClose: () => void;
   onSubmit: (name: string, photoUri?: string | null) => Promise<void>;
+  initialName?: string;
+  initialPhotoUri?: string | null;
+  editMode?: boolean;
 }
 
-export default function SpaceFormModal({ visible, onClose, onSubmit }: SpaceFormModalProps) {
+export default function SpaceFormModal({ visible, onClose, onSubmit, initialName, initialPhotoUri, editMode }: SpaceFormModalProps) {
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const isDark = colorScheme === 'dark';
@@ -42,6 +45,14 @@ export default function SpaceFormModal({ visible, onClose, onSubmit }: SpaceForm
   const [error, setError] = useState<string | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [showPhotoPicker, setShowPhotoPicker] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setName(initialName ?? '');
+      setPhotoUri(initialPhotoUri ?? null);
+      setError(null);
+    }
+  }, [visible]);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const inputBg = isDark ? '#2c2c2e' : '#f8f9fa';
@@ -90,7 +101,7 @@ export default function SpaceFormModal({ visible, onClose, onSubmit }: SpaceForm
                 <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
                 {/* Title */}
-                <Text style={[styles.sheetTitle, { color: textColor }]}>New Space</Text>
+                <Text style={[styles.sheetTitle, { color: textColor }]}>{editMode ? 'Edit Space' : 'New Space'}</Text>
 
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
@@ -166,7 +177,7 @@ export default function SpaceFormModal({ visible, onClose, onSubmit }: SpaceForm
                     {loading ? (
                       <ActivityIndicator color="#fff" size="small" />
                     ) : (
-                      <Text style={[styles.createBtnText, { color: isValid ? '#fff' : subtleText }]}>Create</Text>
+                      <Text style={[styles.createBtnText, { color: isValid ? '#fff' : subtleText }]}>{editMode ? 'Save' : 'Create'}</Text>
                     )}
                   </TouchableOpacity>
                 </View>

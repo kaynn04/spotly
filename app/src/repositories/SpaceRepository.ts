@@ -228,5 +228,17 @@ return (result as any[]).map((row: SpaceRow) => ({
       throw serviceError;
     }
   }
+
+  static async updateName(id: string, name: string): Promise<void> {
+    try {
+      const db = getDatabase();
+      const now = new Date().toISOString();
+      await db.runAsync('UPDATE spaces SET name = ?, updated_at = ? WHERE id = ?', [name, now, id]);
+    } catch (error) {
+      console.error('[SpaceRepository.updateName] Database error:', error);
+      const serviceError: ServiceError = { code: 'DB_ERROR', message: 'Failed to update space name.' };
+      throw serviceError;
+    }
+  }
   
 }
