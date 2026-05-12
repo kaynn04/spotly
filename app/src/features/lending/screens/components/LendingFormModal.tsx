@@ -6,7 +6,7 @@
  * Feature: 009 - Lending Tracker
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faCalendar, faTimes } from '@fortawesome/free-solid-svg-icons';
+import DatePickerSheet from './DatePickerSheet';
 
 const PRIMARY = '#6b7f99';
 
@@ -33,6 +36,8 @@ interface LendingFormModalProps {
   onBorrowerNameChange: (text: string) => void;
   note: string;
   onNoteChange: (text: string) => void;
+  dueDate: Date | null;
+  onDueDateChange: (date: Date | null) => void;
   onSubmit: () => void;
   onCancel: () => void;
   loading: boolean;
@@ -45,6 +50,8 @@ export default function LendingFormModal({
   onBorrowerNameChange,
   note,
   onNoteChange,
+  dueDate,
+  onDueDateChange,
   onSubmit,
   onCancel,
   loading,
@@ -60,6 +67,9 @@ export default function LendingFormModal({
   const borderColor = isDark ? '#3a3a3c' : '#e2e6ea';
 
   const isValid = borrowerName.trim().length > 0;
+
+  // Show inline picker on Android (shown inline), modal-style on iOS
+  const [showPicker, setShowPicker] = useState(false);
 
   const sheetTranslateY = useRef(new Animated.Value(0)).current;
   const panResponder = useRef(
@@ -156,6 +166,46 @@ export default function LendingFormModal({
                     />
                   </View>
                   <Text style={[styles.charCount, { color: subtleText }]}>{note.length}/500</Text>
+
+                  {/* Due Date */}
+                  <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 12 }]}>Due Date (optional)</Text>
+                  <TouchableOpacity
+                    style={[styles.dueDateRow, { backgroundColor: inputBg, borderColor }]}
+                    onPress={() => setShowPicker(true)}
+                    disabled={loading}
+                  >
+                    <FontAwesomeIcon icon={faCalendar} size={14} color={subtleText} />
+                    <Text style={[styles.dueDateText, { color: dueDate ? textColor : subtleText }]}>
+                      {dueDate
+                        ? dueDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+                        : 'No due date'}
+                    </Text>
+                    {dueDate && (
+                      <TouchableOpacity
+                        onPress={() => { onDueDateChange(null); setShowPicker(false); }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <FontAwesomeIcon icon={faTimes} size={12} color={subtleText} />
+                      </TouchableOpacity>
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Native date picker — shown inline on Android, above buttons on iOS */}
+                  {showPicker && (
+                    <DatePickerSheet
+                      visible={showPicker}
+                      value={dueDate ?? new Date()}
+                      minimumDate={new Date()}
+                      onChange={(d) => onDueDateChange(d)}
+                      onClose={() => setShowPicker(false)}
+                      cardBg={cardBg}
+                      borderColor={borderColor}
+                      textColor={textColor}
+                      subtleText={subtleText}
+                      isDark={isDark}
+                    />
+                  )}
+                  <View style={{ height: 16 }} />
                 </ScrollView>
 
                 {/* Buttons - fixed at bottom */}
@@ -240,7 +290,18 @@ const styles = StyleSheet.create({
   noteWrapper: { paddingVertical: 8 },
   input: { fontSize: 15, paddingVertical: 10 },
   noteInput: { minHeight: 72, paddingTop: 2 },
-  charCount: { fontSize: 12, textAlign: 'right', marginTop: 4, marginBottom: 20 },
+  charCount: { fontSize: 12, textAlign: 'right', marginTop: 4, marginBottom: 8 },
+
+  dueDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  dueDateText: { flex: 1, fontSize: 15 },
 
   buttonRow: { flexDirection: 'row', gap: 10 },
   cancelBtn: {

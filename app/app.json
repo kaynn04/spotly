@@ -48,6 +48,7 @@
         }
       ],
       "expo-sqlite",
+      "expo-notifications",
       "expo-speech-recognition"
     ],
     "experiments": {
@@ -62,3 +63,5 @@
     }
   }
 }
+
+

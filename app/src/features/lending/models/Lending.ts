@@ -44,8 +44,10 @@ export interface Lending {
   borrower_name: string; // Required
   note?: string; // Optional
   lent_at: Date;
+  due_date: Date | null; // Optional return-by date
   returned_at: Date | null;
   status: LendingStatus;
+  reminder_id?: string; // Scheduled notification identifier
   created_at: Date;
   updated_at: Date;
 }
@@ -62,9 +64,10 @@ export interface Lending {
  * - UI form submission handlers
  */
 export interface LendingCreateInput {
-  item_id: string; // User selects item to lend
-  borrower_name: string; // User enters borrower name (required)
-  note?: string; // User optionally adds note
+  item_id: string;
+  borrower_name: string;
+  note?: string;
+  due_date?: Date | null; // Optional due date
 }
 
 /**

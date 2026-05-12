@@ -25,6 +25,9 @@ import { LendingService } from '../services/LendingService';
 import { LendingRepository } from '../repositories/LendingRepository';
 import { ItemRepository } from '../../../repositories/ItemRepository';
 import { Lending } from '../models/Lending';
+import { LendingPhoto, LendingPhotoPhase } from '../models/LendingPhoto';
+import LendingPhotoSection from './components/LendingPhotoSection';
+import { ReminderService } from '../../../services/ReminderService';
 
 const PRIMARY = '#6b7f99';
 const SUCCESS = '#6b9e7a';
@@ -51,6 +54,8 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [beforePhotos, setBeforePhotos] = useState<LendingPhoto[]>([]);
+  const [afterPhotos, setAfterPhotos] = useState<LendingPhoto[]>([]);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
@@ -67,6 +72,13 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
         const itemData = await itemRepository.getById(lendingData.item_id);
         setItem(itemData);
       } catch { setItem(null); }
+      // Load photos
+      const [before, after] = await Promise.all([
+        lendingService.getPhotos(lendingData.id, 'before'),
+        lendingService.getPhotos(lendingData.id, 'after'),
+      ]);
+      setBeforePhotos(before);
+      setAfterPhotos(after);
     } catch (err: any) {
       setError(err?.message || 'Failed to load lending details');
     } finally {
@@ -81,6 +93,11 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
     setShowConfirm(false);
     setSubmitting(true);
     try {
+      // Cancel scheduled reminders before marking returned
+      if (lending.reminder_id) {
+        try { await ReminderService.cancelReminders(lending.reminder_id); } catch { /* non-fatal */ }
+      }
+
       const updated = await lendingService.markAsReturned(lending.id);
       setLending(updated);
       // Show location hint before navigating back
@@ -109,6 +126,28 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
     if (!date) return 'N/A';
     return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
+
+  const handleAddPhoto = useCallback(async (phase: LendingPhotoPhase, tempUri: string) => {
+    if (!lending) return;
+    try {
+      const photo = await lendingService.addPhoto(lending.id, phase, tempUri);
+      if (phase === 'before') setBeforePhotos((prev) => [...prev, photo]);
+      else setAfterPhotos((prev) => [...prev, photo]);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to add photo');
+    }
+  }, [lending, lendingService]);
+
+  const handleDeletePhoto = useCallback(async (photo: LendingPhoto) => {
+    try {
+      await lendingService.deletePhoto(photo.id, photo.photo_uri);
+      if (photo.phase === 'before') setBeforePhotos((prev) => prev.filter((p) => p.id !== photo.id));
+      else setAfterPhotos((prev) => prev.filter((p) => p.id !== photo.id));
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to delete photo');
+    }
+  }, [lendingService]);
+
 
   const headerBar = (
     <View style={[styles.headerBar, { borderBottomColor: borderColor }]}>
@@ -197,6 +236,26 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
             <Text style={[styles.sectionLabel, { color: subtleText }]}>LENT ON</Text>
             <Text style={[styles.sectionValue, { color: colors.text }]}>{formatDate(lending.lent_at)}</Text>
 
+            {lending.due_date && (
+              <>
+                <View style={[styles.divider, { backgroundColor: borderColor }]} />
+                <Text style={[styles.sectionLabel, { color: subtleText }]}>DUE DATE</Text>
+                <Text style={[
+                  styles.sectionValue,
+                  {
+                    color: isActive && lending.due_date < new Date()
+                      ? '#d32f2f'
+                      : isActive && lending.due_date.toDateString() === new Date().toDateString()
+                      ? '#e67e22'
+                      : colors.text,
+                  },
+                ]}>
+                  {formatDate(lending.due_date)}
+                  {isActive && lending.due_date < new Date() ? '  ⚠ Overdue' : ''}
+                </Text>
+              </>
+            )}
+
             {!isActive && lending.returned_at && (
               <>
                 <View style={[styles.divider, { backgroundColor: borderColor }]} />
@@ -213,6 +272,36 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
               </>
             )}
           </View>
+
+          {/* Before Photos */}
+          <LendingPhotoSection
+            lendingId={lending.id}
+            phase="before"
+            photos={beforePhotos}
+            readOnly={false}
+            onAdd={handleAddPhoto}
+            onDelete={handleDeletePhoto}
+            cardBg={cardBg}
+            borderColor={borderColor}
+            subtleText={subtleText}
+            textColor={colors.text}
+            isDark={isDark}
+          />
+
+          {/* After Photos — always visible */}
+          <LendingPhotoSection
+            lendingId={lending.id}
+            phase="after"
+            photos={afterPhotos}
+            readOnly={isActive}
+            onAdd={handleAddPhoto}
+            onDelete={handleDeletePhoto}
+            cardBg={cardBg}
+            borderColor={borderColor}
+            subtleText={subtleText}
+            textColor={colors.text}
+            isDark={isDark}
+          />
         </View>
       </ScrollView>
 
@@ -304,6 +393,7 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 4 },
   sectionValue: { fontSize: 16, fontWeight: '500' },
   sectionValueMuted: { fontSize: 15, fontStyle: 'italic' },
+
   divider: { height: 1, marginVertical: 12 },
   itemPhoto: { width: '100%', height: 180, borderRadius: 10, marginBottom: 14, resizeMode: 'cover' },
 

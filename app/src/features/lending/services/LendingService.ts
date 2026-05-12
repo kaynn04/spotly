@@ -12,8 +12,11 @@
  */
 
 import { LendingRepository } from '../repositories/LendingRepository';
+import { LendingPhotoRepository } from '../repositories/LendingPhotoRepository';
 import { Lending, LendingCreateInput, LendingStatus } from '../models/Lending';
+import { LendingPhoto, LendingPhotoPhase } from '../models/LendingPhoto';
 import { ItemRepository } from '../../../repositories/ItemRepository';
+import { PhotoService } from '../../../services/PhotoService';
 
 /**
  * Service Error
@@ -70,21 +73,15 @@ function createServiceError(code: string, message: string): ServiceError {
  */
 export class LendingService {
   private lendingRepository: LendingRepository;
+  private lendingPhotoRepository: LendingPhotoRepository;
   private itemRepository: ItemRepository;
 
-  /**
-   * Constructor
-   *
-   * Dependency injection for repositories
-   *
-   * @param lendingRepository - LendingRepository instance
-   * @param itemRepository - ItemRepository instance
-   */
   constructor(
     lendingRepository: LendingRepository,
     itemRepository: ItemRepository
   ) {
     this.lendingRepository = lendingRepository;
+    this.lendingPhotoRepository = new LendingPhotoRepository();
     this.itemRepository = itemRepository;
   }
 
@@ -174,6 +171,7 @@ export class LendingService {
         item_id: input.item_id,
         borrower_name: input.borrower_name.trim(),
         note: input.note ? input.note.trim() : undefined,
+        due_date: input.due_date ?? null,
       });
       console.log('[LendingService.createLending] Lending created successfully:', lending);
     } catch (error: any) {
@@ -380,6 +378,38 @@ export class LendingService {
       return await this.lendingRepository.getActiveLendingForItem(itemId);
     } catch (error) {
       throw createServiceError('DATABASE_ERROR', 'Failed to check lending status');
+    }
+  }
+
+  // ─── Photo Methods ───────────────────────────────────────────────────────────
+
+  async getPhotos(lendingId: string, phase?: LendingPhotoPhase): Promise<LendingPhoto[]> {
+    try {
+      return await this.lendingPhotoRepository.getByLendingId(lendingId, phase);
+    } catch (error) {
+      throw createServiceError('DATABASE_ERROR', 'Failed to fetch lending photos');
+    }
+  }
+
+  async addPhoto(lendingId: string, phase: LendingPhotoPhase, tempUri: string): Promise<LendingPhoto> {
+    try {
+      const key = `lending_${lendingId}_${phase}`;
+      const savedUri = await PhotoService.savePhoto(tempUri, key);
+      return await this.lendingPhotoRepository.create({ lending_id: lendingId, phase, photo_uri: savedUri });
+    } catch (error: any) {
+      if (error?.message === 'MAX_PHOTOS_EXCEEDED') {
+        throw createServiceError('MAX_PHOTOS_EXCEEDED', `Maximum 4 photos allowed per phase`);
+      }
+      throw createServiceError('DATABASE_ERROR', 'Failed to add lending photo');
+    }
+  }
+
+  async deletePhoto(photoId: string, photoUri: string): Promise<void> {
+    try {
+      await this.lendingPhotoRepository.delete(photoId);
+      await PhotoService.deletePhoto(photoUri);
+    } catch (error) {
+      throw createServiceError('DATABASE_ERROR', 'Failed to delete lending photo');
     }
   }
 }

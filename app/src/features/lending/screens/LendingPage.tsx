@@ -23,11 +23,13 @@ import {
   PanResponder,
   DeviceEventEmitter,
   Image,
+  useWindowDimensions,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faMagnifyingGlass, faTimes, faChevronRight, faHandshake, faPlus, faMapPin, faFolder } from '@fortawesome/free-solid-svg-icons';
+import { faMagnifyingGlass, faTimes, faChevronRight, faHandshake, faPlus, faMapPin, faFolder, faEllipsisVertical, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faCheck, faList, faGrip } from '@fortawesome/free-solid-svg-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
@@ -40,8 +42,16 @@ import { Lending } from '../models/Lending';
 import type { Item } from '../../../models/Item';
 import LendingFormModal from './components/LendingFormModal';
 import { OutsideSessionItemRepository } from '../../outside/repositories/OutsideSessionItemRepository';
+import { ReminderService } from '../../../services/ReminderService';
 
 const PRIMARY = '#6b7f99';
+const SORT_KEY = 'spotly:lending-sort';
+const VIEW_KEY = 'spotly:lending-view';
+type SortMode = 'name-asc' | 'name-desc' | 'newest' | 'oldest';
+type ViewMode = 'list' | 'grid';
+const GRID_GAP = 10;
+const GRID_PADDING = 16;
+const GRID_COLUMNS = 2;
 
 export default function LendingPage() {
   const router = useRouter();
@@ -51,6 +61,9 @@ export default function LendingPage() {
   const isDark = colorScheme === 'dark';
   const { handleScroll } = useScrollHide();
   const tabBarPadding = useTabBarPadding();
+
+  const { width: screenWidth } = useWindowDimensions();
+  const GRID_ITEM_WIDTH = (screenWidth - GRID_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
 
   const repositories = useMemo(() => ({
     lendingRepository: new LendingRepository(),
@@ -67,6 +80,18 @@ export default function LendingPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
+  const [showMenu, setShowMenu] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>('newest');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+
+  useEffect(() => {
+    AsyncStorage.getItem(SORT_KEY).then((v) => {
+      if (v === 'name-asc' || v === 'name-desc' || v === 'newest' || v === 'oldest') setSortMode(v);
+    }).catch(() => {});
+    AsyncStorage.getItem(VIEW_KEY).then((v) => {
+      if (v === 'list' || v === 'grid') setViewMode(v);
+    }).catch(() => {});
+  }, []);
 
   // Lend from here — item picker + form
   const [showItemPicker, setShowItemPicker] = useState(false);
@@ -77,6 +102,7 @@ export default function LendingPage() {
   const [showLendForm, setShowLendForm] = useState(false);
   const [borrowerName, setBorrowerName] = useState('');
   const [lendNote, setLendNote] = useState('');
+  const [lendDueDate, setLendDueDate] = useState<Date | null>(null);
   const [lendLoading, setLendLoading] = useState(false);
 
   const pickerTranslateY = useRef(new Animated.Value(0)).current;
@@ -165,6 +191,7 @@ export default function LendingPage() {
     setShowItemPicker(false);
     setBorrowerName('');
     setLendNote('');
+    setLendDueDate(null);
     setShowLendForm(true);
   };
 
@@ -172,16 +199,38 @@ export default function LendingPage() {
     if (!selectedLendItem || !borrowerName.trim()) return;
     setLendLoading(true);
     try {
-      await lendingService.createLending({
+      const created = await lendingService.createLending({
         item_id: selectedLendItem.id,
         borrower_name: borrowerName.trim(),
         note: lendNote.trim() || undefined,
+        due_date: lendDueDate ?? undefined,
       });
+
+      // Schedule reminders if due date was set
+      if (lendDueDate) {
+        try {
+          const reminderId = await ReminderService.scheduleDueDateReminders(
+            created.id,
+            borrowerName.trim(),
+            selectedLendItem.name,
+            lendDueDate
+          );
+          if (reminderId) {
+            await repositories.lendingRepository.setReminderId(created.id, reminderId);
+          }
+        } catch {
+          // Non-fatal — lending still created
+        }
+      }
+
       setShowLendForm(false);
       setSelectedLendItem(null);
       setBorrowerName('');
       setLendNote('');
+      setLendDueDate(null);
       await loadLendings();
+      // Navigate to detail so user can add before photos immediately
+      router.push(`/lending/${created.id}`);
     } catch (err: any) {
       Alert.alert('Error', err.code === 'DUPLICATE_ACTIVE_LENDING'
         ? 'This item is already lent out'
@@ -202,26 +251,73 @@ export default function LendingPage() {
     );
   }, [allItems, itemPickerSearch]);
 
+  const sortedLendings = useMemo(() => {
+    const sorted = [...lendings];
+    switch (sortMode) {
+      case 'name-asc': sorted.sort((a, b) => (a.itemName ?? '').localeCompare(b.itemName ?? '')); break;
+      case 'name-desc': sorted.sort((a, b) => (b.itemName ?? '').localeCompare(a.itemName ?? '')); break;
+      case 'newest': sorted.sort((a, b) => new Date(b.lent_at).getTime() - new Date(a.lent_at).getTime()); break;
+      case 'oldest': sorted.sort((a, b) => new Date(a.lent_at).getTime() - new Date(b.lent_at).getTime()); break;
+    }
+    return sorted;
+  }, [lendings, sortMode]);
+
   const filteredLendings = useMemo(() => {
     const q = searchText.trim().toLowerCase();
-    if (!q) return lendings;
-    return lendings.filter(
+    if (!q) return sortedLendings;
+    return sortedLendings.filter(
       (l) =>
         (l.itemName ?? '').toLowerCase().includes(q) ||
         l.borrower_name.toLowerCase().includes(q)
     );
-  }, [lendings, searchText]);
+  }, [sortedLendings, searchText]);
+
+  const switchSortMode = (mode: SortMode) => {
+    setSortMode(mode);
+    setShowMenu(false);
+    AsyncStorage.setItem(SORT_KEY, mode).catch(() => {});
+  };
+
+  const switchViewMode = (mode: ViewMode) => {
+    setViewMode(mode);
+    setShowMenu(false);
+    AsyncStorage.setItem(VIEW_KEY, mode).catch(() => {});
+  };
 
   const formatDate = (date: Date | null): string => {
     if (!date) return '';
     return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const renderLendingItem = ({ item, index }: { item: Lending & { itemName?: string; itemPhotoUri?: string | null }, index: number }) => (
+  const renderLendingItem = ({ item, index }: { item: Lending & { itemName?: string; itemPhotoUri?: string | null }, index: number }) => {
+    if (viewMode === 'grid') {
+      return (
+        <TouchableOpacity
+          style={[styles.gridCard, { backgroundColor: cardBg, borderColor, width: GRID_ITEM_WIDTH }]}
+          onPress={() => router.push(`/lending/${item.id}`)}
+          activeOpacity={0.7}
+        >
+          {item.itemPhotoUri ? (
+            <Image source={{ uri: item.itemPhotoUri }} style={[styles.gridPhoto, { height: GRID_ITEM_WIDTH * 0.7 }]} />
+          ) : (
+            <View style={[styles.gridPhotoPlaceholder, { backgroundColor: `${PRIMARY}12`, height: GRID_ITEM_WIDTH * 0.7 }]}>
+              <FontAwesomeIcon icon={faHandshake} size={28} color={PRIMARY} />
+            </View>
+          )}
+          <View style={styles.gridContent}>
+            <Text style={[styles.gridBadge, { color: PRIMARY }]}>Lent</Text>
+            <Text style={[styles.gridName, { color: colors.text }]} numberOfLines={1}>{item.itemName || 'Unknown Item'}</Text>
+            <Text style={[styles.gridMeta, { color: subtleText }]} numberOfLines={1}>To {item.borrower_name}</Text>
+            <Text style={[styles.gridDate, { color: subtleText }]}>{formatDate(item.lent_at)}</Text>
+          </View>
+        </TouchableOpacity>
+      );
+    }
+    return (
     <TouchableOpacity
       style={[
         styles.lendingRow,
-        index < lendings.length - 1 && { borderBottomWidth: 1, borderBottomColor: borderColor },
+        index < filteredLendings.length - 1 && { borderBottomWidth: 1, borderBottomColor: borderColor },
       ]}
       onPress={() => router.push(`/lending/${item.id}`)}
       activeOpacity={0.6}
@@ -244,7 +340,7 @@ export default function LendingPage() {
       </View>
       <FontAwesomeIcon icon={faChevronRight} size={16} color={subtleText} />
     </TouchableOpacity>
-  );
+  );};
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top']}>
@@ -260,12 +356,22 @@ export default function LendingPage() {
             <Text style={[styles.title, { color: colors.text }]}>Lending</Text>
             <Text style={[styles.subtitle, { color: subtleText }]}>{"Track items you've lent out"}</Text>
           </View>
-          <TouchableOpacity
-            style={[styles.historyPill, { borderColor, backgroundColor: cardBg }]}
-            onPress={() => router.push('/lending/history')}
-          >
-            <Text style={[styles.historyPillText, { color: PRIMARY }]}>History</Text>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={[styles.historyPill, { borderColor, backgroundColor: cardBg }]}
+              onPress={() => router.push('/lending/history')}
+            >
+              <Text style={[styles.historyPillText, { color: PRIMARY }]}>History</Text>
+            </TouchableOpacity>
+            {lendings.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setShowMenu(true)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <FontAwesomeIcon icon={faEllipsisVertical} size={18} color={subtleText} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Content */}
@@ -305,21 +411,37 @@ export default function LendingPage() {
             </View>
 
             {filteredLendings.length > 0 ? (
-              <View style={[styles.card, { backgroundColor: cardBg, borderColor, padding: 0, overflow: 'hidden' }]}>
-                <View style={[styles.cardHeaderRow, { borderBottomColor: borderColor }]}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>Active</Text>
-                  <View style={[styles.countBadge, { backgroundColor: `${PRIMARY}18` }]}>
-                    <Text style={[styles.countBadgeText, { color: PRIMARY }]}>{filteredLendings.length}</Text>
-                  </View>
+              <>
+                <View style={styles.sectionLabelRow}>
+                  <Text style={[styles.sectionLabel, { color: subtleText }]}>
+                    ACTIVE{' '}
+                    <Text style={styles.sectionLabelHint}>{'\u00B7'} {filteredLendings.length} item{filteredLendings.length !== 1 ? 's' : ''}</Text>
+                  </Text>
                 </View>
-                <FlatList
-                  data={filteredLendings}
-                  renderItem={renderLendingItem}
-                  keyExtractor={(item) => item.id}
-                  scrollEnabled={false}
-                  contentContainerStyle={{ paddingHorizontal: 16 }}
-                />
-              </View>
+                {viewMode === 'grid' ? (
+                  <FlatList
+                    data={filteredLendings}
+                    renderItem={renderLendingItem}
+                    keyExtractor={(item) => item.id}
+                    key="grid"
+                    numColumns={GRID_COLUMNS}
+                    columnWrapperStyle={styles.gridRow}
+                    scrollEnabled={false}
+                    contentContainerStyle={{ paddingBottom: 4 }}
+                  />
+                ) : (
+                  <View style={[styles.card, { backgroundColor: cardBg, borderColor, padding: 0, overflow: 'hidden' }]}>
+                    <FlatList
+                      data={filteredLendings}
+                      renderItem={renderLendingItem}
+                      keyExtractor={(item) => item.id}
+                      key="list"
+                      scrollEnabled={false}
+                      contentContainerStyle={{ paddingHorizontal: 16 }}
+                    />
+                  </View>
+                )}
+              </>
             ) : (
               <View style={[styles.card, styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
                 <Text style={[styles.emptyTitle, { color: colors.text }]}>No results found</Text>
@@ -442,6 +564,57 @@ export default function LendingPage() {
       </Modal>
 
       {/* Lend Form Modal */}
+      {/* Sort Menu */}
+      <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
+        <TouchableWithoutFeedback onPress={() => setShowMenu(false)}>
+          <View style={styles.menuOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.menuCard, { backgroundColor: cardBg, borderColor }]}>
+                <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+                  <Text style={[styles.menuTitle, { color: subtleText }]}>View</Text>
+                  {([
+                    { key: 'list' as ViewMode, icon: faList, label: 'List' },
+                    { key: 'grid' as ViewMode, icon: faGrip, label: 'Grid' },
+                  ] as { key: ViewMode; icon: any; label: string }[]).map((opt) => (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[styles.menuOption, viewMode === opt.key && styles.menuOptionActive]}
+                      onPress={() => switchViewMode(opt.key)}
+                      activeOpacity={0.7}
+                    >
+                      <FontAwesomeIcon icon={opt.icon} size={14} color={viewMode === opt.key ? PRIMARY : subtleText} />
+                      <Text style={[styles.menuOptionText, { color: viewMode === opt.key ? PRIMARY : colors.text }]}>{opt.label}</Text>
+                      {viewMode === opt.key && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
+                    </TouchableOpacity>
+                  ))}
+
+                  <View style={[styles.menuDivider, { backgroundColor: borderColor }]} />
+
+                  <Text style={[styles.menuTitle, { color: subtleText }]}>Sort</Text>
+                  {([
+                    { key: 'name-asc' as SortMode, icon: faArrowDownAZ, label: 'Name A→Z' },
+                    { key: 'name-desc' as SortMode, icon: faArrowDownZA, label: 'Name Z→A' },
+                    { key: 'newest' as SortMode, icon: faCalendarPlus, label: 'Newest first' },
+                    { key: 'oldest' as SortMode, icon: faCalendar, label: 'Oldest first' },
+                  ] as { key: SortMode; icon: any; label: string }[]).map((opt) => (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[styles.menuOption, sortMode === opt.key && styles.menuOptionActive]}
+                      onPress={() => switchSortMode(opt.key)}
+                      activeOpacity={0.7}
+                    >
+                      <FontAwesomeIcon icon={opt.icon} size={14} color={sortMode === opt.key ? PRIMARY : subtleText} />
+                      <Text style={[styles.menuOptionText, { color: sortMode === opt.key ? PRIMARY : colors.text }]}>{opt.label}</Text>
+                      {sortMode === opt.key && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
       <LendingFormModal
         visible={showLendForm}
         item={selectedLendItem}
@@ -449,8 +622,10 @@ export default function LendingPage() {
         onBorrowerNameChange={setBorrowerName}
         note={lendNote}
         onNoteChange={setLendNote}
+        dueDate={lendDueDate}
+        onDueDateChange={setLendDueDate}
         onSubmit={handleLendSubmit}
-        onCancel={() => { setShowLendForm(false); setSelectedLendItem(null); setBorrowerName(''); setLendNote(''); }}
+        onCancel={() => { setShowLendForm(false); setSelectedLendItem(null); setBorrowerName(''); setLendNote(''); setLendDueDate(null); }}
         loading={lendLoading}
       />
     </SafeAreaView>
@@ -492,13 +667,6 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
   },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-  },
   cardTitle: { fontSize: 16, fontWeight: '600' },
   countBadge: {
     paddingHorizontal: 8,
@@ -506,6 +674,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   countBadgeText: { fontSize: 12, fontWeight: '700' },
+
+  sectionLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
+  sectionLabelHint: { fontSize: 11, fontStyle: 'italic', fontWeight: '400' },
 
   lendingRow: {
     flexDirection: 'row',
@@ -535,7 +707,54 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 20, fontWeight: '700' },
   emptySubtitle: { fontSize: 14, textAlign: 'center', lineHeight: 20, paddingHorizontal: 16 },
 
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 100,
+    paddingRight: 20,
+  },
+  menuCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    minWidth: 180,
+    maxHeight: '60%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  menuTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 4, textTransform: 'uppercase' },
+  menuOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 8,
+    marginHorizontal: 4,
+  },
+  menuOptionActive: { backgroundColor: 'rgba(107,127,153,0.1)' },
+  menuOptionText: { fontSize: 14, fontWeight: '500', flex: 1 },
+  menuCheck: { marginLeft: 'auto' },
+  menuDivider: { height: 1, marginVertical: 6, marginHorizontal: 14 },
+
+  // Grid view
+  gridRow: { gap: GRID_GAP },
+  gridCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden', marginBottom: GRID_GAP },
+  gridPhoto: { width: '100%', resizeMode: 'cover' },
+  gridPhotoPlaceholder: { width: '100%', alignItems: 'center', justifyContent: 'center' },
+  gridContent: { padding: 10 },
+  gridBadge: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  gridName: { fontSize: 14, fontWeight: '600', marginBottom: 2 },
+  gridMeta: { fontSize: 12, marginBottom: 1 },
+  gridDate: { fontSize: 11 },
 
   fab: {
     position: 'absolute',

@@ -15,6 +15,8 @@ import { addItemsForeignKeys } from './migrations/006-add-items-foreign-keys';
 import { addItemPhotoUri } from './migrations/007-add-item-photo-uri';
 import { addSpacePhotoUri } from './migrations/008-add-space-photo-uri';
 import { addContainerPhotoUri } from './migrations/009-add-container-photo-uri';
+import { createLendingPhotosTable } from './migrations/010-create-lending-photos-table';
+import { addLendingDueDate } from './migrations/011-add-lending-due-date';
 
 /**
  * Initialize the database schema
@@ -166,6 +168,24 @@ export async function initializeDatabase() {
       }
     } catch (err) {
       console.error('⚠ Containers photo_uri migration failed:', err);
+    }
+
+    // Create lending_photos table (Migration 010)
+    try {
+      const tables = await db.getAllAsync<any>("SELECT name FROM sqlite_master WHERE type='table' AND name='lending_photos';");
+      if (tables.length === 0) {
+        await createLendingPhotosTable(db);
+        console.log('✓ Created lending_photos table');
+      }
+    } catch (err) {
+      console.error('⚠ Lending photos table creation failed:', err);
+    }
+
+    // Add due_date + reminder_id columns to lendings (Migration 011)
+    try {
+      await addLendingDueDate(db);
+    } catch (err) {
+      console.error('⚠ Lending due_date migration failed:', err);
     }
 
     console.log('✓ Database initialized (migrations completed with possible non-critical errors)');
