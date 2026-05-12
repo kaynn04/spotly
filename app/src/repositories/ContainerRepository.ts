@@ -48,6 +48,7 @@ export class ContainerRepository {
         name,
         spaceId,
         createdAt: now,
+        photoUri: null,
       };
     } catch (error) {
       // Convert database error to ServiceError
@@ -87,6 +88,7 @@ export class ContainerRepository {
         name: row.name,
         spaceId: row.space_id,
         createdAt: row.created_at,
+        photoUri: row.photo_uri ?? null,
       }));
     } catch (error) {
       // Convert database error to ServiceError
@@ -131,6 +133,7 @@ export class ContainerRepository {
         name: row.name,
         spaceId: row.space_id,
         createdAt: row.created_at,
+        photoUri: row.photo_uri ?? null,
       };
     } catch (error) {
       // Convert database error to ServiceError
@@ -251,6 +254,18 @@ export class ContainerRepository {
     } catch (error) {
       console.error('[ContainerRepository.getRecentlyMovedContainers] Database error:', error);
       return [];
+    }
+  }
+
+  static async updatePhotoUri(id: string, photoUri: string | null): Promise<void> {
+    try {
+      const db = getDatabase();
+      const now = new Date().toISOString();
+      await db.runAsync('UPDATE containers SET photo_uri = ?, updated_at = ? WHERE id = ?', [photoUri, now, id]);
+    } catch (error) {
+      console.error('[ContainerRepository.updatePhotoUri] Database error:', error);
+      const serviceError: ServiceError = { code: 'DB_ERROR', message: 'Failed to update container photo.' };
+      throw serviceError;
     }
   }
 }

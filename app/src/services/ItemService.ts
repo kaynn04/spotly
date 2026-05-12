@@ -9,6 +9,7 @@
 
 import type { Item, ServiceError } from '../models/Item';
 import { ItemRepository } from '../repositories/ItemRepository';
+import { PhotoService } from './PhotoService';
 
 /**
  * ItemService handles all item-related business logic
@@ -33,7 +34,8 @@ export class ItemService {
     name: string,
     containerId?: string | null,
     description?: string | null,
-    quantity?: number
+    quantity?: number,
+    photoUri?: string | null
   ): Promise<Item> {
     try {
       // Trim input
@@ -49,7 +51,7 @@ export class ItemService {
       }
 
       // Create item in database via repository
-      const item = await ItemRepository.createItem(trimmedName, spaceId, containerId, description, quantity);
+      const item = await ItemRepository.createItem(trimmedName, spaceId, containerId, description, quantity, photoUri);
 
       return item;
     } catch (error) {
@@ -187,6 +189,11 @@ export class ItemService {
    */
   static async deleteItem(itemId: string): Promise<void> {
     try {
+      // Fetch item to get the stored photoUri before deleting
+      const item = await ItemRepository.getById(itemId);
+      if (item?.photoUri) {
+        await PhotoService.deletePhoto(item.photoUri);
+      }
       // Delete item from database via repository
       await ItemRepository.deleteItem(itemId);
     } catch (error) {

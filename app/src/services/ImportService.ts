@@ -12,6 +12,17 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { getDatabase } from '../db/client';
 import { resetDatabase, initializeDatabase } from '../db/migrations';
 
+const PHOTOS_DIR = `${FileSystem.documentDirectory}photos/`;
+
+/** Write a base64-encoded photo to the photos directory, return the saved URI */
+async function restorePhoto(base64: string, filename: string): Promise<string> {
+  const info = await FileSystem.getInfoAsync(PHOTOS_DIR);
+  if (!info.exists) await FileSystem.makeDirectoryAsync(PHOTOS_DIR, { intermediates: true });
+  const destPath = `${PHOTOS_DIR}${filename}`;
+  await FileSystem.writeAsStringAsync(destPath, base64, { encoding: FileSystem.EncodingType.Base64 });
+  return destPath;
+}
+
 export type ImportMode = 'merge' | 'replace';
 
 export interface ImportResult {
@@ -72,9 +83,13 @@ export const ImportService = {
       if (Array.isArray(data.spaces)) {
         for (const s of data.spaces) {
           if (!s.id || !s.name) continue;
+          let photoUri: string | null = null;
+          if (s.photo_base64) {
+            try { photoUri = await restorePhoto(s.photo_base64, `space_${s.id}.jpg`); } catch {}
+          }
           await db.runAsync(
-            `${insertOrIgnore} INTO spaces (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)`,
-            [s.id, s.name, s.created_at || new Date().toISOString(), s.updated_at || s.created_at || new Date().toISOString()]
+            `${insertOrIgnore} INTO spaces (id, name, photo_uri, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+            [s.id, s.name, photoUri, s.created_at || new Date().toISOString(), s.updated_at || s.created_at || new Date().toISOString()]
           );
           counts.spaces++;
         }
@@ -84,9 +99,13 @@ export const ImportService = {
       if (Array.isArray(data.containers)) {
         for (const c of data.containers) {
           if (!c.id || !c.name || !c.space_id) continue;
+          let photoUri: string | null = null;
+          if (c.photo_base64) {
+            try { photoUri = await restorePhoto(c.photo_base64, `container_${c.id}.jpg`); } catch {}
+          }
           await db.runAsync(
-            `${insertOrIgnore} INTO containers (id, name, space_id, created_at) VALUES (?, ?, ?, ?)`,
-            [c.id, c.name, c.space_id, c.created_at || new Date().toISOString()]
+            `${insertOrIgnore} INTO containers (id, name, space_id, photo_uri, created_at) VALUES (?, ?, ?, ?, ?)`,
+            [c.id, c.name, c.space_id, photoUri, c.created_at || new Date().toISOString()]
           );
           counts.containers++;
         }
@@ -96,9 +115,13 @@ export const ImportService = {
       if (Array.isArray(data.items)) {
         for (const i of data.items) {
           if (!i.id || !i.name || !i.space_id) continue;
+          let photoUri: string | null = null;
+          if (i.photo_base64) {
+            try { photoUri = await restorePhoto(i.photo_base64, `${i.id}.jpg`); } catch {}
+          }
           await db.runAsync(
-            `${insertOrIgnore} INTO items (id, name, space_id, container_id, description, quantity, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [i.id, i.name, i.space_id, i.container_id || null, i.description || null, i.quantity ?? 1, i.created_at || new Date().toISOString()]
+            `${insertOrIgnore} INTO items (id, name, space_id, container_id, description, quantity, photo_uri, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [i.id, i.name, i.space_id, i.container_id || null, i.description || null, i.quantity ?? 1, photoUri, i.created_at || new Date().toISOString()]
           );
           counts.items++;
         }

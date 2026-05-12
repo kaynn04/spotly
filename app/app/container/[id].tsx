@@ -22,6 +22,7 @@ import {
   Alert,
   ScrollView,
   Modal,
+  Image,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faChevronLeft, faMapPin, faEllipsisVertical, faBox, faHandshake, faCheck, faTrash, faFolder, faRightLeft } from '@fortawesome/free-solid-svg-icons';
@@ -38,6 +39,9 @@ import { ContainerService } from '@/src/services/ContainerService';
 import { LendingService } from '@/src/features/lending/services/LendingService';
 import { LendingRepository } from '@/src/features/lending/repositories/LendingRepository';
 import { ItemRepository } from '@/src/repositories/ItemRepository';
+import { PhotoService } from '@/src/services/PhotoService';
+import { ContainerRepository } from '@/src/repositories/ContainerRepository';
+import PhotoPickerSheet from '@/components/PhotoPickerSheet';
 import { Lending } from '@/src/features/lending/models/Lending';
 import { OutsideService } from '@/src/features/outside/services/OutsideService';
 import ItemFormModal from '@/src/features/spaces/screens/components/ItemFormModal';
@@ -62,6 +66,7 @@ export default function ContainerDetailScreen() {
   const [loading, setLoading] = useState(true);
 
   const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [showContainerPhotoPicker, setShowContainerPhotoPicker] = useState(false);
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [selectedMoveItemId, setSelectedMoveItemId] = useState<string | null>(null);
   const [actionSheetItem, setActionSheetItem] = useState<Item | null>(null);
@@ -266,10 +271,42 @@ export default function ContainerDetailScreen() {
     } catch { Alert.alert('Error', 'Failed to move item'); }
   }
 
-  async function handleAddItem(name: string, description?: string, quantity?: number) {
+  async function handleAddItem(name: string, description?: string, quantity?: number, photoUri?: string | null) {
     if (!space || !containerId) return;
-    await ItemService.createItem(space.id, name, containerId, description, quantity);
+    const item = await ItemService.createItem(space.id, name, containerId, description, quantity);
+    if (photoUri) {
+      const savedUri = await PhotoService.savePhoto(photoUri, item.id);
+      await ItemRepository.updatePhotoUri(item.id, savedUri);
+    }
     await loadItems();
+  }
+
+  async function handleContainerPhoto(source: 'camera' | 'gallery') {
+    if (!containerId) return;
+    setShowContainerPhotoPicker(false);
+    try {
+      const tempUri = source === 'camera'
+        ? await PhotoService.captureFromCamera()
+        : await PhotoService.pickFromGallery();
+      if (!tempUri) return;
+      if (container?.photoUri) await PhotoService.deletePhoto(container.photoUri);
+      const savedUri = await PhotoService.savePhoto(tempUri, `container_${containerId}`);
+      await ContainerRepository.updatePhotoUri(containerId, savedUri);
+      await loadContainer();
+    } catch {
+      Alert.alert('Error', 'Failed to save photo');
+    }
+  }
+
+  async function handleRemoveContainerPhoto() {
+    if (!containerId) return;
+    try {
+      if (container?.photoUri) await PhotoService.deletePhoto(container.photoUri);
+      await ContainerRepository.updatePhotoUri(containerId, null);
+      await loadContainer();
+    } catch {
+      Alert.alert('Error', 'Failed to remove photo');
+    }
   }
 
   return (
@@ -293,6 +330,31 @@ export default function ContainerDetailScreen() {
           <FontAwesomeIcon icon={faEllipsisVertical} size={18} color={PRIMARY} />
         </TouchableOpacity>
       </View>
+
+      {/* Container Photo */}
+      {!loading && container && (
+        container.photoUri ? (
+          <TouchableOpacity
+            style={[styles.containerPhotoWrap, { borderColor }]}
+            onPress={() => Alert.alert('Container Photo', '', [
+              { text: 'Replace Photo', onPress: () => setShowContainerPhotoPicker(true) },
+              { text: 'Remove Photo', style: 'destructive', onPress: handleRemoveContainerPhoto },
+              { text: 'Cancel', style: 'cancel' },
+            ])}
+            activeOpacity={0.8}
+          >
+            <Image source={{ uri: container.photoUri }} style={styles.containerPhoto} resizeMode="cover" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.containerPhotoPlaceholder, { backgroundColor: cardBg, borderColor }]}
+            onPress={() => setShowContainerPhotoPicker(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.containerPhotoPlaceholderText, { color: subtleText }]}>+ Add Container Photo</Text>
+          </TouchableOpacity>
+        )
+      )}
 
       {loading ? (
         <View style={styles.centerContainer}>
@@ -323,6 +385,9 @@ export default function ContainerDetailScreen() {
                 activeOpacity={0.7}
               >
                 <View style={[styles.itemDot, { backgroundColor: isOutside ? '#e67e22' : isLent ? LENDING : isDark ? '#48484a' : '#c7c7cc' }]} />
+                {item.photoUri ? (
+                  <Image source={{ uri: item.photoUri }} style={styles.itemThumb} />
+                ) : null}
                 <View style={styles.itemTextWrap}>
                   <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={1}>
                     {item.name}
@@ -558,6 +623,13 @@ export default function ContainerDetailScreen() {
           ];
         })()}
       />
+
+      <PhotoPickerSheet
+        visible={showContainerPhotoPicker}
+        onClose={() => setShowContainerPhotoPicker(false)}
+        onCamera={() => handleContainerPhoto('camera')}
+        onGallery={() => handleContainerPhoto('gallery')}
+      />
     </View>
   );
 }
@@ -571,6 +643,10 @@ const styles = StyleSheet.create({
   breadcrumb: { fontSize: 11, fontWeight: '500', letterSpacing: 0.2, marginBottom: 1 },
   headerTitle: { fontSize: 17, fontWeight: '600' },
   headerMenuBtn: { paddingLeft: 12, paddingVertical: 8 },
+  containerPhotoWrap: { marginHorizontal: 16, marginTop: 8, borderRadius: 12, overflow: 'hidden', borderWidth: 1 },
+  containerPhoto: { width: '100%', height: 160 },
+  containerPhotoPlaceholder: { marginHorizontal: 16, marginTop: 8, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', paddingVertical: 14, alignItems: 'center' },
+  containerPhotoPlaceholderText: { fontSize: 14, fontWeight: '500' },
   menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-start', alignItems: 'flex-end', paddingTop: 60, paddingRight: 16 },
   menuSheet: { borderRadius: 14, borderWidth: 1, minWidth: 200, overflow: 'hidden' },
   menuTitle: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
@@ -582,6 +658,7 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3, marginBottom: 12 },
   itemCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingVertical: 14, paddingHorizontal: 14, marginBottom: 6, gap: 10 },
   itemDot: { width: 6, height: 6, borderRadius: 3 },
+  itemThumb: { width: 40, height: 40, borderRadius: 8 },
   itemTextWrap: { flex: 1 },
   itemName: { fontSize: 15, fontWeight: '500' },
   itemLentMeta: { fontSize: 12, marginTop: 2 },

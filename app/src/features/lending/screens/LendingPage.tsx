@@ -22,6 +22,7 @@ import {
   Animated,
   PanResponder,
   DeviceEventEmitter,
+  Image,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faMagnifyingGlass, faTimes, faChevronRight, faHandshake, faPlus, faMapPin, faFolder } from '@fortawesome/free-solid-svg-icons';
@@ -62,7 +63,7 @@ export default function LendingPage() {
     [repositories]
   );
 
-  const [lendings, setLendings] = useState<(Lending & { itemName?: string })[]>([]);
+  const [lendings, setLendings] = useState<(Lending & { itemName?: string; itemPhotoUri?: string | null })[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
@@ -117,9 +118,9 @@ export default function LendingPage() {
         activeLendings.map(async (lending) => {
           try {
             const item = await repositories.itemRepository.getById(lending.item_id);
-            return { ...lending, itemName: item?.name || 'Unknown Item' };
+            return { ...lending, itemName: item?.name || 'Unknown Item', itemPhotoUri: item?.photoUri ?? null };
           } catch {
-            return { ...lending, itemName: 'Unknown Item' };
+            return { ...lending, itemName: 'Unknown Item', itemPhotoUri: null };
           }
         })
       );
@@ -216,7 +217,7 @@ export default function LendingPage() {
     return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const renderLendingItem = ({ item, index }: { item: Lending & { itemName?: string }, index: number }) => (
+  const renderLendingItem = ({ item, index }: { item: Lending & { itemName?: string; itemPhotoUri?: string | null }, index: number }) => (
     <TouchableOpacity
       style={[
         styles.lendingRow,
@@ -225,7 +226,11 @@ export default function LendingPage() {
       onPress={() => router.push(`/lending/${item.id}`)}
       activeOpacity={0.6}
     >
-      <View style={[styles.activeDot, { backgroundColor: PRIMARY }]} />
+      {item.itemPhotoUri ? (
+        <Image source={{ uri: item.itemPhotoUri }} style={styles.lendingThumb} />
+      ) : (
+        <View style={[styles.activeDot, { backgroundColor: PRIMARY }]} />
+      )}
       <View style={styles.lendingRowContent}>
         <Text style={[styles.lendingItemName, { color: colors.text }]} numberOfLines={1}>
           {item.itemName || 'Unknown Item'}
@@ -399,11 +404,15 @@ export default function LendingPage() {
                       onPress={() => handleSelectItem(item)}
                       activeOpacity={0.7}
                     >
-                      <FontAwesomeIcon
-                        icon={containerName ? faFolder : faMapPin}
-                        size={15}
-                        color={PRIMARY}
-                      />
+                      {item.photoUri ? (
+                        <Image source={{ uri: item.photoUri }} style={styles.pickerThumb} />
+                      ) : (
+                        <FontAwesomeIcon
+                          icon={containerName ? faFolder : faMapPin}
+                          size={15}
+                          color={PRIMARY}
+                        />
+                      )}
                       <View style={styles.pickerRowText}>
                         <Text style={[styles.pickerItemName, { color: colors.text }]} numberOfLines={1}>
                           {item.name}
@@ -505,6 +514,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   activeDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  lendingThumb: { width: 40, height: 40, borderRadius: 8, flexShrink: 0 },
   lendingRowContent: { flex: 1 },
   lendingItemName: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
   lendingBorrower: { fontSize: 13, marginBottom: 2 },
@@ -552,6 +562,7 @@ const styles = StyleSheet.create({
   pickerSearchInput: { flex: 1, fontSize: 15 },
   pickerList: { marginBottom: 8 },
   pickerRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, gap: 12 },
+  pickerThumb: { width: 36, height: 36, borderRadius: 8, flexShrink: 0 },
   pickerRowText: { flex: 1 },
   pickerItemName: { fontSize: 15, fontWeight: '500' },
   pickerItemLocation: { fontSize: 12, marginTop: 2 },

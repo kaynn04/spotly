@@ -47,6 +47,7 @@ export class SpaceRepository {
         name,
         createdAt: now,
         updatedAt: now,
+        photoUri: null,
       };
     } catch (error) {
       // Convert database error to ServiceError
@@ -82,6 +83,7 @@ return (result as any[]).map((row: SpaceRow) => ({
         name: row.name,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
+        photoUri: row.photo_uri ?? null,
      }));
      
     } catch (error) {
@@ -106,6 +108,7 @@ return (result as any[]).map((row: SpaceRow) => ({
         name: row.name,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
+        photoUri: row.photo_uri ?? null,
         itemCount: row.direct_item_count ?? 0,
         containerCount: row.container_count ?? 0,
       }));
@@ -143,6 +146,7 @@ return (result as any[]).map((row: SpaceRow) => ({
         name: row.name,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
+        photoUri: row.photo_uri ?? null,
       };
     } catch (error) {
       // Convert database error to ServiceError
@@ -210,6 +214,18 @@ return (result as any[]).map((row: SpaceRow) => ({
       // Log error but return 0 as fallback
       console.error('[SpaceRepository.countSpaces] Database error:', error);
       return 0;
+    }
+  }
+
+  static async updatePhotoUri(id: string, photoUri: string | null): Promise<void> {
+    try {
+      const db = getDatabase();
+      const now = new Date().toISOString();
+      await db.runAsync('UPDATE spaces SET photo_uri = ?, updated_at = ? WHERE id = ?', [photoUri, now, id]);
+    } catch (error) {
+      console.error('[SpaceRepository.updatePhotoUri] Database error:', error);
+      const serviceError: ServiceError = { code: 'DB_ERROR', message: 'Failed to update space photo.' };
+      throw serviceError;
     }
   }
   

@@ -15,6 +15,7 @@ import {
   TextInput,
   Alert,
   DeviceEventEmitter,
+  Image,
 } from 'react-native';
 import ItemActionSheet from './components/ItemActionSheet';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
@@ -31,6 +32,8 @@ import type { SpaceWithCount } from '@/src/models/Space';
 import type { Item } from '@/src/models/Item';
 import type { Container } from '@/src/models/Container';
 import { SpaceService } from '@/src/services/SpaceService';
+import { SpaceRepository } from '@/src/repositories/SpaceRepository';
+import { PhotoService } from '@/src/services/PhotoService';
 import { ItemRepository } from '@/src/repositories/ItemRepository';
 import { ContainerRepository } from '@/src/repositories/ContainerRepository';
 import SpaceFormModal from './components/SpaceFormModal';
@@ -193,8 +196,12 @@ export default function SpacesPage() {
     }
   }, []);
 
-  const handleCreateSpace = async (name: string) => {
-    await SpaceService.createSpace(name);
+  const handleCreateSpace = async (name: string, photoUri?: string | null) => {
+    const space = await SpaceService.createSpace(name);
+    if (photoUri && space) {
+      const savedUri = await PhotoService.savePhoto(photoUri, `space_${space.id}`);
+      await SpaceRepository.updatePhotoUri(space.id, savedUri);
+    }
     await loadSpaces();
   };
 
@@ -245,6 +252,9 @@ export default function SpacesPage() {
       activeOpacity={0.7}
     >
       <View style={[styles.spaceDot, { backgroundColor: PRIMARY }]} />
+      {item.photoUri ? (
+        <Image source={{ uri: item.photoUri }} style={styles.spaceThumb} />
+      ) : null}
       <View style={styles.spaceCardContent}>
         <Text style={[styles.spaceName, { color: colors.text }]} numberOfLines={1}>
           {item.name}
@@ -518,6 +528,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   spaceDot: { width: 8, height: 8, borderRadius: 4 },
+  spaceThumb: { width: 44, height: 44, borderRadius: 8 },
   spaceCardContent: { flex: 1 },
   spaceName: { fontSize: 16, fontWeight: '600', marginBottom: 2 },
   spaceDate: { fontSize: 12 },

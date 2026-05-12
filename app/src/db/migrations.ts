@@ -12,6 +12,9 @@ import { createLendingsTable, dropLendingsTable } from './migrations/003-create-
 import { createOutsideSessionsTables, dropOutsideSessionsTables } from './migrations/004-create-outside-tables';
 import { addItemsUpdatedAt } from './migrations/005-add-items-updated-at';
 import { addItemsForeignKeys } from './migrations/006-add-items-foreign-keys';
+import { addItemPhotoUri } from './migrations/007-add-item-photo-uri';
+import { addSpacePhotoUri } from './migrations/008-add-space-photo-uri';
+import { addContainerPhotoUri } from './migrations/009-add-container-photo-uri';
 
 /**
  * Initialize the database schema
@@ -132,6 +135,39 @@ export async function initializeDatabase() {
       console.error('⚠ Items foreign keys migration failed:', err);
     }
 
+    // Add photo_uri column to items table (Migration 007)
+    try {
+      const cols = await db.getAllAsync<any>("PRAGMA table_info(items);");
+      if (!cols.some((col: any) => col.name === 'photo_uri')) {
+        await addItemPhotoUri();
+        console.log('✓ Added photo_uri column to items');
+      }
+    } catch (err) {
+      console.error('⚠ Items photo_uri migration failed:', err);
+    }
+
+    // Add photo_uri column to spaces table (Migration 008)
+    try {
+      const spaceCols = await db.getAllAsync<any>("PRAGMA table_info(spaces);");
+      if (!spaceCols.some((col: any) => col.name === 'photo_uri')) {
+        await addSpacePhotoUri();
+        console.log('✓ Added photo_uri column to spaces');
+      }
+    } catch (err) {
+      console.error('⚠ Spaces photo_uri migration failed:', err);
+    }
+
+    // Add photo_uri column to containers table (Migration 009)
+    try {
+      const containerCols = await db.getAllAsync<any>("PRAGMA table_info(containers);");
+      if (!containerCols.some((col: any) => col.name === 'photo_uri')) {
+        await addContainerPhotoUri();
+        console.log('✓ Added photo_uri column to containers');
+      }
+    } catch (err) {
+      console.error('⚠ Containers photo_uri migration failed:', err);
+    }
+
     console.log('✓ Database initialized (migrations completed with possible non-critical errors)');
   } catch (error) {
     console.error('✗ Critical database initialization error:', error);
@@ -157,6 +193,15 @@ export async function resetDatabase() {
       DROP TABLE IF EXISTS spaces;
     `);
     await initializeDatabase();
+
+    // Delete all stored photos to free device storage
+    const FileSystem = await import('expo-file-system/legacy');
+    const photosDir = `${FileSystem.documentDirectory}photos/`;
+    const info = await FileSystem.getInfoAsync(photosDir);
+    if (info.exists) {
+      await FileSystem.deleteAsync(photosDir, { idempotent: true });
+    }
+
     console.log('✓ Database reset successfully');
   } catch (error) {
     console.error('✗ Database reset error:', error);

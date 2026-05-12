@@ -34,7 +34,8 @@ export class ItemRepository {
     spaceId: string,
     containerId?: string | null,
     description?: string | null,
-    quantity?: number
+    quantity?: number,
+    photoUri?: string | null
   ): Promise<Item> {
     try {
       const db = getDatabase();
@@ -46,8 +47,8 @@ export class ItemRepository {
 
       // Execute parameterized INSERT query (handle optional containerId)
       await db.runAsync(
-        'INSERT INTO items (id, name, space_id, container_id, description, quantity, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [id, name, spaceId, containerId ?? null, description ?? null, qty, now, now]
+        'INSERT INTO items (id, name, space_id, container_id, description, quantity, photo_uri, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, name, spaceId, containerId ?? null, description ?? null, qty, photoUri ?? null, now, now]
       );
 
       // Return the created Item object
@@ -58,6 +59,7 @@ export class ItemRepository {
         quantity: qty,
         spaceId,
         containerId,
+        photoUri: photoUri ?? null,
         createdAt: now,
       };
     } catch (error) {
@@ -105,6 +107,7 @@ export class ItemRepository {
         spaceId: row.space_id,
         containerId: row.container_id,
         createdAt: row.created_at,
+        photoUri: row.photo_uri ?? null,
       }));
     } catch (error) {
       // Convert database error to ServiceError
@@ -146,6 +149,7 @@ export class ItemRepository {
         spaceId: row.space_id,
         createdAt: row.created_at,
         containerId: row.container_id,
+        photoUri: row.photo_uri ?? null,
       }));
     } catch (error) {
       // Convert database error to ServiceError
@@ -412,6 +416,7 @@ export class ItemRepository {
           i.space_id,
           i.container_id,
           i.created_at,
+          i.photo_uri,
           s.name as space,
           c.name as container
         FROM items i
@@ -428,6 +433,7 @@ export class ItemRepository {
         spaceId: row.space_id,
         containerId: row.container_id,
         createdAt: row.created_at,
+        photoUri: row.photo_uri ?? null,
         space: row.space ? { name: row.space } : null,
         container: row.container ? { name: row.container } : null,
       }));
@@ -460,6 +466,7 @@ export class ItemRepository {
           i.space_id,
           i.container_id,
           i.created_at,
+          i.photo_uri,
           s.name as space,
           c.name as container
         FROM items i
@@ -481,6 +488,7 @@ export class ItemRepository {
         spaceId: result.space_id,
         containerId: result.container_id,
         createdAt: result.created_at,
+        photoUri: result.photo_uri ?? null,
         space: result.space ? { name: result.space } : null,
         container: result.container ? { name: result.container } : null,
       };
@@ -522,6 +530,21 @@ export class ItemRepository {
     } catch (error) {
       console.error('[ItemRepository.updateItem] Database error:', error);
       const serviceError: ServiceError = { code: 'DB_ERROR', message: 'Failed to update item.' };
+      throw serviceError;
+    }
+  }
+
+  /**
+   * Update an item's photo_uri
+   */
+  static async updatePhotoUri(id: string, photoUri: string | null): Promise<void> {
+    try {
+      const db = getDatabase();
+      const now = new Date().toISOString();
+      await db.runAsync('UPDATE items SET photo_uri = ?, updated_at = ? WHERE id = ?', [photoUri, now, id]);
+    } catch (error) {
+      console.error('[ItemRepository.updatePhotoUri] Database error:', error);
+      const serviceError: ServiceError = { code: 'DB_ERROR', message: 'Failed to update item photo.' };
       throw serviceError;
     }
   }

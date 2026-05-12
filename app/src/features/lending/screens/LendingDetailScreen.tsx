@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Alert,
+  Image,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -162,6 +163,9 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
 
           {/* Item Card */}
           <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+            {item?.photoUri && (
+              <Image source={{ uri: item.photoUri }} style={styles.itemPhoto} />
+            )}
             <Text style={[styles.sectionLabel, { color: subtleText }]}>ITEM</Text>
             {item ? (
               <>
@@ -301,6 +305,7 @@ const styles = StyleSheet.create({
   sectionValue: { fontSize: 16, fontWeight: '500' },
   sectionValueMuted: { fontSize: 15, fontStyle: 'italic' },
   divider: { height: 1, marginVertical: 12 },
+  itemPhoto: { width: '100%', height: 180, borderRadius: 10, marginBottom: 14, resizeMode: 'cover' },
 
   footer: {
     paddingHorizontal: 16,
