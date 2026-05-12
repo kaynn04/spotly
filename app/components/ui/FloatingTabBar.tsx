@@ -49,6 +49,14 @@ const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function Floa
   const { translateY } = useScrollHide();
   const router = useRouter();
   const [showVoiceModal, setShowVoiceModal] = useState(false);
+  const [hidden, setHidden] = useState(false);
+
+  // Listen for hide/show events (e.g. multi-select mode)
+  useEffect(() => {
+    const showSub = DeviceEventEmitter.addListener('spotly:show-tab-bar', () => setHidden(false));
+    const hideSub = DeviceEventEmitter.addListener('spotly:hide-tab-bar', () => setHidden(true));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   const bg = isDark ? '#1c1c1e' : '#ffffff';
   const border = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
@@ -79,6 +87,7 @@ const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function Floa
 
   return (
     <>
+      {!hidden && (
       <Animated.View
         style={[
           styles.pill,
@@ -130,6 +139,7 @@ const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function Floa
           return tabItem;
         })}
       </Animated.View>
+      )}
 
       <VoiceModal
         visible={showVoiceModal}

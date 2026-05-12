@@ -16,10 +16,16 @@ import {
   Alert,
   DeviceEventEmitter,
   Image,
+  Modal,
+  TouchableWithoutFeedback,
+  ScrollView,
+  BackHandler,
+  useWindowDimensions,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import ItemActionSheet from './components/ItemActionSheet';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faFileAlt, faFileArchive, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faFileAlt, faFileArchive, faTrash, faPen, faEllipsisVertical, faList, faGrip, faArrowDownAZ, faArrowDownZA, faCubes, faCalendarPlus, faCalendar, faFilter, faCheck } from '@fortawesome/free-solid-svg-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -54,8 +60,19 @@ type SectionedSearchItem =
   | { kind: 'result'; data: SearchResult };
 
 const PRIMARY = '#6b7f99';
+const VIEW_MODE_KEY = 'spotly:spaces-view-mode';
+const SORT_KEY = 'spotly:spaces-sort';
+const FILTER_KEY = 'spotly:spaces-filter';
+type ViewMode = 'list' | 'grid';
+type SortMode = 'name-asc' | 'name-desc' | 'most-items' | 'newest' | 'oldest';
+type FilterMode = 'all' | 'non-empty';
+const GRID_GAP = 10;
+const GRID_PADDING = 16;
+const GRID_COLUMNS = 2;
 
 export default function SpacesPage() {
+  const { width: screenWidth } = useWindowDimensions();
+  const GRID_ITEM_WIDTH = (screenWidth - GRID_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -70,6 +87,27 @@ export default function SpacesPage() {
   const [loading, setLoading] = useState(false);
   const [formVisible, setFormVisible] = useState(false);
   const [actionSheetSpace, setActionSheetSpace] = useState<SpaceWithCount | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [sortMode, setSortMode] = useState<SortMode>('name-asc');
+  const [filterMode, setFilterMode] = useState<FilterMode>('all');
+  const [showMenu, setShowMenu] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+  const [editingSpace, setEditingSpace] = useState<SpaceWithCount | null>(null);
+
+  // Load persisted preferences
+  useEffect(() => {
+    Promise.all([
+      AsyncStorage.getItem(VIEW_MODE_KEY),
+      AsyncStorage.getItem(SORT_KEY),
+      AsyncStorage.getItem(FILTER_KEY),
+    ]).then(([v, s, f]) => {
+      if (v === 'list' || v === 'grid') setViewMode(v);
+      if (s === 'name-asc' || s === 'name-desc' || s === 'most-items' || s === 'newest' || s === 'oldest') setSortMode(s);
+      if (f === 'all' || f === 'non-empty') setFilterMode(f);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (openCreate === '1') {
@@ -80,6 +118,7 @@ export default function SpacesPage() {
   const [searchResults, setSearchResults] = useState<SectionedSearchItem[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const isSearching = searchText.trim().length > 0;
+  const searchInputRef = useRef<TextInput>(null);
   const totalSearchResults = useMemo(
     () => searchResults.filter((i) => i.kind !== 'section').length,
     [searchResults]
@@ -95,10 +134,33 @@ export default function SpacesPage() {
     }, [])
   );
 
+  // Restore tab bar if navigating away while in select mode
+  const selectModeRef = useRef(false);
+  selectModeRef.current = selectMode;
+  useEffect(() => {
+    return () => {
+      if (selectModeRef.current) {
+        DeviceEventEmitter.emit('spotly:show-tab-bar');
+      }
+    };
+  }, []);
+
   // Listen for refresh events from voice feature or other sources
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('spotly:refresh-home', loadSpaces);
     return () => subscription.remove();
+  }, []);
+
+  // Handle back button — cancel select mode instead of navigating away
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (selectModeRef.current) {
+        exitSelectMode();
+        return true; // Prevent default navigation
+      }
+      return false; // Allow default navigation
+    });
+    return () => backHandler.remove();
   }, []);
 
   const loadSpaces = async () => {
@@ -113,7 +175,7 @@ export default function SpacesPage() {
     }
   };
 
-  const handleSearch = useCallback(async (text: string) => {
+  const handleSearch = useCallback((text: string) => {
     setSearchText(text);
     const trimmed = text.trim();
     if (!trimmed) { setSearchResults([]); return; }
@@ -196,6 +258,56 @@ export default function SpacesPage() {
     }
   }, []);
 
+  const enterSelectMode = (space: SpaceWithCount) => {
+    setSelectMode(true);
+    setSelectedIds(new Set([space.id]));
+    DeviceEventEmitter.emit('spotly:hide-tab-bar');
+  };
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    DeviceEventEmitter.emit('spotly:show-tab-bar');
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => setSelectedIds(new Set(displayedSpaces.map((s) => s.id)));
+
+  const handleBulkDelete = () => {
+    const count = selectedIds.size;
+    Alert.alert(
+      `Delete ${count} Space${count !== 1 ? 's' : ''}`,
+      `This will permanently delete ${count} space${count !== 1 ? 's' : ''} and all their contents. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              await Promise.all([...selectedIds].map((id) => SpaceService.deleteSpace(id)));
+              exitSelectMode();
+              await loadSpaces();
+            } catch {
+              Alert.alert('Error', 'Some spaces could not be deleted');
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleCreateSpace = async (name: string, photoUri?: string | null) => {
     const space = await SpaceService.createSpace(name);
     if (photoUri && space) {
@@ -203,6 +315,29 @@ export default function SpacesPage() {
       await SpaceRepository.updatePhotoUri(space.id, savedUri);
     }
     await loadSpaces();
+  };
+
+  const handleEditSpace = async (name: string, photoUri?: string | null) => {
+    if (!editingSpace) return;
+    const id = editingSpace.id;
+    await SpaceRepository.updateName(id, name);
+    if (photoUri && photoUri !== editingSpace.photoUri) {
+      const savedUri = await PhotoService.savePhoto(photoUri, `space_${id}`);
+      await SpaceRepository.updatePhotoUri(id, savedUri);
+    } else if (!photoUri && editingSpace.photoUri) {
+      await PhotoService.deletePhoto(editingSpace.photoUri);
+      await SpaceRepository.updatePhotoUri(id, null);
+    }
+    setEditingSpace(null);
+    exitSelectMode();
+    await loadSpaces();
+  };
+
+  const handleBulkEdit = () => {
+    if (selectedIds.size !== 1) return;
+    const id = [...selectedIds][0];
+    const space = spaces.find((s) => s.id === id);
+    if (space) setEditingSpace(space);
   };
 
   const confirmDeleteSpace = (space: SpaceWithCount) => {
@@ -236,22 +371,111 @@ export default function SpacesPage() {
       year: 'numeric',
     });
 
+  const switchViewMode = (mode: ViewMode) => {
+    setViewMode(mode);
+    setShowMenu(false);
+    AsyncStorage.setItem(VIEW_MODE_KEY, mode).catch(() => {});
+  };
+
+  const switchSortMode = (mode: SortMode) => {
+    setSortMode(mode);
+    setShowMenu(false);
+    AsyncStorage.setItem(SORT_KEY, mode).catch(() => {});
+  };
+
+  const switchFilterMode = (mode: FilterMode) => {
+    setFilterMode(mode);
+    setShowMenu(false);
+    AsyncStorage.setItem(FILTER_KEY, mode).catch(() => {});
+  };
+
+  const displayedSpaces = useMemo(() => {
+    let result = [...spaces];
+
+    // Filter
+    if (filterMode === 'non-empty') {
+      result = result.filter((s) => s.itemCount > 0 || s.containerCount > 0);
+    }
+
+    // Sort
+    switch (sortMode) {
+      case 'name-asc':
+        result.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case 'name-desc':
+        result.sort((a, b) => b.name.localeCompare(a.name));
+        break;
+      case 'most-items':
+        result.sort((a, b) => (b.itemCount + b.containerCount) - (a.itemCount + a.containerCount));
+        break;
+      case 'newest':
+        result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        break;
+      case 'oldest':
+        result.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        break;
+    }
+
+    return result;
+  }, [spaces, sortMode, filterMode]);
+
   const renderSpace = ({ item, index }: { item: SpaceWithCount; index: number }) => {
     const metaParts: string[] = [];
     if (item.containerCount > 0) metaParts.push(`${item.containerCount} container${item.containerCount !== 1 ? 's' : ''}`);
     if (item.itemCount > 0) metaParts.push(`${item.itemCount} item${item.itemCount !== 1 ? 's' : ''}`);
     const meta = metaParts.length > 0 ? metaParts.join(' · ') : 'Empty';
+    const isSelected = selectedIds.has(item.id);
+
+    const handlePress = () => {
+      if (selectMode) { toggleSelect(item.id); return; }
+      router.push({ pathname: '/space/[id]' as any, params: { id: item.id } });
+    };
+    const handleLongPress = () => {
+      if (!selectMode) enterSelectMode(item);
+    };
+
+    if (viewMode === 'grid' && !isSearching) {
+      return (
+        <TouchableOpacity
+          style={[styles.gridCard, { backgroundColor: cardBg, borderColor: isSelected ? PRIMARY : borderColor, width: GRID_ITEM_WIDTH }, isSelected && styles.selectedCard]}
+          onPress={handlePress}
+          onLongPress={handleLongPress}
+          activeOpacity={0.7}
+        >
+          {item.photoUri ? (
+            <Image source={{ uri: item.photoUri }} style={[styles.gridPhoto, { height: GRID_ITEM_WIDTH * 0.7 }]} />
+          ) : (
+            <View style={[styles.gridPhotoPlaceholder, { backgroundColor: `${PRIMARY}12`, height: GRID_ITEM_WIDTH * 0.7 }]}>
+              <FontAwesomeIcon icon={faFolder} size={28} color={PRIMARY} />
+            </View>
+          )}
+          {selectMode && (
+            <View style={[styles.gridSelectBadge, isSelected && { backgroundColor: PRIMARY }]}>
+              {isSelected && <FontAwesomeIcon icon={faCheck} size={10} color="#fff" />}
+            </View>
+          )}
+          <View style={styles.gridContent}>
+            <Text style={[styles.gridName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
+            <Text style={[styles.gridMeta, { color: subtleText }]} numberOfLines={1}>{meta}</Text>
+          </View>
+        </TouchableOpacity>
+      );
+    }
 
     return (
     <TouchableOpacity
-      style={[styles.spaceCard, { backgroundColor: cardBg, borderColor }]}
-      onPress={() =>
-        router.push({ pathname: '/space/[id]' as any, params: { id: item.id } })
-      }
-      onLongPress={() => setActionSheetSpace(item)}
+      style={[styles.spaceCard, { backgroundColor: cardBg, borderColor: isSelected ? PRIMARY : borderColor }, isSelected && styles.selectedCard]}
+      onPress={handlePress}
+      onLongPress={handleLongPress}
       activeOpacity={0.7}
     >
-      <View style={[styles.spaceDot, { backgroundColor: PRIMARY }]} />
+      {selectMode ? (
+        <View style={[styles.selectCircle, isSelected && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}>
+          {isSelected && <FontAwesomeIcon icon={faCheck} size={10} color="#fff" />}
+        </View>
+      ) : (
+        <View style={[styles.spaceDot, { backgroundColor: PRIMARY }]} />
+      )}
       {item.photoUri ? (
         <Image source={{ uri: item.photoUri }} style={styles.spaceThumb} />
       ) : null}
@@ -263,16 +487,93 @@ export default function SpacesPage() {
           {meta}
         </Text>
       </View>
-      <FontAwesomeIcon icon={faChevronRight} size={16} color={subtleText} />
+      {!selectMode && <FontAwesomeIcon icon={faChevronRight} size={16} color={subtleText} />}
     </TouchableOpacity>
   );
   };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top']}>
+      {/* Page header — outside FlatList to prevent remount on key change */}
+      <View style={styles.headerFixed}>
+        <View style={styles.header}>
+          <View>
+            {selectMode ? (
+              <Text style={[styles.title, { color: colors.text }]}>{selectedIds.size} selected</Text>
+            ) : (
+              <>
+                <Text style={[styles.title, { color: colors.text }]}>Spaces</Text>
+                <Text style={[styles.subtitle, { color: subtleText }]}>Organize your belongings</Text>
+              </>
+            )}
+          </View>
+          {selectMode ? (
+            <View style={styles.selectHeaderActions}>
+              <TouchableOpacity onPress={selectAll} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Text style={[styles.selectActionText, { color: PRIMARY }]}>All</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={exitSelectMode} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Text style={[styles.selectActionText, { color: subtleText }]}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            spaces.length > 0 && !isSearching && (
+              <TouchableOpacity
+                style={styles.menuBtn}
+                onPress={() => setShowMenu(true)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <FontAwesomeIcon icon={faEllipsisVertical} size={18} color={subtleText} />
+              </TouchableOpacity>
+            )
+          )}
+        </View>
+
+        {/* Search bar */}
+        <View style={[styles.searchWrapper, { backgroundColor: isDark ? '#1c1c1e' : '#ffffff', borderColor }]}>
+          <FontAwesomeIcon icon={faMagnifyingGlass} size={16} color={colors.text} />
+          <TextInput
+            ref={searchInputRef}
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Search items & containers across all spaces..."
+            placeholderTextColor={subtleText}
+            value={searchText}
+            onChangeText={handleSearch}
+            returnKeyType="search"
+          />
+          {isSearching && (
+            <TouchableOpacity 
+              onPress={() => { setSearchText(''); setSearchResults([]); searchInputRef.current?.focus(); }} 
+              style={styles.clearBtn}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              activeOpacity={0.6}
+            >
+              <FontAwesomeIcon icon={faTimes} size={16} color={subtleText} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Search result summary OR spaces section label */}
+        {isSearching ? (
+          <View style={styles.resultHeader}>
+            {searchLoading ? (
+              <ActivityIndicator size="small" color={PRIMARY} style={{ marginRight: 8 }} />
+            ) : null}
+            <Text style={[styles.sectionLabel, { color: subtleText }]}>
+              {searchLoading ? 'Searching...' : `${totalSearchResults} result${totalSearchResults !== 1 ? 's' : ''} for "${searchText.trim()}"`}
+            </Text>
+          </View>
+        ) : spaces.length > 0 ? (
+          <View style={styles.sectionLabelRow}>
+            <Text style={[styles.sectionLabel, { color: subtleText }]}>YOUR SPACES</Text>
+            <Text style={[styles.longPressHint, { color: subtleText }]}>Long press to select</Text>
+          </View>
+        ) : null}
+      </View>
+
       <FlatList
-        data={isSearching ? searchResults : spaces}
-        keyExtractor={(item) => {
+        data={(isSearching ? searchResults : displayedSpaces) as any[]}
+        keyExtractor={(item: any) => {
           if (isSearching) {
             const si = item as SectionedSearchItem;
             if (si.kind === 'section') return `section-${si.title}`;
@@ -281,7 +582,7 @@ export default function SpacesPage() {
           }
           return (item as Space).id;
         }}
-        renderItem={isSearching ? ({ item }) => {
+        renderItem={isSearching ? ({ item }: any) => {
           const si = item as SectionedSearchItem;
           if (si.kind === 'section') {
             return (
@@ -289,7 +590,7 @@ export default function SpacesPage() {
             );
           }
           if (si.kind === 'space') {
-            return renderSpace({ item: si.data, index: 0 });
+            return renderSpace({ item: si.data as SpaceWithCount, index: 0 });
           }
           const result = si.data;
           const isContainer = result.type === 'container';
@@ -322,61 +623,14 @@ export default function SpacesPage() {
             </TouchableOpacity>
           );
         } : renderSpace}
+        key={isSearching ? 'list' : (viewMode === 'grid' ? 'grid' : 'list')}
+        numColumns={!isSearching && viewMode === 'grid' ? GRID_COLUMNS : 1}
+        columnWrapperStyle={!isSearching && viewMode === 'grid' ? styles.gridRow : undefined}
         contentContainerStyle={[styles.listContent, { paddingTop: 8, paddingBottom: tabBarPadding }]}
         showsVerticalScrollIndicator={false}
         onScroll={isSearching ? undefined : handleScroll}
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
-        ListHeaderComponent={
-          <>
-            {/* Page header */}
-            <View style={styles.header}>
-              <View>
-                <Text style={[styles.title, { color: colors.text }]}>Spaces</Text>
-                <Text style={[styles.subtitle, { color: subtleText }]}>
-                  Organize your belongings
-                </Text>
-              </View>
-              {spaces.length > 0 && !isSearching && (
-                <View style={[styles.countBadge, { backgroundColor: `${PRIMARY}18`, borderColor: `${PRIMARY}30` }]}>
-                  <Text style={[styles.countBadgeText, { color: PRIMARY }]}>{spaces.length}</Text>
-                </View>
-              )}
-            </View>
-
-            {/* Search bar */}
-            <View style={[styles.searchWrapper, { backgroundColor: isDark ? '#1c1c1e' : '#ffffff', borderColor }]}>
-              <FontAwesomeIcon icon={faMagnifyingGlass} size={16} color={colors.text} />
-              <TextInput
-                style={[styles.searchInput, { color: colors.text }]}
-                placeholder="Search items & containers across all spaces..."
-                placeholderTextColor={subtleText}
-                value={searchText}
-                onChangeText={handleSearch}
-                returnKeyType="search"
-              />
-              {isSearching && (
-                <TouchableOpacity onPress={() => { setSearchText(''); setSearchResults([]); }} style={styles.clearBtn}>
-                  <FontAwesomeIcon icon={faTimes} size={16} color={subtleText} />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Search result summary OR spaces section label */}
-            {isSearching ? (
-              <View style={styles.resultHeader}>
-                {searchLoading ? (
-                  <ActivityIndicator size="small" color={PRIMARY} style={{ marginRight: 8 }} />
-                ) : null}
-                <Text style={[styles.sectionLabel, { color: subtleText }]}>
-                  {searchLoading ? 'Searching...' : `${totalSearchResults} result${totalSearchResults !== 1 ? 's' : ''} for "${searchText.trim()}"`}
-                </Text>
-              </View>
-            ) : spaces.length > 0 ? (
-              <Text style={[styles.sectionLabel, { color: subtleText }]}>YOUR SPACES</Text>
-            ) : null}
-          </>
-        }
         ListEmptyComponent={
           isSearching ? (
             searchLoading ? null : (
@@ -409,8 +663,8 @@ export default function SpacesPage() {
         }
       />
 
-      {/* FAB -- only shown when spaces exist */}
-      {spaces.length > 0 && (
+      {/* FAB -- hidden in select mode */}
+      {spaces.length > 0 && !selectMode && (
         <TouchableOpacity
           style={[styles.fab, { backgroundColor: PRIMARY, bottom: insets.bottom + 84 }]}
           onPress={() => setFormVisible(true)}
@@ -425,6 +679,41 @@ export default function SpacesPage() {
         onClose={() => setFormVisible(false)}
         onSubmit={handleCreateSpace}
       />
+
+      <SpaceFormModal
+        visible={editingSpace !== null}
+        onClose={() => setEditingSpace(null)}
+        onSubmit={handleEditSpace}
+        editMode
+        initialName={editingSpace?.name}
+        initialPhotoUri={editingSpace?.photoUri}
+      />
+
+      {/* Bulk action toolbar — floats above tab bar */}
+      {selectMode && (
+        <View style={[styles.bulkToolbar, { backgroundColor: cardBg, borderColor, bottom: insets.bottom + 16 }]}>
+          <TouchableOpacity
+            style={[styles.bulkAction, { opacity: selectedIds.size !== 1 ? 0.4 : 1 }]}
+            onPress={handleBulkEdit}
+            disabled={selectedIds.size !== 1}
+          >
+            <FontAwesomeIcon icon={faPen} size={18} color={PRIMARY} />
+            <Text style={[styles.bulkActionLabel, { color: PRIMARY }]}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.bulkAction, { opacity: selectedIds.size === 0 || deleting ? 0.4 : 1 }]}
+            onPress={handleBulkDelete}
+            disabled={selectedIds.size === 0 || deleting}
+          >
+            {deleting ? (
+              <ActivityIndicator size="small" color="#d32f2f" />
+            ) : (
+              <FontAwesomeIcon icon={faTrash} size={18} color="#d32f2f" />
+            )}
+            <Text style={[styles.bulkActionLabel, { color: '#d32f2f' }]}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       <ItemActionSheet
         visible={actionSheetSpace !== null}
         itemName={actionSheetSpace?.name ?? ''}
@@ -449,6 +738,83 @@ export default function SpacesPage() {
           ];
         })()}
       />
+
+      {/* Menu */}
+      <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
+        <TouchableWithoutFeedback onPress={() => setShowMenu(false)}>
+          <View style={styles.menuOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.menuCard, { backgroundColor: cardBg, borderColor }]}>
+              <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+                {/* View section */}
+                <Text style={[styles.menuTitle, { color: subtleText }]}>View</Text>
+                <TouchableOpacity
+                  style={[styles.menuOption, viewMode === 'list' && styles.menuOptionActive]}
+                  onPress={() => switchViewMode('list')}
+                  activeOpacity={0.7}
+                >
+                  <FontAwesomeIcon icon={faList} size={14} color={viewMode === 'list' ? PRIMARY : subtleText} />
+                  <Text style={[styles.menuOptionText, { color: viewMode === 'list' ? PRIMARY : colors.text }]}>List</Text>
+                  {viewMode === 'list' && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.menuOption, viewMode === 'grid' && styles.menuOptionActive]}
+                  onPress={() => switchViewMode('grid')}
+                  activeOpacity={0.7}
+                >
+                  <FontAwesomeIcon icon={faGrip} size={14} color={viewMode === 'grid' ? PRIMARY : subtleText} />
+                  <Text style={[styles.menuOptionText, { color: viewMode === 'grid' ? PRIMARY : colors.text }]}>Grid</Text>
+                  {viewMode === 'grid' && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
+                </TouchableOpacity>
+
+                <View style={[styles.menuDivider, { backgroundColor: borderColor }]} />
+
+                {/* Sort section */}
+                <Text style={[styles.menuTitle, { color: subtleText }]}>Sort</Text>
+                {[
+                  { key: 'name-asc' as SortMode, icon: faArrowDownAZ, label: 'Name A→Z' },
+                  { key: 'name-desc' as SortMode, icon: faArrowDownZA, label: 'Name Z→A' },
+                  { key: 'most-items' as SortMode, icon: faCubes, label: 'Most items' },
+                  { key: 'newest' as SortMode, icon: faCalendarPlus, label: 'Newest first' },
+                  { key: 'oldest' as SortMode, icon: faCalendar, label: 'Oldest first' },
+                ].map((opt) => (
+                  <TouchableOpacity
+                    key={opt.key}
+                    style={[styles.menuOption, sortMode === opt.key && styles.menuOptionActive]}
+                    onPress={() => switchSortMode(opt.key)}
+                    activeOpacity={0.7}
+                  >
+                    <FontAwesomeIcon icon={opt.icon} size={14} color={sortMode === opt.key ? PRIMARY : subtleText} />
+                    <Text style={[styles.menuOptionText, { color: sortMode === opt.key ? PRIMARY : colors.text }]}>{opt.label}</Text>
+                    {sortMode === opt.key && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
+                  </TouchableOpacity>
+                ))}
+
+                <View style={[styles.menuDivider, { backgroundColor: borderColor }]} />
+
+                {/* Filter section */}
+                <Text style={[styles.menuTitle, { color: subtleText }]}>Filter</Text>
+                {[
+                  { key: 'all' as FilterMode, label: 'All spaces' },
+                  { key: 'non-empty' as FilterMode, label: 'Non-empty only' },
+                ].map((opt) => (
+                  <TouchableOpacity
+                    key={opt.key}
+                    style={[styles.menuOption, filterMode === opt.key && styles.menuOptionActive]}
+                    onPress={() => switchFilterMode(opt.key)}
+                    activeOpacity={0.7}
+                  >
+                    <FontAwesomeIcon icon={faFilter} size={14} color={filterMode === opt.key ? PRIMARY : subtleText} />
+                    <Text style={[styles.menuOptionText, { color: filterMode === opt.key ? PRIMARY : colors.text }]}>{opt.label}</Text>
+                    {filterMode === opt.key && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -456,6 +822,7 @@ export default function SpacesPage() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   listContent: { paddingHorizontal: 16 },
+  headerFixed: { paddingHorizontal: 16 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -473,6 +840,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   countBadgeText: { fontSize: 14, fontWeight: '600' },
+  menuBtn: { padding: 8, marginTop: 4 },
 
   // Search
   searchWrapper: {
@@ -491,6 +859,8 @@ const styles = StyleSheet.create({
   clearBtnText: { fontSize: 16 },
   resultHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5, marginBottom: 10 },
+  sectionLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  longPressHint: { fontSize: 11, fontStyle: 'italic' },
   sectionHeader: { fontSize: 12, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', paddingTop: 12, paddingBottom: 6 },
 
   // Search results
@@ -585,4 +955,112 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   fabText: { color: '#fff', fontSize: 28, fontWeight: '300', lineHeight: 32 },
+
+  // Grid view
+  gridRow: { gap: GRID_GAP },
+  gridCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: GRID_GAP,
+  },
+  gridPhoto: { width: '100%', resizeMode: 'cover' },
+  gridPhotoPlaceholder: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gridContent: { padding: 10 },
+  gridName: { fontSize: 14, fontWeight: '600', marginBottom: 2 },
+  gridMeta: { fontSize: 11 },
+
+  // 3-dot menu
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 100,
+    paddingRight: 20,
+  },
+  menuCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    minWidth: 180,
+    maxHeight: '60%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  menuTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 4, textTransform: 'uppercase' },
+  menuOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 8,
+    marginHorizontal: 4,
+  },
+  menuOptionActive: { backgroundColor: 'rgba(107,127,153,0.1)' },
+  menuOptionText: { fontSize: 14, fontWeight: '500', flex: 1 },
+  menuCheck: { marginLeft: 'auto' },
+  menuDivider: { height: 1, marginVertical: 6, marginHorizontal: 14 },
+
+  // Multi-select
+  selectCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#c0c0c0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  selectedCard: { borderWidth: 2 },
+  gridSelectBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#c0c0c0',
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectHeaderActions: { flexDirection: 'row', gap: 16, alignItems: 'center', marginTop: 6 },
+  selectActionText: { fontSize: 15, fontWeight: '600' },
+  bulkToolbar: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  bulkAction: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    gap: 4,
+    minWidth: 60,
+  },
+  bulkActionLabel: { fontSize: 11, fontWeight: '600' },
 });
