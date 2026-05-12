@@ -4,7 +4,7 @@
  * Main Outside tab — modern minimalist redesign
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,13 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Alert,
+  DeviceEventEmitter,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faSuitcase, faChevronRight, faCheckCircle, faClockRotateLeft } from '@fortawesome/free-solid-svg-icons';
 import { OutsideSession } from '../models/OutsideSession';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -26,6 +28,7 @@ import { useTabBarPadding } from '@/hooks/use-tab-bar-padding';
 import { useOutsideService } from '../services/OutsideService';
 import { OutsideSessionItemWithContext } from '../models/OutsideSessionItem';
 import SessionFormModal from './components/SessionFormModal';
+import { ItemRepository } from '@/src/repositories/ItemRepository';
 
 interface SessionCardState {
   loading: boolean;
@@ -52,7 +55,6 @@ export default function OutsidePage() {
   const colorScheme = useColorScheme();
   const outsideService = useOutsideService();
   const colors = Colors[colorScheme ?? 'light'];
-  const insets = useSafeAreaInsets();
   const isDark = colorScheme === 'dark';
   const { handleScroll } = useScrollHide();
   const tabBarPadding = useTabBarPadding();
@@ -75,6 +77,15 @@ export default function OutsidePage() {
       loadRecentSessions();
     }, [])
   );
+
+  // Listen for refresh events from voice feature or other sources
+  useEffect(() => {
+    const handleRefresh = async () => {
+      await Promise.all([loadActiveSession(), loadRecentSessions()]);
+    };
+    const subscription = DeviceEventEmitter.addListener('spotly:refresh-home', handleRefresh);
+    return () => subscription.remove();
+  }, []);
 
   const loadActiveSession = async () => {
     setSessionCard({ loading: true, error: null, itemCount: 0, checkedCount: 0 });
@@ -115,7 +126,22 @@ export default function OutsidePage() {
   const handleViewHistory = () => router.push('/outside/history');
   const handleOpenSession = () => activeSessionId && router.push(`/outside/${activeSessionId}`);
   const handleCompleteSession = () => activeSessionId && router.push(`/outside/${activeSessionId}`);
-  const handleCreateSession = () => setFormVisible(true);
+  const handleCreateSession = async () => {
+    try {
+      const items = await new ItemRepository().getAll();
+      if (items.length === 0) {
+        Alert.alert(
+          'No Items Yet',
+          'Add items to your spaces first before starting an outside session.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+    } catch {
+      // If check fails, allow through
+    }
+    setFormVisible(true);
+  };
 
   const previewItems = sessionItems.slice(0, 5);
   const progressPercent =
@@ -128,9 +154,9 @@ export default function OutsidePage() {
   const subtleText = isDark ? '#8e8e93' : '#a0aec0';
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top', 'bottom']}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8, paddingBottom: tabBarPadding }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarPadding }]}
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
@@ -262,7 +288,7 @@ export default function OutsidePage() {
               style={[styles.primaryButton, { backgroundColor: PRIMARY, alignSelf: 'stretch' }]}
               onPress={handleCreateSession}
             >
-              <Text style={styles.primaryButtonText}>Start New Session</Text>
+              <Text style={styles.primaryButtonText}>+ Start New Session</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -314,7 +340,7 @@ export default function OutsidePage() {
           loadRecentSessions();
         }}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 

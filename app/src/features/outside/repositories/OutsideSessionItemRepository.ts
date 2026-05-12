@@ -65,8 +65,11 @@ export class OutsideSessionItemRepository {
           osi.moved_to_space_name,
           osi.moved_to_container_name,
           COALESCE(i.name, 'Unknown Item') as item_name,
+          i.space_id,
           COALESCE(s.name, 'Unknown Space') as space_name,
-          c.name as container_name
+          i.container_id,
+          c.name as container_name,
+          (SELECT l.borrower_name FROM lendings l WHERE l.item_id = osi.item_id AND l.status = 'ACTIVE' LIMIT 1) as active_borrower_name
         FROM outside_session_items osi
         LEFT JOIN items i ON osi.item_id = i.id
         LEFT JOIN spaces s ON i.space_id = s.id
@@ -86,10 +89,13 @@ export class OutsideSessionItemRepository {
         is_checked: Number(row.is_checked),
         checked_at: row.checked_at,
         item_name: String(row.item_name || 'Unknown Item'),
+        space_id: row.space_id ? String(row.space_id) : null,
         space_name: String(row.space_name || 'Unknown Space'),
+        container_id: row.container_id ? String(row.container_id) : null,
         container_name: row.container_name ? String(row.container_name) : null,
         moved_to_space_name: row.moved_to_space_name ? String(row.moved_to_space_name) : null,
         moved_to_container_name: row.moved_to_container_name ? String(row.moved_to_container_name) : null,
+        active_borrower_name: row.active_borrower_name ? String(row.active_borrower_name) : null,
       }));
 
       console.log('[OutsideSessionItemRepository] Parsed results:', parsed);

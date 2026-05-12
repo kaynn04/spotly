@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faCheck, faTimes, faHome, faBox, faFolder, faChevronLeft, faMapPin, faHandshake, faTrash } from '@fortawesome/free-solid-svg-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -38,6 +38,7 @@ import LendingFormModal from '@/src/features/lending/screens/components/LendingF
 import ItemPickerModal from './components/ItemPickerModal';
 
 const PRIMARY = '#6b7f99';
+const LENDING = '#9b72cb';
 
 export default function SessionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -293,10 +294,31 @@ export default function SessionDetailScreen() {
   };
 
   const handleCompleteSession = () => {
-    const uncheckedCount = items.filter(item => !item.is_checked).length;
+    const uncheckedItems = items.filter(item => !item.is_checked);
+    const uncheckedCount = uncheckedItems.length;
 
     const doComplete = async () => {
       try {
+        // Auto-return unchecked items to original locations
+        if (uncheckedCount > 0) {
+          for (const item of uncheckedItems) {
+            try {
+              // Move item back to original location
+              if (item.space_id) {
+                await ItemService.moveItemToContainer(
+                  item.item_id,
+                  item.space_id,
+                  item.container_id || ''
+                );
+              }
+              // Check the item off
+              await outsideService.checkItem(id!, item.item_id);
+            } catch (err) {
+              console.error(`Error returning item ${item.item_id}:`, err);
+            }
+          }
+        }
+        
         await outsideService.completeSession(id!);
         router.replace('/outside/history');
       } catch (err) {
@@ -307,11 +329,11 @@ export default function SessionDetailScreen() {
 
     if (uncheckedCount > 0) {
       Alert.alert(
-        'Unchecked Items',
-        `${uncheckedCount} item${uncheckedCount === 1 ? '' : 's'} ${uncheckedCount === 1 ? 'has' : 'have'} not been checked off and will remain in ${uncheckedCount === 1 ? 'its' : 'their'} original location. Complete anyway?`,
+        'Return Unchecked Items',
+        `${uncheckedCount} item${uncheckedCount === 1 ? '' : 's'} will be returned to ${uncheckedCount === 1 ? 'its' : 'their'} original location${uncheckedCount === 1 ? '' : 's'}. Continue?`,
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Complete Anyway', onPress: doComplete },
+          { text: 'Return & Complete', onPress: doComplete },
         ]
       );
     } else if (items.length === 0) {
@@ -345,17 +367,17 @@ export default function SessionDetailScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#f8f9fa', paddingTop: insets.top }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000' : '#f8f9fa' }]} edges={['top', 'bottom']}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={PRIMARY} />
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (error || !session) {
     return (
-      <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#f8f9fa', paddingTop: insets.top }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000' : '#f8f9fa' }]} edges={['top', 'bottom']}>
         <View style={styles.center}>
           <Text style={[styles.errorText, { color: '#d32f2f' }]}>{error || 'Session not found'}</Text>
           <TouchableOpacity
@@ -365,20 +387,30 @@ export default function SessionDetailScreen() {
             <Text style={styles.primaryButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   const renderItem = ({ item, index }: { item: OutsideSessionItemWithContext; index: number }) => {
     const checked = Boolean(item.is_checked);
     const wasMoved = checked && !!item.moved_to_space_name;
+    const isLent = !!item.active_borrower_name;
     const spaceName = item.space_name && item.space_name !== 'Unknown Space' ? item.space_name : null;
     const containerName = item.container_name ?? null;
     const originalLocation = containerName ? `${spaceName ?? ''} › ${containerName}` : spaceName;
     const movedLocation = item.moved_to_container_name
       ? `${item.moved_to_space_name} › ${item.moved_to_container_name}`
       : item.moved_to_space_name;
-    const locationLine = wasMoved ? `→ ${movedLocation}` : originalLocation;
+    const locationLine = isLent
+      ? `Lent to ${item.active_borrower_name}`
+      : wasMoved
+      ? `→ ${movedLocation}`
+      : originalLocation;
+    const locationColor = isLent
+      ? LENDING
+      : wasMoved
+      ? (isDark ? '#4ade80' : '#6b9e7a')
+      : subtleText;
     const checkColor = wasMoved ? (isDark ? '#4ade80' : '#6b9e7a') : PRIMARY;
 
     return (
@@ -416,7 +448,7 @@ export default function SessionDetailScreen() {
           </Text>
           {locationLine && (
             <Text
-              style={[styles.itemLocation, { color: wasMoved ? (isDark ? '#4ade80' : '#6b9e7a') : subtleText }]}
+              style={[styles.itemLocation, { color: locationColor }]}
               numberOfLines={1}
             >
               {locationLine}
@@ -439,9 +471,9 @@ export default function SessionDetailScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top', 'bottom']}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top, backgroundColor: cardBg, borderBottomColor: borderColor }]}>
+      <View style={[styles.header, { backgroundColor: cardBg, borderBottomColor: borderColor }]}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <FontAwesomeIcon icon={faChevronLeft} size={16} color={PRIMARY} />
         </TouchableOpacity>
@@ -715,7 +747,7 @@ export default function SessionDetailScreen() {
         onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setPutAwayItem(null); }}
         loading={lendLoading}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -728,6 +760,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
+    paddingTop: 8,
     paddingBottom: 12,
     borderBottomWidth: 1,
   },

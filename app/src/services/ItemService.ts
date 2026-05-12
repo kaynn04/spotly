@@ -214,6 +214,14 @@ export class ItemService {
   }
 
   /**
+   * Get all items across all spaces
+   */
+  static async getAllItems(): Promise<Item[]> {
+    const repo = new ItemRepository();
+    return repo.getAll();
+  }
+
+  /**
    * Update item fields (name, description, quantity)
    */
   static async updateItem(itemId: string, updates: { name?: string; description?: string | null; quantity?: number }): Promise<void> {

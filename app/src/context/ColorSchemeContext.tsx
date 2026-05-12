@@ -6,7 +6,13 @@ import * as SystemUI from 'expo-system-ui';
 const STORAGE_KEY = '@spotly/color-scheme';
 
 function setNativeBg(scheme: 'light' | 'dark') {
-  SystemUI.setBackgroundColorAsync(scheme === 'dark' ? '#000000' : '#f8f9fa');
+  try {
+    SystemUI.setBackgroundColorAsync(scheme === 'dark' ? '#000000' : '#f8f9fa').catch(err => {
+      console.warn('SystemUI background color not available:', err);
+    });
+  } catch (err) {
+    console.warn('SystemUI background color failed:', err);
+  }
 }
 
 const ColorSchemeToggleContext = createContext<() => void>(() => {});

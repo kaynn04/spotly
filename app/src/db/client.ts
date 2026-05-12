@@ -13,12 +13,23 @@ let db: SQLiteDatabase | null = null;
 /**
  * Get or create the database instance
  * Uses singleton pattern to ensure only one database connection
+ * 
+ * Note: In development with fast refresh, the database handle may become invalid.
+ * This function attempts to recover by creating a fresh connection if the old one fails.
  */
 export function getDatabase(): SQLiteDatabase {
   if (!db) {
-    db = openDatabaseSync('spotly.db');
-    // Enable foreign keys (optional, for future item relationships)
-    db.execSync('PRAGMA foreign_keys = ON');
+    try {
+      db = openDatabaseSync('spotly.db');
+      // Enable foreign keys
+      db.execSync('PRAGMA foreign_keys = ON');
+    } catch (error) {
+      console.warn('[getDatabase] Failed to open database, retrying:', error);
+      // Reset and try again
+      db = null;
+      db = openDatabaseSync('spotly.db');
+      db.execSync('PRAGMA foreign_keys = ON');
+    }
   }
   return db;
 }

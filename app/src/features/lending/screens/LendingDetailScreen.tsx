@@ -17,7 +17,7 @@ import {
   Alert,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { LendingService } from '../services/LendingService';
@@ -110,7 +110,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
   };
 
   const headerBar = (
-    <View style={[styles.headerBar, { borderBottomColor: borderColor, paddingTop: insets.top }]}>
+    <View style={[styles.headerBar, { borderBottomColor: borderColor }]}>
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
         <Text style={[styles.backBtnText, { color: PRIMARY }]}>{'< Back'}</Text>
       </TouchableOpacity>
@@ -121,18 +121,18 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top', 'bottom']}>
         {headerBar}
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={PRIMARY} />
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (error || !lending) {
     return (
-      <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top', 'bottom']}>
         {headerBar}
         <View style={styles.centerContainer}>
           <Text style={[styles.errorText, { color: '#d32f2f' }]}>{error || 'Lending not found'}</Text>
@@ -140,14 +140,14 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
             <Text style={styles.primaryButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   const isActive = lending.status === 'ACTIVE';
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top', 'bottom']}>
       {headerBar}
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -172,7 +172,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
                     <Text style={[styles.sectionLabel, { color: subtleText }]}>LOCATION</Text>
                     <Text style={[styles.sectionValue, { color: colors.text }]}>
                       {item.container
-                        ? `${item.space?.name ?? 'Unknown Space'} › ${item.container}`
+                        ? `${item.space?.name ?? 'Unknown Space'} › ${item.container?.name ?? 'Unknown Container'}`
                         : item.space?.name ?? 'Unknown Space'}
                     </Text>
                   </>
@@ -255,7 +255,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
           </View>
         </View>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 

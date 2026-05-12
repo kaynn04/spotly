@@ -8,9 +8,9 @@
  * Feature: 008 - Dashboard Navigation Structure
  */
 
-import type { ItemRepository } from '../repositories/ItemRepository';
-import type { SpaceRepository } from '../repositories/SpaceRepository';
-import type { ContainerRepository } from '../repositories/ContainerRepository';
+import { ItemRepository } from '../repositories/ItemRepository';
+import { SpaceRepository } from '../repositories/SpaceRepository';
+import { ContainerRepository } from '../repositories/ContainerRepository';
 
 /**
  * Dashboard Item - Display model for recent items
@@ -19,6 +19,9 @@ export interface DashboardItem {
   id: string;
   name: string;
   spaceName: string;
+  containerName: string | null;
+  spaceId: string;
+  containerId: string | null;
   createdAt: string;
 }
 
@@ -55,24 +58,6 @@ export interface Dashboard {
  * This service coordinates between repositories to fetch and combine data.
  */
 export class DashboardService {
-  private static itemRepository: typeof ItemRepository;
-  private static spaceRepository: typeof SpaceRepository;
-  private static containerRepository: typeof ContainerRepository;
-
-  /**
-   * Initialize repositories (dependency injection)
-   * Called once during app startup
-   */
-  static initialize(
-    itemRepo: typeof ItemRepository,
-    spaceRepo: typeof SpaceRepository,
-    containerRepo: typeof ContainerRepository
-  ): void {
-    this.itemRepository = itemRepo;
-    this.spaceRepository = spaceRepo;
-    this.containerRepository = containerRepo;
-  }
-
   /**
    * Get the N most recent items across all spaces
    *
@@ -84,7 +69,7 @@ export class DashboardService {
    */
   static async getRecentItems(limit: number = 5): Promise<DashboardItem[]> {
     try {
-      const items = await this.itemRepository.getRecentItems(limit);
+      const items = await ItemRepository.getRecentItems(limit);
       return items;
     } catch (error) {
       console.error('[DashboardService.getRecentItems] Error:', error);
@@ -95,8 +80,8 @@ export class DashboardService {
   static async getRecentlyMovedItems(limit: number = 5): Promise<DashboardMovedItem[]> {
     try {
       const [movedItems, movedContainers] = await Promise.all([
-        this.itemRepository.getRecentlyMovedItems(limit),
-        this.containerRepository.getRecentlyMovedContainers(limit),
+        ItemRepository.getRecentlyMovedItems(limit),
+        ContainerRepository.getRecentlyMovedContainers(limit),
       ]);
       const combined: DashboardMovedItem[] = [
         ...movedItems.map(i => ({ ...i, kind: 'item' as const })),
@@ -121,9 +106,9 @@ export class DashboardService {
   static async getDashboardStats(): Promise<DashboardStats> {
     try {
       const [totalItems, totalSpaces, totalContainers] = await Promise.all([
-        this.itemRepository.countItems(),
-        this.spaceRepository.countSpaces(),
-        this.containerRepository.countContainers(),
+        ItemRepository.countItems(),
+        SpaceRepository.countSpaces(),
+        ContainerRepository.countContainers(),
       ]);
 
       return {

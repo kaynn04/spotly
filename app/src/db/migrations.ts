@@ -11,6 +11,7 @@ import { getDatabase } from './client';
 import { createLendingsTable, dropLendingsTable } from './migrations/003-create-lendings-table';
 import { createOutsideSessionsTables, dropOutsideSessionsTables } from './migrations/004-create-outside-tables';
 import { addItemsUpdatedAt } from './migrations/005-add-items-updated-at';
+import { addItemsForeignKeys } from './migrations/006-add-items-foreign-keys';
 
 /**
  * Initialize the database schema
@@ -104,17 +105,37 @@ export async function initializeDatabase() {
     }
 
     // Create lendings table (Migration 003)
-    await createLendingsTable(db);
+    try {
+      await createLendingsTable(db);
+    } catch (err) {
+      console.error('⚠ Lendings table creation failed:', err);
+    }
 
     // Create outside sessions tables (Migration 004)
-    await createOutsideSessionsTables(db);
+    try {
+      await createOutsideSessionsTables(db);
+    } catch (err) {
+      console.error('⚠ Outside sessions tables creation failed:', err);
+    }
 
     // Add items.updated_at column (Migration 005)
-    await addItemsUpdatedAt(db);
+    try {
+      await addItemsUpdatedAt(db);
+    } catch (err) {
+      console.error('⚠ Items updated_at migration failed:', err);
+    }
 
-    console.log('✓ Database initialized successfully');
+    // Add foreign keys to items table (Migration 006)
+    try {
+      await addItemsForeignKeys(db);
+    } catch (err) {
+      console.error('⚠ Items foreign keys migration failed:', err);
+    }
+
+    console.log('✓ Database initialized (migrations completed with possible non-critical errors)');
   } catch (error) {
-    console.error('✗ Database initialization error:', error);
+    console.error('✗ Critical database initialization error:', error);
+    // Allow app to continue even if DB init has non-critical failures
     throw error;
   }
 }

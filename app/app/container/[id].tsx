@@ -45,6 +45,7 @@ import ItemActionSheet from '@/src/features/spaces/screens/components/ItemAction
 import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
 
 const PRIMARY = '#6b7f99';
+const LENDING = '#9b72cb';
 
 export default function ContainerDetailScreen() {
   const router = useRouter();
@@ -316,18 +317,18 @@ export default function ContainerDetailScreen() {
             const isOutside = activeOutsideItemIds.has(item.id);
             return (
               <TouchableOpacity
-                style={[styles.itemCard, { backgroundColor: cardBg, borderColor: isOutside ? '#e67e2240' : isLent ? `${PRIMARY}40` : borderColor }]}
+                style={[styles.itemCard, { backgroundColor: cardBg, borderColor: isOutside ? '#e67e2240' : isLent ? `${LENDING}40` : borderColor }]}
                 onPress={() => router.push({ pathname: '../item/[id]' as any, params: { id: item.id } })}
                 onLongPress={() => handleItemPress(item)}
                 activeOpacity={0.7}
               >
-                <View style={[styles.itemDot, { backgroundColor: isOutside ? '#e67e22' : isLent ? PRIMARY : isDark ? '#48484a' : '#c7c7cc' }]} />
+                <View style={[styles.itemDot, { backgroundColor: isOutside ? '#e67e22' : isLent ? LENDING : isDark ? '#48484a' : '#c7c7cc' }]} />
                 <View style={styles.itemTextWrap}>
                   <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={1}>
                     {item.name}
                   </Text>
                   {isLent && (
-                    <Text style={[styles.itemLentMeta, { color: PRIMARY }]} numberOfLines={1}>
+                    <Text style={[styles.itemLentMeta, { color: LENDING }]} numberOfLines={1}>
                       Lent to {activeLending.borrower_name}
                     </Text>
                   )}
@@ -343,8 +344,8 @@ export default function ContainerDetailScreen() {
                   </View>
                 )}
                 {!isOutside && isLent && (
-                  <View style={[styles.lentBadge, { backgroundColor: `${PRIMARY}15` }]}>
-                    <Text style={[styles.lentBadgeText, { color: PRIMARY }]}>Lent</Text>
+                  <View style={[styles.lentBadge, { backgroundColor: `${LENDING}15` }]}>
+                    <Text style={[styles.lentBadgeText, { color: LENDING }]}>Lent</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -522,12 +523,17 @@ export default function ContainerDetailScreen() {
               'Item is Outside',
               'This item is in an active outside session. Complete or remove it from the session before moving or lending it.'
             );
+          const lendingGuard = () =>
+            Alert.alert(
+              'Item is Lent Out',
+              'This item is currently lent out. Mark it as returned before moving it.'
+            );
           return [
             {
               icon: faBox,
               label: 'Move',
-              description: isOutside ? 'In active outside session' : 'Move to another space or container',
-              onPress: isOutside ? outsideGuard : () => { setSelectedMoveItemId(item.id); setShowMoveModal(true); },
+              description: isOutside ? 'In active outside session' : isLent ? 'Item is currently lent out' : 'Move to another space or container',
+              onPress: isOutside ? outsideGuard : isLent ? lendingGuard : () => { setSelectedMoveItemId(item.id); setShowMoveModal(true); },
             },
             isLent
               ? {

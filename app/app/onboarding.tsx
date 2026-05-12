@@ -33,11 +33,11 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import {
-  faBoxesStacked,
   faFolder,
   faHandshake,
   faSuitcase,
   faUser,
+  faMicrophone,
 } from '@fortawesome/free-solid-svg-icons';
 import { UserService } from '@/src/services/UserService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -63,6 +63,7 @@ interface Slide {
   subtitle: string;
   isNameSlide?: boolean;
   source?: any;
+  bullets?: string[];
 }
 
 const SLIDES: Slide[] = [
@@ -95,6 +96,20 @@ const SLIDES: Slide[] = [
     subtitle: 'Taking items out of the house? Create a checklist session and track when everything comes back.',
   },
   {
+    key: 'voice',
+    icon: faMicrophone,
+    iconColor: '#6b7f99',
+    title: 'Voice Commands',
+    subtitle: 'Tap the mic button in the nav bar to control Spotly hands-free.',
+    bullets: [
+      '🟢  "Add drill and hammer to Garage"',
+      '🔵  "Move scissors to Kitchen"',
+      '🔵  "Where is my charger?"',
+      '🟣  "Lend drill to John"',
+      '🟠  "Create space Tool Shed"',
+    ],
+  },
+  {
     key: 'name',
     icon: faUser,
     iconColor: PRIMARY,
@@ -121,7 +136,6 @@ export default function OnboardingScreen() {
   const slideHeight = SCREEN_HEIGHT - insets.bottom - 16 - 130;
 
   const bg = isDark ? '#000000' : '#f8f9fa';
-  const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
   const subtleText = isDark ? '#8e8e93' : '#a0aec0';
   const inputBg = isDark ? '#2c2c2e' : '#ffffff';
@@ -174,6 +188,14 @@ export default function OnboardingScreen() {
 
         <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
         <Text style={[styles.subtitle, { color: subtleText }]}>{item.subtitle}</Text>
+
+        {item.bullets && (
+          <View style={styles.bulletsWrapper}>
+            {item.bullets.map((b, i) => (
+              <Text key={i} style={[styles.bulletText, { color: subtleText }]}>{b}</Text>
+            ))}
+          </View>
+        )}
 
         {item.isNameSlide && (
           <View style={styles.nameInputWrapper}>
@@ -298,6 +320,16 @@ const styles = StyleSheet.create({
     marginTop: 28,
     width: '100%',
   },
+  bulletsWrapper: {
+    marginTop: 20,
+    width: '100%',
+    gap: 10,
+  },
+  bulletText: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+
   nameInput: {
     borderWidth: 1.5,
     borderRadius: 14,

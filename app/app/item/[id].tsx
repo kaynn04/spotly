@@ -37,6 +37,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faBox, faHandshake, faCheck, faTrash, faMapPin, faFolder, faEllipsisVertical, faChevronLeft } from '@fortawesome/free-solid-svg-icons';
 
 const PRIMARY = '#6b7f99';
+const LENDING = '#9b72cb';
 
 export default function ItemDetailScreen() {
   const { id: itemId } = useLocalSearchParams<{ id: string }>();
@@ -272,6 +273,12 @@ export default function ItemDetailScreen() {
       'This item is in an active outside session. Complete or remove it from the session before moving or lending it.'
     );
 
+  const lendingGuard = () =>
+    Alert.alert(
+      'Item is Lent Out',
+      'This item is currently lent out. Mark it as returned before moving it.'
+    );
+
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
       {/* Header */}
@@ -288,9 +295,9 @@ export default function ItemDetailScreen() {
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
         {/* Lending badge */}
         {isLent && (
-          <View style={[styles.lendingBanner, { backgroundColor: `${PRIMARY}15`, borderColor: `${PRIMARY}40` }]}>
-            <FontAwesomeIcon icon={faHandshake} size={16} color={PRIMARY} />
-            <Text style={[styles.lendingBannerText, { color: PRIMARY }]}>
+          <View style={[styles.lendingBanner, { backgroundColor: `${LENDING}15`, borderColor: `${LENDING}40` }]}>
+            <FontAwesomeIcon icon={faHandshake} size={16} color={LENDING} />
+            <Text style={[styles.lendingBannerText, { color: LENDING }]}>
               Lent to {activeLending.borrower_name}
               {activeLending.lent_at ? ` · since ${new Date(activeLending.lent_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}
             </Text>
@@ -413,10 +420,10 @@ export default function ItemDetailScreen() {
           <View style={[styles.menuDropdown, { backgroundColor: cardBg, borderColor, top: insets.top + 44 }]}>  
             <TouchableOpacity
               style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]}
-              onPress={() => { setShowMenu(false); if (isOutside) { outsideGuard(); } else { openMoveModal(); } }}
+              onPress={() => { setShowMenu(false); if (isOutside) { outsideGuard(); } else if (isLent) { lendingGuard(); } else { openMoveModal(); } }}
             >
-              <FontAwesomeIcon icon={faBox} size={18} color={isOutside ? '#e67e22' : PRIMARY} />
-              <Text style={[styles.menuItemText, { color: isOutside ? '#e67e22' : colors.text }]}>Move to...</Text>
+              <FontAwesomeIcon icon={faBox} size={18} color={isOutside ? '#e67e22' : isLent ? '#e67e22' : PRIMARY} />
+              <Text style={[styles.menuItemText, { color: isOutside ? '#e67e22' : isLent ? '#e67e22' : colors.text }]}>Move to...</Text>
             </TouchableOpacity>
             {isLent ? (
               <TouchableOpacity style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]} onPress={() => { setShowMenu(false); handleMarkReturned(); }}>

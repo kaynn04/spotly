@@ -11,7 +11,11 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "backgroundColor": "#f8f9fa"
+      "backgroundColor": "#f8f9fa",
+      "bundleIdentifier": "com.kaynn04.spotly",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +26,8 @@
       },
       "backgroundColor": "#000000",
       "edgeToEdgeEnabled": false,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.kaynn04.spotly"
     },
     "web": {
       "output": "static",
@@ -41,11 +46,19 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-sqlite",
+      "expo-speech-recognition"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "07662434-d2e3-4e2a-88e9-99e819911e89"
+      }
     }
   }
 }

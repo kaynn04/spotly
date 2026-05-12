@@ -4,7 +4,7 @@
  * Main Spaces tab -- minimalist redesign uniform with Outside feature
  */
 
-import React, { useCallback, useState, useMemo, useRef } from 'react';
+import React, { useCallback, useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,17 +13,21 @@ import {
   FlatList,
   ActivityIndicator,
   TextInput,
+  Alert,
+  DeviceEventEmitter,
 } from 'react-native';
+import ItemActionSheet from './components/ItemActionSheet';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faFileAlt, faFileArchive } from '@fortawesome/free-solid-svg-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faFileAlt, faFileArchive, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { useScrollHide } from '@/hooks/use-scroll-hide';
 import { useTabBarPadding } from '@/hooks/use-tab-bar-padding';
 import type { Space } from '@/src/models/Space';
+import type { SpaceWithCount } from '@/src/models/Space';
 import type { Item } from '@/src/models/Item';
 import type { Container } from '@/src/models/Container';
 import { SpaceService } from '@/src/services/SpaceService';
@@ -57,9 +61,18 @@ export default function SpacesPage() {
   const { handleScroll } = useScrollHide();
   const tabBarPadding = useTabBarPadding();
 
-  const [spaces, setSpaces] = useState<Space[]>([]);
+  const { openCreate } = useLocalSearchParams<{ openCreate?: string }>();
+
+  const [spaces, setSpaces] = useState<SpaceWithCount[]>([]);
   const [loading, setLoading] = useState(false);
   const [formVisible, setFormVisible] = useState(false);
+  const [actionSheetSpace, setActionSheetSpace] = useState<SpaceWithCount | null>(null);
+
+  useEffect(() => {
+    if (openCreate === '1') {
+      setFormVisible(true);
+    }
+  }, [openCreate]);
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<SectionedSearchItem[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -79,10 +92,16 @@ export default function SpacesPage() {
     }, [])
   );
 
+  // Listen for refresh events from voice feature or other sources
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('spotly:refresh-home', loadSpaces);
+    return () => subscription.remove();
+  }, []);
+
   const loadSpaces = async () => {
     setLoading(true);
     try {
-      const result = await SpaceService.getAllSpaces();
+      const result = await SpaceService.getAllSpacesWithCounts();
       setSpaces(result);
     } catch (err) {
       console.error('[SpacesPage] Error loading spaces:', err);
@@ -179,6 +198,30 @@ export default function SpacesPage() {
     await loadSpaces();
   };
 
+  const confirmDeleteSpace = (space: SpaceWithCount) => {
+    const parts: string[] = [];
+    if (space.containerCount > 0) parts.push(`${space.containerCount} container${space.containerCount !== 1 ? 's' : ''}`);
+    if (space.itemCount > 0) parts.push(`${space.itemCount} item${space.itemCount !== 1 ? 's' : ''}`);
+    const msg = parts.length > 0
+      ? `Delete "${space.name}" and its ${parts.join(' and ')}? This cannot be undone.`
+      : `Delete "${space.name}"? This cannot be undone.`;
+    Alert.alert('Delete Space', msg, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await SpaceService.deleteSpace(space.id);
+            await loadSpaces();
+          } catch {
+            Alert.alert('Error', 'Failed to delete space');
+          }
+        },
+      },
+    ]);
+  };
+
   const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleDateString(undefined, {
       month: 'short',
@@ -186,12 +229,19 @@ export default function SpacesPage() {
       year: 'numeric',
     });
 
-  const renderSpace = ({ item, index }: { item: Space; index: number }) => (
+  const renderSpace = ({ item, index }: { item: SpaceWithCount; index: number }) => {
+    const metaParts: string[] = [];
+    if (item.containerCount > 0) metaParts.push(`${item.containerCount} container${item.containerCount !== 1 ? 's' : ''}`);
+    if (item.itemCount > 0) metaParts.push(`${item.itemCount} item${item.itemCount !== 1 ? 's' : ''}`);
+    const meta = metaParts.length > 0 ? metaParts.join(' · ') : 'Empty';
+
+    return (
     <TouchableOpacity
       style={[styles.spaceCard, { backgroundColor: cardBg, borderColor }]}
       onPress={() =>
         router.push({ pathname: '/space/[id]' as any, params: { id: item.id } })
       }
+      onLongPress={() => setActionSheetSpace(item)}
       activeOpacity={0.7}
     >
       <View style={[styles.spaceDot, { backgroundColor: PRIMARY }]} />
@@ -200,15 +250,16 @@ export default function SpacesPage() {
           {item.name}
         </Text>
         <Text style={[styles.spaceDate, { color: subtleText }]}>
-          Created {formatDate(item.createdAt)}
+          {meta}
         </Text>
       </View>
       <FontAwesomeIcon icon={faChevronRight} size={16} color={subtleText} />
     </TouchableOpacity>
   );
+  };
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top']}>
       <FlatList
         data={isSearching ? searchResults : spaces}
         keyExtractor={(item) => {
@@ -261,7 +312,7 @@ export default function SpacesPage() {
             </TouchableOpacity>
           );
         } : renderSpace}
-        contentContainerStyle={[styles.listContent, { paddingTop: insets.top + 8, paddingBottom: tabBarPadding }]}
+        contentContainerStyle={[styles.listContent, { paddingTop: 8, paddingBottom: tabBarPadding }]}
         showsVerticalScrollIndicator={false}
         onScroll={isSearching ? undefined : handleScroll}
         scrollEventThrottle={16}
@@ -364,7 +415,31 @@ export default function SpacesPage() {
         onClose={() => setFormVisible(false)}
         onSubmit={handleCreateSpace}
       />
-    </View>
+      <ItemActionSheet
+        visible={actionSheetSpace !== null}
+        itemName={actionSheetSpace?.name ?? ''}
+        onClose={() => setActionSheetSpace(null)}
+        actions={(() => {
+          const s = actionSheetSpace;
+          if (!s) return [];
+          const parts: string[] = [];
+          if (s.containerCount > 0) parts.push(`${s.containerCount} container${s.containerCount !== 1 ? 's' : ''}`);
+          if (s.itemCount > 0) parts.push(`${s.itemCount} item${s.itemCount !== 1 ? 's' : ''}`);
+          const description = parts.length > 0
+            ? `Will delete ${parts.join(' and ')} inside`
+            : 'Remove this empty space';
+          return [
+            {
+              icon: faTrash,
+              label: 'Delete',
+              description,
+              destructive: true,
+              onPress: () => confirmDeleteSpace(s),
+            },
+          ];
+        })()}
+      />
+    </SafeAreaView>
   );
 }
 

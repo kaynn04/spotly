@@ -23,10 +23,13 @@ export interface OutsideSessionItemUpdateDTO {
 
 export interface OutsideSessionItemWithContext extends OutsideSessionItem {
   item_name: string;
+  space_id: string | null;  // Original space ID
   space_name: string | null;
+  container_id: string | null;  // Original container ID
   container_name: string | null;
   moved_to_space_name: string | null;
   moved_to_container_name: string | null;
+  active_borrower_name: string | null;
 }
 
 /**

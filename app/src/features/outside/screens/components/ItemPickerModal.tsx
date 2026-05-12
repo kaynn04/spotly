@@ -18,7 +18,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { ItemRepository } from '../../../../repositories/ItemRepository';
@@ -43,7 +43,6 @@ interface PickerItem {
 export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }: ItemPickerModalProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const insets = useSafeAreaInsets();
 
   const [allItems, setAllItems] = useState<PickerItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<PickerItem[]>([]);
@@ -157,8 +156,8 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
   );
 
   return (
-    <Modal visible={true} animationType="slide" transparent statusBarTranslucent>
-      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+    <Modal visible={true} animationType="slide" transparent statusBarTranslucent onRequestClose={onClose}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} disabled={loading}>
@@ -226,7 +225,7 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
             scrollEnabled={true}
           />
         )}
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }

@@ -23,7 +23,8 @@ export interface Space {
  * Includes aggregated count from items table (when available)
  */
 export interface SpaceWithCount extends Space {
-  itemCount: number;             // Number of items in this space (0+)
+  itemCount: number;             // Number of direct items in this space (0+)
+  containerCount: number;        // Number of containers in this space (0+)
 }
 
 /**

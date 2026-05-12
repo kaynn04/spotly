@@ -11,7 +11,7 @@
  *   - Recently added items
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -19,10 +19,19 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  DeviceEventEmitter,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faBox, faSun, faMoon, faChevronRight } from '@fortawesome/free-solid-svg-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { 
+  faBox, 
+  faSun, 
+  faMoon, 
+  faChevronRight, 
+  faGear,
+  faHandshake,
+  faSuitcase,
+} from '@fortawesome/free-solid-svg-icons';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -34,13 +43,15 @@ import { DashboardService } from '@/src/services/DashboardService';
 import type { DashboardMovedItem } from '@/src/services/DashboardService';
 import { UserService } from '@/src/services/UserService';
 import { ItemRepository } from '@/src/repositories/ItemRepository';
-import { SpaceRepository } from '@/src/repositories/SpaceRepository';
-import { ContainerRepository } from '@/src/repositories/ContainerRepository';
 import { LendingService } from '@/src/features/lending/services/LendingService';
 import { LendingRepository } from '@/src/features/lending/repositories/LendingRepository';
 import { useOutsideService } from '@/src/features/outside/services/OutsideService';
 import { Lending } from '@/src/features/lending/models/Lending';
 import NamePromptModal from './components/NamePromptModal';
+import { WalkthroughService } from '@/src/features/walkthrough/services/WalkthroughService';
+import { WALKTHROUGH_STEPS, type SpotlightRect } from '@/src/features/walkthrough/models/WalkthroughStep';
+import { useWalkthroughContext } from '@/src/features/walkthrough/context/WalkthroughContext';
+import WalkthroughOverlay from '@/src/features/walkthrough/components/WalkthroughOverlay';
 
 const PRIMARY = '#6b7f99';
 const SUCCESS = '#6b9e7a';
@@ -58,14 +69,12 @@ function formatDate(dateString: string) {
 
 interface DashboardData {
   stats: { totalItems: number; totalSpaces: number; totalContainers: number };
-  recentItems: { id: string; name: string; spaceName: string; createdAt: string }[];
+  recentItems: { id: string; name: string; spaceName: string; containerName: string | null; spaceId: string; containerId: string | null; createdAt: string }[];
   recentlyMoved: DashboardMovedItem[];
   activeLendings: (Lending & { item_name: string })[];
   activeSession: { id: string; title: string; itemCount: number; checkedCount: number } | null;
   isEmpty: boolean;
 }
-
-DashboardService.initialize(ItemRepository, SpaceRepository, ContainerRepository);
 
 export default function HomePage() {
   const router = useRouter();
@@ -88,6 +97,14 @@ export default function HomePage() {
   const [userName, setUserName] = useState<string | null>(null);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
 
+  // Walkthrough
+  const { tabBarRef } = useWalkthroughContext();
+  const dashboardRef = useRef<View>(null);
+  const settingsRef = useRef<View>(null);
+  const [walkthroughVisible, setWalkthroughVisible] = useState(false);
+  const [walkthroughIndex, setWalkthroughIndex] = useState(0);
+  const [spotlightRect, setSpotlightRect] = useState<SpotlightRect | null>(null);
+
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
   const subtleText = isDark ? '#8e8e93' : '#a0aec0';
@@ -97,6 +114,78 @@ export default function HomePage() {
       loadAll();
     }, [])
   );
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('spotly:refresh-home', loadAll);
+    return () => sub.remove();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      const check = async () => {
+        const done = await WalkthroughService.isDone();
+        if (!done && !cancelled) {
+          setTimeout(() => {
+            if (!cancelled) startWalkthrough();
+          }, 600);
+        }
+      };
+      check();
+      return () => { cancelled = true; };
+    }, [])
+  );
+
+  const measureStep = async (index: number): Promise<SpotlightRect | null> => {
+    const step = WALKTHROUGH_STEPS[index];
+    if (!step) return null;
+    try {
+      if (step.targetRef === 'dashboard') {
+        return await new Promise<SpotlightRect>((resolve, reject) => {
+          dashboardRef.current?.measure((_, __, width, height, pageX, pageY) => {
+            resolve({ x: pageX, y: pageY, width, height });
+          }) ?? reject(new Error('no ref'));
+        });
+      }
+      if (step.targetRef === 'settings') {
+        return await new Promise<SpotlightRect>((resolve, reject) => {
+          settingsRef.current?.measure((_, __, width, height, pageX, pageY) => {
+            resolve({ x: pageX, y: pageY, width, height });
+          }) ?? reject(new Error('no ref'));
+        });
+      }
+      if (tabBarRef.current) {
+        return await tabBarRef.current.measureTab(step.targetRef);
+      }
+    } catch {
+      // If measurement fails, return null — overlay will use default center
+    }
+    return null;
+  };
+
+  const startWalkthrough = async () => {
+    const rect = await measureStep(0);
+    setSpotlightRect(rect);
+    setWalkthroughIndex(0);
+    setWalkthroughVisible(true);
+  };
+
+  const handleWalkthroughNext = async () => {
+    const nextIndex = walkthroughIndex + 1;
+    if (nextIndex >= WALKTHROUGH_STEPS.length) {
+      await WalkthroughService.markDone();
+      setWalkthroughVisible(false);
+      return;
+    }
+    const rect = await measureStep(nextIndex);
+    setSpotlightRect(rect);
+    setWalkthroughIndex(nextIndex);
+  };
+
+  const handleWalkthroughSkip = async () => {
+    await WalkthroughService.markDone();
+    setWalkthroughVisible(false);
+  };
 
   const loadAll = async () => {
     setLoading(true);
@@ -121,8 +210,8 @@ export default function HomePage() {
           : null,
         isEmpty: dashboard.isEmpty,
       });
-    } catch (err) {
-      console.error('[HomePage] loadAll error:', err);
+    } catch {
+      // Silently handle load errors; UI will show loading state
     } finally {
       setLoading(false);
     }
@@ -134,9 +223,9 @@ export default function HomePage() {
       : 0;
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top']}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8, paddingBottom: tabBarPadding }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: 8, paddingBottom: tabBarPadding }]}
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
@@ -151,17 +240,27 @@ export default function HomePage() {
               </Text>
             </View>
           </View>
-          <TouchableOpacity
-            onPress={toggleColorScheme}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={[styles.themeToggle, { backgroundColor: isDark ? '#2c2c2e' : '#e8eaed' }]}
-          >
-            <FontAwesomeIcon
-              icon={isDark ? faSun : faMoon}
-              size={15}
-              color={isDark ? '#fbbf24' : '#6b7f99'}
-            />
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              onPress={toggleColorScheme}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={[styles.themeToggle, { backgroundColor: isDark ? '#2c2c2e' : '#e8eaed' }]}
+            >
+              <FontAwesomeIcon
+                icon={isDark ? faSun : faMoon}
+                size={15}
+                color={isDark ? '#fbbf24' : '#6b7f99'}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              ref={settingsRef}
+              onPress={() => router.push('/settings' as any)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={[styles.themeToggle, { backgroundColor: isDark ? '#2c2c2e' : '#e8eaed' }]}
+            >
+              <FontAwesomeIcon icon={faGear} size={15} color={PRIMARY} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {loading ? (
@@ -171,7 +270,7 @@ export default function HomePage() {
         ) : (
           <>
             {/* ── Inventory overview ──────────────────────────── */}
-            <View style={styles.statsRow}>
+            <View ref={dashboardRef} style={styles.statsRow}>
               <TouchableOpacity
                 style={[styles.statCard, { backgroundColor: cardBg, borderColor }]}
                 onPress={() => router.push('/(tabs)/spaces' as any)}
@@ -203,6 +302,50 @@ export default function HomePage() {
                 <Text style={[styles.statLabel, { color: subtleText }]}>Containers</Text>
               </TouchableOpacity>
             </View>
+
+            {/* ── Lend guidance (if has items but no lendings) ─ */}
+            {data && !data.isEmpty && data.stats.totalItems > 0 && (data?.activeLendings?.length ?? 0) === 0 && (
+              <TouchableOpacity
+                style={[styles.guidanceCard, { backgroundColor: cardBg, borderColor }]}
+                onPress={() => router.push('/(tabs)/lending' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.guidanceCardContent}>
+                  <View style={[styles.guidanceIconBox, { backgroundColor: `${PRIMARY}18` }]}>
+                    <FontAwesomeIcon icon={faHandshake} size={20} color={PRIMARY} />
+                  </View>
+                  <View style={styles.guidanceTextBlock}>
+                    <Text style={[styles.guidanceTitle, { color: colors.text }]}>Lend an item</Text>
+                    <Text style={[styles.guidanceSubtitle, { color: subtleText }]}>
+                      Share your items with friends and track who has what
+                    </Text>
+                  </View>
+                  <FontAwesomeIcon icon={faChevronRight} size={13} color={subtleText} />
+                </View>
+              </TouchableOpacity>
+            )}
+
+            {/* ── Outside guidance (if has items but no session) */}
+            {data && !data.isEmpty && data.stats.totalItems > 0 && !data?.activeSession && (
+              <TouchableOpacity
+                style={[styles.guidanceCard, { backgroundColor: cardBg, borderColor }]}
+                onPress={() => router.push('/(tabs)/outside' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.guidanceCardContent}>
+                  <View style={[styles.guidanceIconBox, { backgroundColor: `${PRIMARY}18` }]}>
+                    <FontAwesomeIcon icon={faSuitcase} size={20} color={PRIMARY} />
+                  </View>
+                  <View style={styles.guidanceTextBlock}>
+                    <Text style={[styles.guidanceTitle, { color: colors.text }]}>Start an outside session</Text>
+                    <Text style={[styles.guidanceSubtitle, { color: subtleText }]}>
+                      List items you need to bring for your errands and check them off
+                    </Text>
+                  </View>
+                  <FontAwesomeIcon icon={faChevronRight} size={13} color={subtleText} />
+                </View>
+              </TouchableOpacity>
+            )}
 
             {/* ── Active outside session ─────────────────────── */}
             {data?.activeSession && (
@@ -249,7 +392,7 @@ export default function HomePage() {
             {(data?.activeLendings?.length ?? 0) > 0 && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Lent Out</Text>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Lending</Text>
                   <TouchableOpacity onPress={() => router.push('/(tabs)/lending' as any)}>
                     <Text style={[styles.seeAll, { color: PRIMARY }]}>See all</Text>
                   </TouchableOpacity>
@@ -271,10 +414,10 @@ export default function HomePage() {
                       <View style={[styles.lendingDot, { backgroundColor: PRIMARY }]} />
                       <View style={styles.lendingContent}>
                         <Text style={[styles.lendingBorrower, { color: colors.text }]} numberOfLines={1}>
-                          {lending.borrower_name}
+                          {lending.item_name}
                         </Text>
                         <Text style={[styles.lendingMeta, { color: subtleText }]} numberOfLines={1}>
-                          {lending.item_name} · since {formatDate(lending.lent_at.toString())}
+                          Lent to {lending.borrower_name} · {formatDate(lending.lent_at.toString())}
                         </Text>
                       </View>
                       <FontAwesomeIcon icon={faChevronRight} size={12} color={subtleText} />
@@ -304,35 +447,41 @@ export default function HomePage() {
                   </TouchableOpacity>
                 </View>
                 <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
-                  {data!.recentItems.map((item, index) => (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={[
-                        styles.recentRow,
-                        index < data!.recentItems.length - 1 && {
-                          borderBottomWidth: 1,
-                          borderBottomColor: borderColor,
-                        },
-                      ]}
-                      onPress={() => router.push(`/item/${item.id}` as any)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.recentContent}>
-                        <Text style={[styles.recentName, { color: colors.text }]} numberOfLines={1}>
-                          {item.name}
-                        </Text>
-                        <Text style={[styles.recentMeta, { color: subtleText }]}>
-                          {item.spaceName}
-                        </Text>
-                      </View>
-                      <View style={styles.recentRight}>
-                        <Text style={[styles.recentDate, { color: subtleText }]}>
-                          {formatDate(item.createdAt)}
-                        </Text>
-                        <FontAwesomeIcon icon={faChevronRight} size={12} color={subtleText} style={{ marginLeft: 6 }} />
-                      </View>
-                    </TouchableOpacity>
-                  ))}
+                  {data!.recentItems.map((item, index) => {
+                    const route = item.containerId ? `/container/${item.containerId}` : `/space/${item.spaceId}`;
+                    const location = item.containerName
+                      ? `${item.spaceName} › ${item.containerName}`
+                      : item.spaceName;
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={[
+                          styles.recentRow,
+                          index < data!.recentItems.length - 1 && {
+                            borderBottomWidth: 1,
+                            borderBottomColor: borderColor,
+                          },
+                        ]}
+                        onPress={() => router.push(route as any)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.recentContent}>
+                          <Text style={[styles.recentName, { color: colors.text }]} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                          <Text style={[styles.recentMeta, { color: subtleText }]} numberOfLines={1}>
+                            {location}
+                          </Text>
+                        </View>
+                        <View style={styles.recentRight}>
+                          <Text style={[styles.recentDate, { color: subtleText }]}>
+                            {formatDate(item.createdAt)}
+                          </Text>
+                          <FontAwesomeIcon icon={faChevronRight} size={12} color={subtleText} style={{ marginLeft: 6 }} />
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
             )}
@@ -395,8 +544,32 @@ export default function HomePage() {
               </View>
             )}
 
-            {/* ── Empty state ────────────────────────────────── */}
-            {data?.isEmpty && (
+            {/* ── No items guidance state ─────────────────────── */}
+            {data && !data.isEmpty && data.stats.totalItems === 0 && (
+              <View style={styles.section}>
+                <TouchableOpacity
+                  style={[styles.guidanceCard, { backgroundColor: cardBg, borderColor }]}
+                  onPress={() => router.push('/(tabs)/spaces' as any)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.guidanceCardContent}>
+                    <View style={[styles.guidanceIconBox, { backgroundColor: `${PRIMARY}18` }]}>
+                      <FontAwesomeIcon icon={faBox} size={20} color={PRIMARY} />
+                    </View>
+                    <View style={styles.guidanceTextBlock}>
+                      <Text style={[styles.guidanceTitle, { color: colors.text }]}>Add your first item</Text>
+                      <Text style={[styles.guidanceSubtitle, { color: subtleText }]}>
+                        Add items to your spaces to unlock lending, outside sessions, and more
+                      </Text>
+                    </View>
+                    <FontAwesomeIcon icon={faChevronRight} size={13} color={subtleText} />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* ── Empty state (no spaces) ────────────────────── */}
+            {data?.isEmpty && !data?.activeSession && !(data?.activeLendings?.length > 0) && (
               <View style={[styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
                 <FontAwesomeIcon icon={faBox} size={40} color={PRIMARY} />
                 <Text style={[styles.emptyTitle, { color: colors.text }]}>Nothing here yet</Text>
@@ -405,9 +578,9 @@ export default function HomePage() {
                 </Text>
                 <TouchableOpacity
                   style={[styles.emptyBtn, { backgroundColor: PRIMARY }]}
-                  onPress={() => router.push('/(tabs)/spaces' as any)}
+                  onPress={() => router.push({ pathname: '/(tabs)/spaces' as any, params: { openCreate: '1' } })}
                 >
-                  <Text style={styles.emptyBtnText}>Create a Space</Text>
+                  <Text style={styles.emptyBtnText}>+ Create a Space</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -424,7 +597,16 @@ export default function HomePage() {
           setShowNamePrompt(false);
         }}
       />
-    </View>
+
+      <WalkthroughOverlay
+        visible={walkthroughVisible}
+        step={WALKTHROUGH_STEPS[walkthroughIndex] ?? null}
+        spotlightRect={spotlightRect}
+        currentIndex={walkthroughIndex}
+        onNext={handleWalkthroughNext}
+        onSkip={handleWalkthroughSkip}
+      />
+    </SafeAreaView>
   );
 }
 
@@ -433,6 +615,7 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 16 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24, paddingTop: 4 },
   headerLeft: {},
+  headerRight: { flexDirection: 'row', gap: 8 },
   themeToggle: {
     width: 34,
     height: 34,
@@ -441,6 +624,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   greetingText: { fontSize: 15, fontWeight: '500' },
+  greetingRow: {},
   nameText: { fontSize: 30, fontWeight: '700', letterSpacing: -0.5, marginTop: 2 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 80 },
   // Stats row
@@ -481,7 +665,47 @@ const styles = StyleSheet.create({
   recentMeta: { fontSize: 12, marginTop: 2 },
   recentRight: { flexDirection: 'row', alignItems: 'center' },
   recentDate: { fontSize: 12 },
+  // Guidance card (feature onboarding)
+  guidanceCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 16 },
+  guidanceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  guidanceCardContent: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  guidanceIconBox: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  guidanceTextBlock: { flex: 1 },
+  guidanceTitle: { fontSize: 15, fontWeight: '600', marginBottom: 3 },
+  guidanceSubtitle: { fontSize: 13, fontWeight: '400', lineHeight: 18 },
+  // FAB
+  fab: {
+    position: 'absolute',
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
   // Empty state
+  // FAB
+  fab: {
+    position: 'absolute',
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
   emptyCard: { borderRadius: 16, borderWidth: 1, padding: 32, alignItems: 'center', marginTop: 8 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },

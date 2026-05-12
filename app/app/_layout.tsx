@@ -4,6 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
+import * as SystemUI from 'expo-system-ui';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { initializeDatabase } from '@/src/db/migrations';
@@ -20,26 +22,49 @@ export default function RootLayout() {
   const [dbReady, setDbReady] = useState(false);
   const [navChecked, setNavChecked] = useState(false);
 
+  const isDark = colorScheme === 'dark';
+  const navBg = isDark ? '#000000' : '#f8f9fa';
+
+  // Keep system bar backgrounds in sync with color scheme
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(navBg);
+  }, [navBg]);
+
   // Effect 1: Initialize DB — blocks rendering until done
   useEffect(() => {
-    initializeDatabase()
-      .catch((err) => console.error('Failed to initialize database:', err))
-      .finally(() => setDbReady(true));
+    const init = async () => {
+      try {
+        await initializeDatabase();
+        console.log('✓ Database initialized');
+      } catch (err) {
+        console.error('✗ Database init failed:', err);
+        // Still allow app to load even if DB fails
+      } finally {
+        setDbReady(true);
+      }
+    };
+    init();
   }, []);
 
   // Effect 2: Check onboarding only after Stack is mounted (dbReady = true)
   useEffect(() => {
     if (!dbReady) return;
-    isOnboardingDone().then((done) => {
-      if (!done) router.replace('/onboarding');
-      setNavChecked(true);
-    });
-  }, [dbReady]);
+    const checkOnboarding = async () => {
+      try {
+        const done = await isOnboardingDone();
+        if (!done) {
+          router.replace('/onboarding');
+        }
+      } catch (err) {
+        console.error('✗ Onboarding check failed:', err);
+      } finally {
+        setNavChecked(true);
+      }
+    };
+    checkOnboarding();
+  }, [dbReady, router]);
 
   if (!dbReady) return null;
-
-  const isDark = colorScheme === 'dark';
-  const navBg = isDark ? '#000000' : '#f8f9fa';
 
   const theme = {
     ...(isDark ? DarkTheme : DefaultTheme),
@@ -51,6 +76,7 @@ export default function RootLayout() {
   };
 
   return (
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
     <ColorSchemeProvider>
       <ThemeProvider value={theme}>
         <Stack
@@ -60,6 +86,7 @@ export default function RootLayout() {
             animation: 'slide_from_right',
             animationDuration: 250,
             navigationBarColor: navBg,
+            gestureEnabled: true,
           }}
         >
           <Stack.Screen name="(tabs)" />
@@ -72,9 +99,11 @@ export default function RootLayout() {
           <Stack.Screen name="lending/history" />
           <Stack.Screen name="outside/[id]" />
           <Stack.Screen name="outside/history" />
+          <Stack.Screen name="settings" />
         </Stack>
-        <StatusBar style="auto" />
+        <StatusBar style="auto" backgroundColor={navBg} translucent={false} />
       </ThemeProvider>
     </ColorSchemeProvider>
+    </SafeAreaProvider>
   );
 }

@@ -14,11 +14,11 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   Keyboard,
+  ScrollView,
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 
 const PRIMARY = '#6b7f99';
 
@@ -33,7 +33,6 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const isDark = colorScheme === 'dark';
-  const keyboardHeight = useKeyboardHeight();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -81,95 +80,102 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
       visible={visible}
       transparent
       animationType="slide"
-      statusBarTranslucent
       onRequestClose={handleCancel}
     >
         <TouchableWithoutFeedback onPress={handleCancel}>
           <View style={styles.overlay}>
-            <TouchableWithoutFeedback onPress={() => {}}>
-              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: Math.max(insets.bottom + 16, keyboardHeight) }]}>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
                 {/* Handle */}
                 <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
                 {/* Title */}
                 <Text style={[styles.sheetTitle, { color: textColor }]}>Add Item</Text>
-                {contextLabel && (
-                  <View style={[styles.contextPill, { backgroundColor: inputBg, borderColor }]}>
-                    <Text style={[styles.contextPillText, { color: subtleText }]}>In: </Text>
-                    <Text style={[styles.contextPillName, { color: textColor }]} numberOfLines={1}>
-                      {contextLabel}
-                    </Text>
-                  </View>
-                )}
 
-                {/* Input */}
-                <Text style={[styles.fieldLabel, { color: subtleText }]}>Item Name *</Text>
-                <View style={[styles.inputWrapper, { backgroundColor: inputBg, borderColor: error ? '#d32f2f' : borderColor }]}>
-                  <TextInput
-                    style={[styles.input, { color: textColor }]}
-                    placeholder="e.g., Passport, Charger, Keys"
-                    placeholderTextColor={subtleText}
-                    value={name}
-                    onChangeText={(t) => { setName(t); setError(null); }}
-                    maxLength={100}
-                    editable={!loading}
-                    autoFocus
-                    returnKeyType="next"
-                  />
-                </View>
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                  bounces={false}
+                  style={styles.scrollContent}
+                >
+                  {contextLabel && (
+                    <View style={[styles.contextPill, { backgroundColor: inputBg, borderColor }]}>
+                      <Text style={[styles.contextPillText, { color: subtleText }]}>In: </Text>
+                      <Text style={[styles.contextPillName, { color: textColor }]} numberOfLines={1}>
+                        {contextLabel}
+                      </Text>
+                    </View>
+                  )}
 
-                {/* Description */}
-                <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 14 }]}>Description (optional)</Text>
-                <View style={[styles.inputWrapper, { backgroundColor: inputBg, borderColor }]}>
-                  <TextInput
-                    style={[styles.input, { color: textColor, minHeight: 60 }]}
-                    placeholder="Notes, serial number, details..."
-                    placeholderTextColor={subtleText}
-                    value={description}
-                    onChangeText={setDescription}
-                    maxLength={500}
-                    editable={!loading}
-                    multiline
-                    textAlignVertical="top"
-                  />
-                </View>
-
-                {/* Quantity */}
-                <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 14 }]}>Quantity</Text>
-                <View style={styles.quantityRow}>
-                  <TouchableOpacity
-                    style={[styles.quantityBtn, { backgroundColor: inputBg, borderColor }]}
-                    onPress={() => setQuantity(String(Math.max(1, (parseInt(quantity) || 1) - 1)))}
-                  >
-                    <Text style={[styles.quantityBtnText, { color: textColor }]}>−</Text>
-                  </TouchableOpacity>
-                  <View style={[styles.quantityInputWrap, { backgroundColor: inputBg, borderColor }]}>
+                  {/* Input */}
+                  <Text style={[styles.fieldLabel, { color: subtleText }]}>Item Name *</Text>
+                  <View style={[styles.inputWrapper, { backgroundColor: inputBg, borderColor: error ? '#d32f2f' : borderColor }]}>
                     <TextInput
-                      style={[styles.quantityInput, { color: textColor }]}
-                      value={quantity}
-                      onChangeText={(t) => setQuantity(t.replace(/[^0-9]/g, ''))}
-                      keyboardType="number-pad"
-                      maxLength={4}
+                      style={[styles.input, { color: textColor }]}
+                      placeholder="e.g., Passport, Charger, Keys"
+                      placeholderTextColor={subtleText}
+                      value={name}
+                      onChangeText={(t) => { setName(t); setError(null); }}
+                      maxLength={100}
                       editable={!loading}
+                      autoFocus
+                      returnKeyType="next"
                     />
                   </View>
-                  <TouchableOpacity
-                    style={[styles.quantityBtn, { backgroundColor: inputBg, borderColor }]}
-                    onPress={() => setQuantity(String((parseInt(quantity) || 1) + 1))}
-                  >
-                    <Text style={[styles.quantityBtnText, { color: textColor }]}>+</Text>
-                  </TouchableOpacity>
-                </View>
 
-                <View style={styles.inputMeta}>
-                  {error ? (
-                    <Text style={styles.errorText}>{error}</Text>
-                  ) : (
-                    <Text style={[styles.hint, { color: subtleText }]}>Long-press items later to manage</Text>
-                  )}
-                </View>
+                  {/* Description */}
+                  <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 14 }]}>Description (optional)</Text>
+                  <View style={[styles.inputWrapper, { backgroundColor: inputBg, borderColor }]}>
+                    <TextInput
+                      style={[styles.input, { color: textColor, minHeight: 60 }]}
+                      placeholder="Notes, serial number, details..."
+                      placeholderTextColor={subtleText}
+                      value={description}
+                      onChangeText={setDescription}
+                      maxLength={500}
+                      editable={!loading}
+                      multiline
+                      textAlignVertical="top"
+                    />
+                  </View>
 
-                {/* Buttons */}
+                  {/* Quantity */}
+                  <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 14 }]}>Quantity</Text>
+                  <View style={styles.quantityRow}>
+                    <TouchableOpacity
+                      style={[styles.quantityBtn, { backgroundColor: inputBg, borderColor }]}
+                      onPress={() => setQuantity(String(Math.max(1, (parseInt(quantity) || 1) - 1)))}
+                    >
+                      <Text style={[styles.quantityBtnText, { color: textColor }]}>−</Text>
+                    </TouchableOpacity>
+                    <View style={[styles.quantityInputWrap, { backgroundColor: inputBg, borderColor }]}>
+                      <TextInput
+                        style={[styles.quantityInput, { color: textColor }]}
+                        value={quantity}
+                        onChangeText={(t) => setQuantity(t.replace(/[^0-9]/g, ''))}
+                        keyboardType="number-pad"
+                        maxLength={4}
+                        editable={!loading}
+                      />
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.quantityBtn, { backgroundColor: inputBg, borderColor }]}
+                      onPress={() => setQuantity(String((parseInt(quantity) || 1) + 1))}
+                    >
+                      <Text style={[styles.quantityBtnText, { color: textColor }]}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.inputMeta}>
+                    {error ? (
+                      <Text style={styles.errorText}>{error}</Text>
+                    ) : (
+                      <Text style={[styles.hint, { color: subtleText }]}>Long-press items later to manage</Text>
+                    )}
+                  </View>
+                </ScrollView>
+
+                {/* Buttons - fixed at bottom */}
                 <View style={styles.buttonRow}>
                   <TouchableOpacity
                     style={[styles.cancelBtn, { borderColor }]}
@@ -203,7 +209,8 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12 },
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '85%' },
+  scrollContent: { flexGrow: 0 },
   handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
   sheetTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.3, marginBottom: 12 },
   contextPill: {

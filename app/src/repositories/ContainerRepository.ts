@@ -38,8 +38,8 @@ export class ContainerRepository {
 
       // Execute parameterized INSERT query
       await db.runAsync(
-        'INSERT INTO containers (id, name, space_id, created_at) VALUES (?, ?, ?, ?)',
-        [id, name, spaceId, now]
+        'INSERT INTO containers (id, name, space_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+        [id, name, spaceId, now, now]
       );
 
       // Return the created Container object
@@ -172,7 +172,7 @@ export class ContainerRepository {
 
   /**
    * Delete a container by id
-   * Items inside the container will be cascade-deleted by the DB
+   * Items inside the container will have container_id set to NULL (ON DELETE SET NULL)
    */
   static async deleteContainer(containerId: string): Promise<void> {
     try {
