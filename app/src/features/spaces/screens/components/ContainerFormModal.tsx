@@ -16,16 +16,20 @@ import {
   Keyboard,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Ionicons } from '@expo/vector-icons';
+import PhotoPickerSheet from '@/components/PhotoPickerSheet';
+import { PhotoService } from '@/src/services/PhotoService';
 
 const PRIMARY = '#6b7f99';
 
 interface ContainerFormModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (name: string) => Promise<void>;
+  onSubmit: (name: string, photoUri?: string | null) => Promise<void>;
 }
 
 export default function ContainerFormModal({ visible, onClose, onSubmit }: ContainerFormModalProps) {
@@ -36,6 +40,8 @@ export default function ContainerFormModal({ visible, onClose, onSubmit }: Conta
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [showPhotoPicker, setShowPhotoPicker] = useState(false);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const inputBg = isDark ? '#2c2c2e' : '#f8f9fa';
@@ -49,6 +55,7 @@ export default function ContainerFormModal({ visible, onClose, onSubmit }: Conta
     Keyboard.dismiss();
     setName('');
     setError(null);
+    setPhotoUri(null);
     onClose();
   };
 
@@ -57,8 +64,9 @@ export default function ContainerFormModal({ visible, onClose, onSubmit }: Conta
     setLoading(true);
     setError(null);
     try {
-      await onSubmit(name.trim());
+      await onSubmit(name.trim(), photoUri);
       setName('');
+      setPhotoUri(null);
       onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to create container');
@@ -118,6 +126,26 @@ export default function ContainerFormModal({ visible, onClose, onSubmit }: Conta
                     )}
                     <Text style={[styles.charCount, { color: subtleText }]}>{name.length}/50</Text>
                   </View>
+
+                  {/* Photo */}
+                  <Text style={[styles.fieldLabel, { color: subtleText }]}>Photo (optional)</Text>
+                  {photoUri ? (
+                    <View style={styles.photoPreviewRow}>
+                      <Image source={{ uri: photoUri }} style={styles.photoPreview} />
+                      <TouchableOpacity onPress={() => setPhotoUri(null)} style={styles.photoRemoveBtn}>
+                        <Ionicons name="close-circle" size={22} color="#d32f2f" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.photoAddBtn, { backgroundColor: inputBg, borderColor }]}
+                      onPress={() => setShowPhotoPicker(true)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="camera-outline" size={20} color={subtleText} />
+                      <Text style={[styles.photoAddText, { color: subtleText }]}>Add Photo</Text>
+                    </TouchableOpacity>
+                  )}
                 </ScrollView>
 
                 {/* Buttons - fixed at bottom */}
@@ -148,6 +176,20 @@ export default function ContainerFormModal({ visible, onClose, onSubmit }: Conta
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
+      <PhotoPickerSheet
+        visible={showPhotoPicker}
+        onClose={() => setShowPhotoPicker(false)}
+        onCamera={async () => {
+          setShowPhotoPicker(false);
+          const uri = await PhotoService.captureFromCamera();
+          if (uri) setPhotoUri(uri);
+        }}
+        onGallery={async () => {
+          setShowPhotoPicker(false);
+          const uri = await PhotoService.pickFromGallery();
+          if (uri) setPhotoUri(uri);
+        }}
+      />
     </Modal>
   );
 }
@@ -176,4 +218,10 @@ const styles = StyleSheet.create({
   cancelBtnText: { fontSize: 15, fontWeight: '600' },
   createBtn: { flex: 2, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   createBtnText: { fontSize: 15, fontWeight: '700' },
+  fieldLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3, marginBottom: 6 },
+  photoPreviewRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 16 },
+  photoPreview: { width: 80, height: 80, borderRadius: 10 },
+  photoRemoveBtn: { marginTop: 2 },
+  photoAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1.5, marginBottom: 16 },
+  photoAddText: { fontSize: 15, fontWeight: '500' },
 });

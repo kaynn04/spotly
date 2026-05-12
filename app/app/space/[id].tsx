@@ -24,6 +24,7 @@ import {
   ScrollView,
   Modal,
   TextInput,
+  Image,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faChevronLeft, faEllipsisVertical, faBox, faHandshake, faCheck, faTrash, faMapPin } from '@fortawesome/free-solid-svg-icons';
@@ -37,9 +38,13 @@ import type { Container } from '@/src/models/Container';
 import { SpaceService } from '@/src/services/SpaceService';
 import { ItemService } from '@/src/services/ItemService';
 import { ContainerService } from '@/src/services/ContainerService';
+import { ContainerRepository } from '@/src/repositories/ContainerRepository';
 import { LendingService } from '@/src/features/lending/services/LendingService';
 import { LendingRepository } from '@/src/features/lending/repositories/LendingRepository';
 import { ItemRepository } from '@/src/repositories/ItemRepository';
+import { PhotoService } from '@/src/services/PhotoService';
+import { SpaceRepository } from '@/src/repositories/SpaceRepository';
+import PhotoPickerSheet from '@/components/PhotoPickerSheet';
 import { Lending } from '@/src/features/lending/models/Lending';
 import { OutsideService } from '@/src/features/outside/services/OutsideService';
 import ItemFormModal from '@/src/features/spaces/screens/components/ItemFormModal';
@@ -70,6 +75,7 @@ export default function SpaceDetailScreen() {
 
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [showAddContainerModal, setShowAddContainerModal] = useState(false);
+  const [showSpacePhotoPicker, setShowSpacePhotoPicker] = useState(false);
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [selectedMoveItemId, setSelectedMoveItemId] = useState<string | null>(null);
   const [spaceContainers, setSpaceContainers] = useState<Record<string, Container[]>>({});
@@ -120,6 +126,11 @@ export default function SpaceDetailScreen() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function loadSpace() {
+    if (!id) return;
+    setSpace(await SpaceService.getSpaceById(id));
   }
 
   async function loadItems() {
@@ -308,15 +319,52 @@ export default function SpaceDetailScreen() {
     ]);
   }
 
-  async function handleAddItem(name: string, description?: string, quantity?: number) {
-    await ItemService.createItem(id!, name, null, description, quantity);
+  async function handleAddItem(name: string, description?: string, quantity?: number, photoUri?: string | null) {
+    // Create item first to get the ID, then save photo if provided
+    const item = await ItemService.createItem(id!, name, null, description, quantity);
+    if (photoUri) {
+      const savedUri = await PhotoService.savePhoto(photoUri, item.id);
+      await ItemRepository.updatePhotoUri(item.id, savedUri);
+    }
     await loadItems();
   }
 
-  async function handleAddContainer(name: string) {
-    await ContainerService.createContainer(name, id!);
+  async function handleAddContainer(name: string, photoUri?: string | null) {
+    const container = await ContainerService.createContainer(name, id!);
+    if (photoUri && container) {
+      const savedUri = await PhotoService.savePhoto(photoUri, `container_${container.id}`);
+      await ContainerRepository.updatePhotoUri(container.id, savedUri);
+    }
     await loadContainers();
     await loadItems();
+  }
+
+  async function handleSpacePhoto(source: 'camera' | 'gallery') {
+    if (!id) return;
+    setShowSpacePhotoPicker(false);
+    try {
+      const tempUri = source === 'camera'
+        ? await PhotoService.captureFromCamera()
+        : await PhotoService.pickFromGallery();
+      if (!tempUri) return;
+      if (space?.photoUri) await PhotoService.deletePhoto(space.photoUri);
+      const savedUri = await PhotoService.savePhoto(tempUri, `space_${id}`);
+      await SpaceRepository.updatePhotoUri(id, savedUri);
+      await loadSpace();
+    } catch {
+      Alert.alert('Error', 'Failed to save photo');
+    }
+  }
+
+  async function handleRemoveSpacePhoto() {
+    if (!id) return;
+    try {
+      if (space?.photoUri) await PhotoService.deletePhoto(space.photoUri);
+      await SpaceRepository.updatePhotoUri(id, null);
+      await loadSpace();
+    } catch {
+      Alert.alert('Error', 'Failed to remove photo');
+    }
   }
 
   const spaceLevelItems = items.filter((item) => !item.containerId);
@@ -358,6 +406,31 @@ export default function SpaceDetailScreen() {
           <Text style={[styles.deleteBtnText, { color: isDark ? '#ff453a' : '#d32f2f' }]}>Delete</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Space Photo */}
+      {!loading && space && (
+        space.photoUri ? (
+          <TouchableOpacity
+            style={[styles.spacePhotoWrap, { borderColor }]}
+            onPress={() => Alert.alert('Space Photo', '', [
+              { text: 'Replace Photo', onPress: () => setShowSpacePhotoPicker(true) },
+              { text: 'Remove Photo', style: 'destructive', onPress: handleRemoveSpacePhoto },
+              { text: 'Cancel', style: 'cancel' },
+            ])}
+            activeOpacity={0.8}
+          >
+            <Image source={{ uri: space.photoUri }} style={styles.spacePhoto} resizeMode="cover" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.spacePhotoPlaceholder, { backgroundColor: cardBg, borderColor }]}
+            onPress={() => setShowSpacePhotoPicker(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.spacePhotoPlaceholderText, { color: subtleText }]}>+ Add Space Photo</Text>
+          </TouchableOpacity>
+        )
+      )}
 
       {loading ? (
         <View style={styles.centerContainer}>
@@ -444,7 +517,10 @@ export default function SpaceDetailScreen() {
                   activeOpacity={0.7}
                 >
                   <View style={[styles.containerIcon, { backgroundColor: `${PRIMARY}15` }]}>
-                    <FontAwesomeIcon icon={faFolder} size={16} color={PRIMARY} />
+                    {c.photoUri
+                      ? <Image source={{ uri: c.photoUri }} style={styles.containerThumb} />
+                      : <FontAwesomeIcon icon={faFolder} size={16} color={PRIMARY} />
+                    }
                   </View>
                   <View style={styles.containerContent}>
                     <Text style={[styles.containerName, { color: colors.text }]} numberOfLines={1}>{c.name}</Text>
@@ -468,6 +544,9 @@ export default function SpaceDetailScreen() {
                 activeOpacity={0.7}
               >
                 <View style={[styles.itemDot, { backgroundColor: isOutside ? '#e67e22' : isLent ? LENDING : isDark ? '#48484a' : '#c7c7cc' }]} />
+                {item.photoUri ? (
+                  <Image source={{ uri: item.photoUri }} style={styles.itemThumb} />
+                ) : null}
                 <View style={styles.itemTextWrap}>
                   <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
                   {isLent && (
@@ -716,6 +795,13 @@ export default function SpaceDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      <PhotoPickerSheet
+        visible={showSpacePhotoPicker}
+        onClose={() => setShowSpacePhotoPicker(false)}
+        onCamera={() => handleSpacePhoto('camera')}
+        onGallery={() => handleSpacePhoto('gallery')}
+      />
     </View>
   );
 }
@@ -727,11 +813,16 @@ const styles = StyleSheet.create({
   backBtnText: { fontSize: 16, fontWeight: '500' },
   headerTitle: { flex: 1, fontSize: 17, fontWeight: '600', textAlign: 'center' },
   deleteBtn: { paddingLeft: 12, paddingVertical: 8 },
+  spacePhotoWrap: { marginHorizontal: 16, marginTop: 8, borderRadius: 12, overflow: 'hidden', borderWidth: 1 },
+  spacePhoto: { width: '100%', height: 160 },
+  spacePhotoPlaceholder: { marginHorizontal: 16, marginTop: 8, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', paddingVertical: 14, alignItems: 'center' },
+  spacePhotoPlaceholderText: { fontSize: 14, fontWeight: '500' },
   deleteBtnText: { fontSize: 15, color: '#d32f2f', fontWeight: '500' },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   listContent: { paddingHorizontal: 16, paddingTop: 12 },
   sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3, marginBottom: 12 },
   containerCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 8, gap: 12 },
+  containerThumb: { width: 36, height: 36, borderRadius: 6 },
   containerIcon: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   containerIconText: { fontSize: 18 },
   containerContent: { flex: 1 },
@@ -740,6 +831,7 @@ const styles = StyleSheet.create({
   chevron: { fontSize: 16 },
   itemCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingVertical: 14, paddingHorizontal: 14, marginBottom: 6, gap: 10 },
   itemDot: { width: 6, height: 6, borderRadius: 3 },
+  itemThumb: { width: 40, height: 40, borderRadius: 8 },
   itemTextWrap: { flex: 1, gap: 2 },
   itemName: { fontSize: 15, fontWeight: '500' },
   itemLentMeta: { fontSize: 11, fontWeight: '500' },

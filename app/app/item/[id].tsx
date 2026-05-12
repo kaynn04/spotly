@@ -16,6 +16,7 @@ import {
   Alert,
   TextInput,
   Modal,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -30,6 +31,8 @@ import { ContainerService } from '@/src/services/ContainerService';
 import { LendingService } from '@/src/features/lending/services/LendingService';
 import { LendingRepository } from '@/src/features/lending/repositories/LendingRepository';
 import { ItemRepository } from '@/src/repositories/ItemRepository';
+import { PhotoService } from '@/src/services/PhotoService';
+import PhotoPickerSheet from '@/components/PhotoPickerSheet';
 import { Lending } from '@/src/features/lending/models/Lending';
 import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
 import { OutsideService } from '@/src/features/outside/services/OutsideService';
@@ -65,6 +68,7 @@ export default function ItemDetailScreen() {
 
   // Menu state
   const [showMenu, setShowMenu] = useState(false);
+  const [showPhotoPicker, setShowPhotoPicker] = useState(false);
 
   // Move state
   const [showMoveModal, setShowMoveModal] = useState(false);
@@ -136,6 +140,35 @@ export default function ItemDetailScreen() {
     else if (field === 'description') setEditDescription(item.description ?? '');
     else if (field === 'quantity') setEditQuantity(String(item.quantity));
     setEditingField(field);
+  }
+
+  async function handleAddPhoto(source: 'camera' | 'gallery') {
+    if (!item || !itemId) return;
+    setShowPhotoPicker(false);
+    try {
+      const tempUri = source === 'camera'
+        ? await PhotoService.captureFromCamera()
+        : await PhotoService.pickFromGallery();
+      if (!tempUri) return;
+      // Delete old photo if replacing
+      if (item.photoUri) await PhotoService.deletePhoto(item.photoUri);
+      const savedUri = await PhotoService.savePhoto(tempUri, itemId);
+      await ItemRepository.updatePhotoUri(itemId, savedUri);
+      await loadItem();
+    } catch {
+      Alert.alert('Error', 'Failed to save photo');
+    }
+  }
+
+  async function handleRemovePhoto() {
+    if (!itemId) return;
+    try {
+      if (item?.photoUri) await PhotoService.deletePhoto(item.photoUri);
+      await ItemRepository.updatePhotoUri(itemId, null);
+      await loadItem();
+    } catch {
+      Alert.alert('Error', 'Failed to remove photo');
+    }
   }
 
   // Move
@@ -312,6 +345,31 @@ export default function ItemDetailScreen() {
               In active outside session · Complete the session before moving or lending
             </Text>
           </View>
+        )}
+
+        {/* Photo */}
+        {item.photoUri ? (
+          <TouchableOpacity
+            style={[styles.photoCard, { backgroundColor: cardBg, borderColor }]}
+            onPress={() => {
+              Alert.alert('Item Photo', '', [
+                { text: 'Replace Photo', onPress: () => setShowPhotoPicker(true) },
+                { text: 'Remove Photo', style: 'destructive', onPress: () => handleRemovePhoto() },
+                { text: 'Cancel', style: 'cancel' },
+              ]);
+            }}
+            activeOpacity={0.8}
+          >
+            <Image source={{ uri: item.photoUri }} style={styles.photoFull} resizeMode="cover" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.addPhotoBtn, { backgroundColor: cardBg, borderColor }]}
+            onPress={() => setShowPhotoPicker(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.addPhotoText, { color: subtleText }]}>+ Add Photo</Text>
+          </TouchableOpacity>
         )}
 
         {/* Name */}
@@ -529,6 +587,13 @@ export default function ItemDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      <PhotoPickerSheet
+        visible={showPhotoPicker}
+        onClose={() => setShowPhotoPicker(false)}
+        onCamera={() => handleAddPhoto('camera')}
+        onGallery={() => handleAddPhoto('gallery')}
+      />
     </View>
   );
 }
@@ -563,6 +628,25 @@ const styles = StyleSheet.create({
   },
   lendingBannerText: { fontSize: 14, fontWeight: '500' },
 
+  photoCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  photoFull: {
+    width: '100%',
+    height: 220,
+  },
+  addPhotoBtn: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  addPhotoText: { fontSize: 15, fontWeight: '500' },
   fieldCard: {
     borderRadius: 12,
     borderWidth: 1,

@@ -17,6 +17,7 @@ export interface Container {
   spaceId: string;               // Foreign key reference to space
   createdAt: string;             // ISO 8601 timestamp, immutable
   updatedAt?: string | null;     // ISO 8601 timestamp, last modification
+  photoUri?: string | null;      // Optional: local file path to container photo
 }
 
 /**
@@ -30,6 +31,7 @@ export interface ContainerRow {
   space_id: string;
   created_at: string;
   updated_at?: string | null;
+  photo_uri?: string | null;
 }
 
 /**
