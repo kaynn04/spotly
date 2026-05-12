@@ -11,7 +11,7 @@
  *  - Full dark mode support
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -23,9 +23,13 @@ import {
   ScrollView,
   Modal,
   Image,
+  TouchableWithoutFeedback,
+  useWindowDimensions,
+  BackHandler,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faChevronLeft, faMapPin, faEllipsisVertical, faBox, faHandshake, faCheck, faTrash, faFolder, faRightLeft } from '@fortawesome/free-solid-svg-icons';
+import { faChevronLeft, faMapPin, faEllipsisVertical, faBox, faHandshake, faCheck, faTrash, faFolder, faRightLeft, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faList, faGrip, faPen, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -50,6 +54,13 @@ import LendingFormModal from '@/src/features/lending/screens/components/LendingF
 
 const PRIMARY = '#6b7f99';
 const LENDING = '#9b72cb';
+const CONTAINER_SORT_KEY = 'spotly:container-detail-sort';
+const CONTAINER_VIEW_KEY = 'spotly:container-detail-view';
+type SortMode = 'name-asc' | 'name-desc' | 'newest' | 'oldest';
+type ViewMode = 'list' | 'grid';
+const GRID_GAP = 10;
+const GRID_PADDING = 16;
+const GRID_COLUMNS = 2;
 
 export default function ContainerDetailScreen() {
   const router = useRouter();
@@ -58,6 +69,8 @@ export default function ContainerDetailScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
   const isDark = colorScheme === 'dark';
+  const { width: screenWidth } = useWindowDimensions();
+  const GRID_ITEM_WIDTH = (screenWidth - GRID_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
 
   const [container, setContainer] = useState<Container | null>(null);
   const [space, setSpace] = useState<Space | null>(null);
@@ -73,6 +86,15 @@ export default function ContainerDetailScreen() {
   const [showContainerMenu, setShowContainerMenu] = useState(false);
   const [showMoveContainerModal, setShowMoveContainerModal] = useState(false);
   const [spaceContainers, setSpaceContainers] = useState<Record<string, Container[]>>({});
+  const [sortMode, setSortMode] = useState<SortMode>('name-asc');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+
+  // Select mode
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const selectModeRef = useRef(false);
+  selectModeRef.current = selectMode;
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
 
   // Lending state
   const [showLendModal, setShowLendModal] = useState(false);
@@ -88,6 +110,17 @@ export default function ContainerDetailScreen() {
     []
   );
   const outsideService = useMemo(() => new OutsideService(), []);
+
+  // Load persisted preferences
+  useEffect(() => {
+    Promise.all([
+      AsyncStorage.getItem(CONTAINER_SORT_KEY),
+      AsyncStorage.getItem(CONTAINER_VIEW_KEY),
+    ]).then(([s, v]) => {
+      if (s === 'name-asc' || s === 'name-desc' || s === 'newest' || s === 'oldest') setSortMode(s);
+      if (v === 'list' || v === 'grid') setViewMode(v);
+    }).catch(() => {});
+  }, []);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
@@ -197,6 +230,143 @@ export default function ContainerDetailScreen() {
   function handleContainerMenuPress() {
     setShowContainerMenu(true);
   }
+
+  const switchSortMode = (mode: SortMode) => {
+    setSortMode(mode);
+    AsyncStorage.setItem(CONTAINER_SORT_KEY, mode).catch(() => {});
+    setShowContainerMenu(false);
+  };
+
+  const switchViewMode = (mode: ViewMode) => {
+    setViewMode(mode);
+    AsyncStorage.setItem(CONTAINER_VIEW_KEY, mode).catch(() => {});
+    setShowContainerMenu(false);
+  };
+
+  const sortedItems = useMemo(() => {
+    const sorted = [...items];
+    switch (sortMode) {
+      case 'name-asc': sorted.sort((a, b) => a.name.localeCompare(b.name)); break;
+      case 'name-desc': sorted.sort((a, b) => b.name.localeCompare(a.name)); break;
+      case 'newest': sorted.sort((a, b) => b.createdAt.localeCompare(a.createdAt)); break;
+      case 'oldest': sorted.sort((a, b) => a.createdAt.localeCompare(b.createdAt)); break;
+    }
+    return sorted;
+  }, [items, sortMode]);
+
+  // --- Select mode ---
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (selectModeRef.current) { exitSelectMode(); return true; }
+      return false;
+    });
+    return () => sub.remove();
+  }, []);
+
+  const enterSelectMode = (item: Item) => {
+    setSelectMode(true);
+    setSelectedIds(new Set([item.id]));
+  };
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    setSelectedIds(new Set(sortedItems.map((i) => i.id)));
+  };
+
+  const handleBulkDelete = () => {
+    const count = selectedIds.size;
+    Alert.alert(
+      `Delete ${count} Item${count !== 1 ? 's' : ''}`,
+      `This will permanently delete ${count} item${count !== 1 ? 's' : ''}. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: async () => {
+          try {
+            await Promise.all([...selectedIds].map((iid) => ItemService.deleteItem(iid)));
+            exitSelectMode();
+            await loadItems();
+          } catch { Alert.alert('Error', 'Some items could not be deleted'); }
+        }},
+      ]
+    );
+  };
+
+  const handleBulkEdit = () => {
+    if (selectedIds.size !== 1) return;
+    const itemId = [...selectedIds][0];
+    const item = items.find((i) => i.id === itemId);
+    if (item) setEditingItem(item);
+  };
+
+  const handleBulkMove = () => {
+    if (selectedIds.size !== 1) return;
+    const itemId = [...selectedIds][0];
+    const item = items.find((i) => i.id === itemId);
+    if (!item) return;
+    const isOutside = activeOutsideItemIds.has(item.id);
+    const isLent = !!activeLendingMap[item.id];
+    if (isOutside) {
+      Alert.alert('Item is Outside', 'This item is in an active outside session. Complete or remove it from the session before moving it.');
+      return;
+    }
+    if (isLent) {
+      Alert.alert('Item is Lent Out', 'This item is currently lent out. Mark it as returned before moving it.');
+      return;
+    }
+    exitSelectMode();
+    setSelectedMoveItemId(itemId);
+    setShowMoveModal(true);
+  };
+
+  const handleBulkLend = () => {
+    if (selectedIds.size !== 1) return;
+    const itemId = [...selectedIds][0];
+    const item = items.find((i) => i.id === itemId);
+    if (!item) return;
+    const isOutside = activeOutsideItemIds.has(item.id);
+    const isLent = !!activeLendingMap[item.id];
+    if (isOutside) {
+      Alert.alert('Item is Outside', 'Complete the outside session before lending.');
+      return;
+    }
+    if (isLent) {
+      Alert.alert('Already Lent', 'This item is already lent out.');
+      return;
+    }
+    exitSelectMode();
+    setSelectedLendItem(item);
+    setBorrowerName('');
+    setLendNote('');
+    setShowLendModal(true);
+  };
+
+  const handleEditItemSubmit = async (name: string, description?: string, quantity?: number, photoUri?: string | null) => {
+    if (!editingItem) return;
+    await ItemService.updateItem(editingItem.id, { name, description: description ?? null, quantity: quantity ?? 1 });
+    if (photoUri && photoUri !== editingItem.photoUri) {
+      const savedUri = await PhotoService.savePhoto(photoUri, editingItem.id);
+      await ItemRepository.updatePhotoUri(editingItem.id, savedUri);
+    } else if (!photoUri && editingItem.photoUri) {
+      await PhotoService.deletePhoto(editingItem.photoUri);
+      await ItemRepository.updatePhotoUri(editingItem.id, null);
+    }
+    setEditingItem(null);
+    exitSelectMode();
+    await loadItems();
+  };
 
   async function handleMoveContainerToSpace(targetSpaceId: string) {
     if (!containerId) return;
@@ -313,22 +483,34 @@ export default function ContainerDetailScreen() {
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
       {/* Header */}
       <View style={[styles.headerBar, { borderBottomColor: borderColor, paddingTop: insets.top, backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <FontAwesomeIcon icon={faChevronLeft} size={16} color={PRIMARY} />
+        <TouchableOpacity onPress={() => selectMode ? exitSelectMode() : router.back()} style={styles.backBtn}>
+          <FontAwesomeIcon icon={selectMode ? faTimes : faChevronLeft} size={16} color={PRIMARY} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          {space && (
-            <Text style={[styles.breadcrumb, { color: subtleText }]} numberOfLines={1}>
-              {space.name}
-            </Text>
+          {selectMode ? (
+            <Text style={[styles.headerTitle, { color: colors.text }]}>{selectedIds.size} selected</Text>
+          ) : (
+            <>
+              {space && (
+                <Text style={[styles.breadcrumb, { color: subtleText }]} numberOfLines={1}>
+                  {space.name}
+                </Text>
+              )}
+              <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+                {container?.name ?? 'Container'}
+              </Text>
+            </>
           )}
-          <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-            {container?.name ?? 'Container'}
-          </Text>
         </View>
-        <TouchableOpacity style={styles.headerMenuBtn} onPress={handleContainerMenuPress}>
-          <FontAwesomeIcon icon={faEllipsisVertical} size={18} color={PRIMARY} />
-        </TouchableOpacity>
+        {!selectMode ? (
+          <TouchableOpacity style={styles.headerMenuBtn} onPress={handleContainerMenuPress}>
+            <FontAwesomeIcon icon={faEllipsisVertical} size={18} color={PRIMARY} />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={handleSelectAll} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={{ color: PRIMARY, fontSize: 14, fontWeight: '500' }}>All</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Container Photo */}
@@ -362,14 +544,17 @@ export default function ContainerDetailScreen() {
         </View>
       ) : (
         <FlatList
-          data={items}
+          data={sortedItems}
           keyExtractor={(item) => item.id}
+          key={viewMode === 'grid' ? 'grid' : 'list'}
+          numColumns={viewMode === 'grid' ? GRID_COLUMNS : 1}
+          columnWrapperStyle={viewMode === 'grid' ? styles.gridRow : undefined}
           contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 80 }]}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             items.length > 0 ? (
               <Text style={[styles.sectionLabel, { color: subtleText }]}>
-                {items.length} item{items.length !== 1 ? 's' : ''} {'·'} Hold to manage
+                {items.length} item{items.length !== 1 ? 's' : ''} {'\u00B7'} <Text style={{ fontStyle: 'italic' }}>Long press to select</Text>
               </Text>
             ) : null
           }
@@ -377,14 +562,64 @@ export default function ContainerDetailScreen() {
             const activeLending = activeLendingMap[item.id];
             const isLent = !!activeLending;
             const isOutside = activeOutsideItemIds.has(item.id);
+            const isSelected = selectedIds.has(item.id);
+
+            if (viewMode === 'grid') {
+              return (
+                <TouchableOpacity
+                  style={[styles.gridCard, { backgroundColor: cardBg, borderColor: isSelected ? PRIMARY : borderColor, width: GRID_ITEM_WIDTH }, isSelected && styles.selectedCard]}
+                  onPress={() => {
+                    if (selectMode) { toggleSelect(item.id); return; }
+                    router.push({ pathname: '../item/[id]' as any, params: { id: item.id } });
+                  }}
+                  onLongPress={() => {
+                    if (!selectMode) enterSelectMode(item);
+                    else toggleSelect(item.id);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  {item.photoUri ? (
+                    <Image source={{ uri: item.photoUri }} style={[styles.gridPhoto, { height: GRID_ITEM_WIDTH * 0.7 }]} />
+                  ) : (
+                    <View style={[styles.gridPhotoPlaceholder, { backgroundColor: `${PRIMARY}12`, height: GRID_ITEM_WIDTH * 0.7 }]}>
+                      <FontAwesomeIcon icon={faBox} size={28} color={PRIMARY} />
+                    </View>
+                  )}
+                  {selectMode && (
+                    <View style={[styles.gridSelectBadge, isSelected && { backgroundColor: PRIMARY }]}>
+                      {isSelected && <FontAwesomeIcon icon={faCheck} size={10} color="#fff" />}
+                    </View>
+                  )}
+                  <View style={styles.gridContent}>
+                    {isLent && <Text style={[styles.gridBadge, { color: LENDING }]}>Lent</Text>}
+                    {isOutside && !isLent && <Text style={[styles.gridBadge, { color: '#e67e22' }]}>Outside</Text>}
+                    <Text style={[styles.gridName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
+                    {isLent && <Text style={[styles.gridMeta, { color: LENDING }]} numberOfLines={1}>To {activeLending.borrower_name}</Text>}
+                  </View>
+                </TouchableOpacity>
+              );
+            }
+
             return (
               <TouchableOpacity
-                style={[styles.itemCard, { backgroundColor: cardBg, borderColor: isOutside ? '#e67e2240' : isLent ? `${LENDING}40` : borderColor }]}
-                onPress={() => router.push({ pathname: '../item/[id]' as any, params: { id: item.id } })}
-                onLongPress={() => handleItemPress(item)}
+                style={[styles.itemCard, { backgroundColor: cardBg, borderColor: isSelected ? PRIMARY : (isOutside ? '#e67e2240' : isLent ? `${LENDING}40` : borderColor) }, isSelected && styles.selectedCard]}
+                onPress={() => {
+                  if (selectMode) { toggleSelect(item.id); return; }
+                  router.push({ pathname: '../item/[id]' as any, params: { id: item.id } });
+                }}
+                onLongPress={() => {
+                  if (!selectMode) enterSelectMode(item);
+                  else toggleSelect(item.id);
+                }}
                 activeOpacity={0.7}
               >
-                <View style={[styles.itemDot, { backgroundColor: isOutside ? '#e67e22' : isLent ? LENDING : isDark ? '#48484a' : '#c7c7cc' }]} />
+                {selectMode ? (
+                  <View style={[styles.selectCircle, isSelected && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}>
+                    {isSelected && <FontAwesomeIcon icon={faCheck} size={10} color="#fff" />}
+                  </View>
+                ) : (
+                  <View style={[styles.itemDot, { backgroundColor: isOutside ? '#e67e22' : isLent ? LENDING : isDark ? '#48484a' : '#c7c7cc' }]} />
+                )}
                 {item.photoUri ? (
                   <Image source={{ uri: item.photoUri }} style={styles.itemThumb} />
                 ) : null}
@@ -403,12 +638,12 @@ export default function ContainerDetailScreen() {
                     </Text>
                   )}
                 </View>
-                {isOutside && (
+                {!selectMode && isOutside && (
                   <View style={[styles.lentBadge, { backgroundColor: '#e67e2215' }]}>
                     <Text style={[styles.lentBadgeText, { color: '#e67e22' }]}>Outside</Text>
                   </View>
                 )}
-                {!isOutside && isLent && (
+                {!selectMode && !isOutside && isLent && (
                   <View style={[styles.lentBadge, { backgroundColor: `${LENDING}15` }]}>
                     <Text style={[styles.lentBadgeText, { color: LENDING }]}>Lent</Text>
                   </View>
@@ -427,6 +662,7 @@ export default function ContainerDetailScreen() {
       )}
 
       {/* Bottom Action Bar */}
+      {!selectMode && (
       <View style={[styles.actionBar, { backgroundColor: cardBg, borderTopColor: borderColor, paddingBottom: insets.bottom + 8 }]}>
         <TouchableOpacity
           style={[styles.actionBarBtn, { backgroundColor: PRIMARY }]}
@@ -435,6 +671,7 @@ export default function ContainerDetailScreen() {
           <Text style={[styles.actionBarBtnText, { color: '#fff' }]}>+ Add Item</Text>
         </TouchableOpacity>
       </View>
+      )}
 
       {/* Move Bottom Sheet */}
       <Modal visible={showMoveModal} transparent animationType="slide" onRequestClose={() => setShowMoveModal(false)}>
@@ -539,26 +776,45 @@ export default function ContainerDetailScreen() {
 
       {/* Container action menu */}
       <Modal visible={showContainerMenu} transparent animationType="fade" onRequestClose={() => setShowContainerMenu(false)}>
-        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowContainerMenu(false)}>
-          <View style={[styles.menuSheet, { backgroundColor: cardBg, borderColor }]}>
-            <Text style={[styles.menuTitle, { color: subtleText }]}>{container?.name ?? 'Container'}</Text>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => { setShowContainerMenu(false); setShowMoveContainerModal(true); }}
-            >
-              <FontAwesomeIcon icon={faRightLeft} size={16} color={PRIMARY} />
-              <Text style={[styles.menuItemText, { color: colors.text }]}>Move to</Text>
-            </TouchableOpacity>
-            <View style={[styles.menuDivider, { backgroundColor: borderColor }]} />
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => { setShowContainerMenu(false); confirmDeleteContainer(); }}
-            >
-              <FontAwesomeIcon icon={faTrash} size={16} color="#e53e3e" />
-              <Text style={[styles.menuItemText, { color: '#e53e3e' }]}>Delete Container</Text>
-            </TouchableOpacity>
+        <TouchableWithoutFeedback onPress={() => setShowContainerMenu(false)}>
+          <View style={styles.menuOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.menuCard, { backgroundColor: cardBg, borderColor }]}>
+              <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+                {/* View section */}
+                <Text style={[styles.menuTitle, { color: subtleText }]}>View</Text>
+                <TouchableOpacity style={[styles.menuOption, viewMode === 'list' && styles.menuOptionActive]} onPress={() => switchViewMode('list')} activeOpacity={0.7}>
+                  <FontAwesomeIcon icon={faList} size={14} color={viewMode === 'list' ? PRIMARY : subtleText} />
+                  <Text style={[styles.menuOptionText, { color: viewMode === 'list' ? PRIMARY : colors.text }]}>List</Text>
+                  {viewMode === 'list' && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.menuOption, viewMode === 'grid' && styles.menuOptionActive]} onPress={() => switchViewMode('grid')} activeOpacity={0.7}>
+                  <FontAwesomeIcon icon={faGrip} size={14} color={viewMode === 'grid' ? PRIMARY : subtleText} />
+                  <Text style={[styles.menuOptionText, { color: viewMode === 'grid' ? PRIMARY : colors.text }]}>Grid</Text>
+                  {viewMode === 'grid' && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
+                </TouchableOpacity>
+
+                <View style={[styles.menuDivider, { backgroundColor: borderColor }]} />
+
+                {/* Sort section */}
+                <Text style={[styles.menuTitle, { color: subtleText }]}>Sort</Text>
+                {([
+                  { key: 'name-asc' as SortMode, icon: faArrowDownAZ, label: 'Name A→Z' },
+                  { key: 'name-desc' as SortMode, icon: faArrowDownZA, label: 'Name Z→A' },
+                  { key: 'newest' as SortMode, icon: faCalendarPlus, label: 'Newest first' },
+                  { key: 'oldest' as SortMode, icon: faCalendar, label: 'Oldest first' },
+                ]).map((opt) => (
+                  <TouchableOpacity key={opt.key} style={[styles.menuOption, sortMode === opt.key && styles.menuOptionActive]} onPress={() => switchSortMode(opt.key)} activeOpacity={0.7}>
+                    <FontAwesomeIcon icon={opt.icon} size={14} color={sortMode === opt.key ? PRIMARY : subtleText} />
+                    <Text style={[styles.menuOptionText, { color: sortMode === opt.key ? PRIMARY : colors.text }]}>{opt.label}</Text>
+                    {sortMode === opt.key && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </TouchableOpacity>
+        </TouchableWithoutFeedback>
       </Modal>
       <LendingFormModal
         visible={showLendModal}
@@ -630,6 +886,62 @@ export default function ContainerDetailScreen() {
         onCamera={() => handleContainerPhoto('camera')}
         onGallery={() => handleContainerPhoto('gallery')}
       />
+
+      {/* Bulk action toolbar */}
+      {selectMode && (() => {
+        const canEdit = selectedIds.size === 1;
+        const canMove = selectedIds.size === 1;
+        const canLend = selectedIds.size === 1;
+        const canDelete = selectedIds.size > 0;
+        return (
+          <View style={[styles.bulkToolbar, { backgroundColor: cardBg, borderColor, bottom: insets.bottom + 16 }]}>
+            <TouchableOpacity
+              style={[styles.bulkAction, { opacity: canEdit ? 1 : 0.4 }]}
+              onPress={handleBulkEdit}
+              disabled={!canEdit}
+            >
+              <FontAwesomeIcon icon={faPen} size={18} color={PRIMARY} />
+              <Text style={[styles.bulkActionLabel, { color: PRIMARY }]}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.bulkAction, { opacity: canMove ? 1 : 0.4 }]}
+              onPress={handleBulkMove}
+              disabled={!canMove}
+            >
+              <FontAwesomeIcon icon={faRightLeft} size={18} color={PRIMARY} />
+              <Text style={[styles.bulkActionLabel, { color: PRIMARY }]}>Move</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.bulkAction, { opacity: canLend ? 1 : 0.4 }]}
+              onPress={handleBulkLend}
+              disabled={!canLend}
+            >
+              <FontAwesomeIcon icon={faHandshake} size={18} color={LENDING} />
+              <Text style={[styles.bulkActionLabel, { color: LENDING }]}>Lend</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.bulkAction, { opacity: canDelete ? 1 : 0.4 }]}
+              onPress={handleBulkDelete}
+              disabled={!canDelete}
+            >
+              <FontAwesomeIcon icon={faTrash} size={18} color="#d32f2f" />
+              <Text style={[styles.bulkActionLabel, { color: '#d32f2f' }]}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      })()}
+
+      {/* Edit Item Modal */}
+      <ItemFormModal
+        visible={editingItem !== null}
+        onClose={() => setEditingItem(null)}
+        onSubmit={handleEditItemSubmit}
+        editMode
+        initialName={editingItem?.name}
+        initialDescription={editingItem?.description ?? undefined}
+        initialQuantity={editingItem?.quantity}
+        initialPhotoUri={editingItem?.photoUri}
+      />
     </View>
   );
 }
@@ -647,12 +959,24 @@ const styles = StyleSheet.create({
   containerPhoto: { width: '100%', height: 160 },
   containerPhotoPlaceholder: { marginHorizontal: 16, marginTop: 8, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', paddingVertical: 14, alignItems: 'center' },
   containerPhotoPlaceholderText: { fontSize: 14, fontWeight: '500' },
-  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-start', alignItems: 'flex-end', paddingTop: 60, paddingRight: 16 },
-  menuSheet: { borderRadius: 14, borderWidth: 1, minWidth: 200, overflow: 'hidden' },
-  menuTitle: { fontSize: 11, fontWeight: '600', letterSpacing: 0.8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
-  menuItemText: { fontSize: 15, fontWeight: '500' },
-  menuDivider: { height: 1, marginHorizontal: 16 },
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-start', alignItems: 'flex-end', paddingTop: 100, paddingRight: 20 },
+  menuCard: { borderRadius: 14, borderWidth: 1, paddingVertical: 8, paddingHorizontal: 4, minWidth: 180, maxHeight: '60%', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8 },
+  menuTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 4, textTransform: 'uppercase' },
+  menuOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8 },
+  menuOptionActive: {},
+  menuOptionText: { fontSize: 14, fontWeight: '500', flex: 1 },
+  menuCheck: { marginLeft: 'auto' },
+  menuDivider: { height: 1, marginVertical: 6, marginHorizontal: 8 },
+
+  // Grid
+  gridRow: { gap: GRID_GAP },
+  gridCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden', marginBottom: GRID_GAP },
+  gridPhoto: { width: '100%', resizeMode: 'cover' },
+  gridPhotoPlaceholder: { width: '100%', alignItems: 'center', justifyContent: 'center' },
+  gridContent: { padding: 10 },
+  gridBadge: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3, marginBottom: 2 },
+  gridName: { fontSize: 14, fontWeight: '600', marginBottom: 2 },
+  gridMeta: { fontSize: 11 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   listContent: { paddingHorizontal: 16, paddingTop: 12 },
   sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3, marginBottom: 12 },
@@ -684,4 +1008,12 @@ const styles = StyleSheet.create({
   currentBadgeText: { fontSize: 11, fontWeight: '600' },
   moveCancelBtn: { marginTop: 12, borderWidth: 1.5, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   moveCancelText: { fontSize: 15, fontWeight: '600' },
+
+  // Select mode
+  selectCircle: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#c0c0c0', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  selectedCard: { borderWidth: 2 },
+  gridSelectBadge: { position: 'absolute', top: 8, right: 8, width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#c0c0c0', backgroundColor: 'rgba(255,255,255,0.85)', alignItems: 'center', justifyContent: 'center' },
+  bulkToolbar: { position: 'absolute', left: 20, right: 20, borderRadius: 16, borderWidth: 1, paddingVertical: 8, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'space-around', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 8 },
+  bulkAction: { alignItems: 'center', justifyContent: 'center', paddingVertical: 6, paddingHorizontal: 12, gap: 4, minWidth: 50 },
+  bulkActionLabel: { fontSize: 11, fontWeight: '600' },
 });

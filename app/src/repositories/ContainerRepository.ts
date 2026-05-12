@@ -268,4 +268,16 @@ export class ContainerRepository {
       throw serviceError;
     }
   }
+
+  static async updateName(id: string, name: string): Promise<void> {
+    try {
+      const db = getDatabase();
+      const now = new Date().toISOString();
+      await db.runAsync('UPDATE containers SET name = ?, updated_at = ? WHERE id = ?', [name, now, id]);
+    } catch (error) {
+      console.error('[ContainerRepository.updateName] Database error:', error);
+      const serviceError: ServiceError = { code: 'DB_ERROR', message: 'Failed to update container name.' };
+      throw serviceError;
+    }
+  }
 }

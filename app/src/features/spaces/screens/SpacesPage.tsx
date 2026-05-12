@@ -419,6 +419,53 @@ export default function SpacesPage() {
     return result;
   }, [spaces, sortMode, filterMode]);
 
+  type GridSearchRow =
+    | { kind: 'fullwidth'; item: SectionedSearchItem }
+    | { kind: 'pair'; left: SectionedSearchItem; right: SectionedSearchItem | null };
+
+  const preparedGridSearchData = useMemo<GridSearchRow[]>(() => {
+    if (!isSearching || viewMode !== 'grid') return [];
+    const rows: GridSearchRow[] = [];
+    let pendingResult: SectionedSearchItem | null = null;
+    for (const si of searchResults) {
+      if (si.kind === 'section' || si.kind === 'space') {
+        if (pendingResult) { rows.push({ kind: 'pair', left: pendingResult, right: null }); pendingResult = null; }
+        rows.push({ kind: 'fullwidth', item: si });
+      } else {
+        if (pendingResult) { rows.push({ kind: 'pair', left: pendingResult, right: si }); pendingResult = null; }
+        else pendingResult = si;
+      }
+    }
+    if (pendingResult) rows.push({ kind: 'pair', left: pendingResult, right: null });
+    return rows;
+  }, [isSearching, viewMode, searchResults]);
+
+  const renderGridSearchResult = (si: SectionedSearchItem) => {
+    if (si.kind !== 'result') return null;
+    const result = si.data;
+    const isContainer = result.type === 'container';
+    return (
+      <TouchableOpacity
+        style={[styles.gridCard, { backgroundColor: cardBg, borderColor, width: GRID_ITEM_WIDTH }]}
+        onPress={() => {
+          if (isContainer) router.push({ pathname: '/container/[id]' as any, params: { id: result.id } });
+          else router.push({ pathname: '/item/[id]' as any, params: { id: result.id } });
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.gridPhotoPlaceholder, { backgroundColor: `${PRIMARY}12`, height: GRID_ITEM_WIDTH * 0.7 }]}>
+          <FontAwesomeIcon icon={isContainer ? faFolder : faFileAlt} size={28} color={PRIMARY} />
+        </View>
+        <View style={styles.gridContent}>
+          <Text style={[styles.gridName, { color: colors.text }]} numberOfLines={1}>{result.name}</Text>
+          <Text style={[styles.gridMeta, { color: subtleText }]} numberOfLines={1}>
+            {isContainer ? result.spaceName : result.containerName ? `${result.spaceName} › ${result.containerName}` : result.spaceName}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   const renderSpace = ({ item, index }: { item: SpaceWithCount; index: number }) => {
     const metaParts: string[] = [];
     if (item.containerCount > 0) metaParts.push(`${item.containerCount} container${item.containerCount !== 1 ? 's' : ''}`);
@@ -565,15 +612,24 @@ export default function SpacesPage() {
           </View>
         ) : spaces.length > 0 ? (
           <View style={styles.sectionLabelRow}>
-            <Text style={[styles.sectionLabel, { color: subtleText }]}>YOUR SPACES</Text>
-            <Text style={[styles.longPressHint, { color: subtleText }]}>Long press to select</Text>
+            <Text style={[styles.sectionLabel, { color: subtleText }]}>YOUR SPACES <Text style={styles.longPressHint}>{'\u00B7'} Long press to select</Text></Text>
           </View>
         ) : null}
       </View>
 
       <FlatList
-        data={(isSearching ? searchResults : displayedSpaces) as any[]}
-        keyExtractor={(item: any) => {
+        data={(isSearching && viewMode === 'grid') ? preparedGridSearchData as any[] : (isSearching ? searchResults : displayedSpaces) as any[]}
+        keyExtractor={(item: any, index: number) => {
+          if (isSearching && viewMode === 'grid') {
+            const row = item as GridSearchRow;
+            if (row.kind === 'fullwidth') {
+              const si = row.item;
+              if (si.kind === 'section') return `section-${si.title}`;
+              if (si.kind === 'space') return `space-${si.data.id}`;
+              return `result-fw-${si.data.type}-${si.data.id}`;
+            }
+            return `pair-${index}`;
+          }
           if (isSearching) {
             const si = item as SectionedSearchItem;
             if (si.kind === 'section') return `section-${si.title}`;
@@ -582,7 +638,21 @@ export default function SpacesPage() {
           }
           return (item as Space).id;
         }}
-        renderItem={isSearching ? ({ item }: any) => {
+        renderItem={(isSearching && viewMode === 'grid') ? ({ item }: any) => {
+          const row = item as GridSearchRow;
+          if (row.kind === 'fullwidth') {
+            const si = row.item;
+            if (si.kind === 'section') return <Text style={[styles.sectionHeader, { color: PRIMARY }]}>{si.title}</Text>;
+            if (si.kind === 'space') return renderSpace({ item: si.data as SpaceWithCount, index: 0 });
+            return null;
+          }
+          return (
+            <View style={[styles.gridRow, { marginBottom: GRID_GAP }]}>
+              {renderGridSearchResult(row.left)}
+              {row.right ? renderGridSearchResult(row.right) : <View style={{ width: GRID_ITEM_WIDTH }} />}
+            </View>
+          );
+        } : isSearching ? ({ item }: any) => {
           const si = item as SectionedSearchItem;
           if (si.kind === 'section') {
             return (
@@ -623,9 +693,9 @@ export default function SpacesPage() {
             </TouchableOpacity>
           );
         } : renderSpace}
-        key={isSearching ? 'list' : (viewMode === 'grid' ? 'grid' : 'list')}
-        numColumns={!isSearching && viewMode === 'grid' ? GRID_COLUMNS : 1}
-        columnWrapperStyle={!isSearching && viewMode === 'grid' ? styles.gridRow : undefined}
+        key={isSearching ? (viewMode === 'grid' ? 'search-grid' : 'search-list') : (viewMode === 'grid' ? 'grid' : 'list')}
+        numColumns={(!isSearching && viewMode === 'grid') ? GRID_COLUMNS : 1}
+        columnWrapperStyle={(!isSearching && viewMode === 'grid') ? styles.gridRow : undefined}
         contentContainerStyle={[styles.listContent, { paddingTop: 8, paddingBottom: tabBarPadding }]}
         showsVerticalScrollIndicator={false}
         onScroll={isSearching ? undefined : handleScroll}
