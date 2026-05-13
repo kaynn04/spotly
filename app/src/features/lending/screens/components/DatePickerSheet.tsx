@@ -141,6 +141,7 @@ interface DatePickerSheetProps {
   value: Date;
   minimumDate?: Date;
   onChange: (date: Date) => void;
+  onConfirm: () => void;
   onClose: () => void;
   cardBg: string;
   borderColor: string;
@@ -154,6 +155,7 @@ export default function DatePickerSheet({
   value,
   minimumDate,
   onChange,
+  onConfirm,
   onClose,
   cardBg,
   borderColor,
@@ -211,7 +213,7 @@ export default function DatePickerSheet({
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
             <Text style={[styles.title, { color: textColor }]}>Select Date</Text>
-            <TouchableOpacity onPress={onClose} style={styles.doneBtn}>
+            <TouchableOpacity onPress={onConfirm} style={styles.doneBtn}>
               <Text style={styles.doneBtnText}>Done</Text>
             </TouchableOpacity>
           </View>

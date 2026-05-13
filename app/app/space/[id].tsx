@@ -125,6 +125,7 @@ export default function SpaceDetailScreen() {
     () => new LendingService(new LendingRepository(), new ItemRepository()),
     []
   );
+  const [dueDate, setDueDate] = useState<Date | null>(null);
   const outsideService = useMemo(() => new OutsideService(), []);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
@@ -482,6 +483,7 @@ export default function SpaceDetailScreen() {
     setSelectedLendItem(item);
     setBorrowerName('');
     setLendNote('');
+    setDueDate(null);
     setShowLendModal(true);
   };
 
@@ -1002,8 +1004,10 @@ export default function SpaceDetailScreen() {
         onBorrowerNameChange={setBorrowerName}
         note={lendNote}
         onNoteChange={setLendNote}
+        dueDate={dueDate}
+        onDueDateChange={setDueDate}
         onSubmit={handleLendSubmit}
-        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setSelectedLendItem(null); }}
+        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setDueDate(null); setSelectedLendItem(null); }}
         loading={lendLoading}
       />
       <ItemActionSheet
@@ -1046,7 +1050,7 @@ export default function SpaceDetailScreen() {
                   icon: faHandshake,
                   label: 'Lend',
                   description: isOutside ? 'In active outside session' : 'Track who you lent this item to',
-                  onPress: isOutside ? outsideGuard : () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setShowLendModal(true); },
+                  onPress: isOutside ? outsideGuard : () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setDueDate(null); setShowLendModal(true); },
                 },
             {
               icon: faTrash,
@@ -1090,7 +1094,7 @@ export default function SpaceDetailScreen() {
             <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
             <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move Container</Text>
             <Text style={[styles.moveSheetSubtitle, { color: subtleText }]}>
-              Move "{selectedMoveContainer?.name}" to another space
+              Move &quot;{selectedMoveContainer?.name}&quot; to another space
             </Text>
             <ScrollView showsVerticalScrollIndicator={false}>
               {allSpaces.filter((s) => s.id !== id).map((s) => (
