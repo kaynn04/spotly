@@ -59,8 +59,8 @@ import ItemActionSheet from '@/src/features/spaces/screens/components/ItemAction
 const PRIMARY = '#6b7f99';
 const LENDING = '#9b72cb';
 
-const SPACE_SORT_KEY = 'spotly:space-detail-sort';
-const SPACE_VIEW_KEY = 'spotly:space-detail-view';
+const SPACE_SORT_KEY = 'synop:space-detail-sort';
+const SPACE_VIEW_KEY = 'synop:space-detail-view';
 type SortMode = 'name-asc' | 'name-desc' | 'newest' | 'oldest';
 type ViewMode = 'list' | 'grid';
 const GRID_GAP = 10;

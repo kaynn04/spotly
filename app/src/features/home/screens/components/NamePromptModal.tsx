@@ -63,7 +63,7 @@ export default function NamePromptModal({ visible, onDone }: NamePromptModalProp
 
                 {/* Greeting */}
                 <Text style={styles.emoji}>{'👋'}</Text>
-                <Text style={[styles.sheetTitle, { color: textColor }]}>Welcome to Spotly!</Text>
+                <Text style={[styles.sheetTitle, { color: textColor }]}>Welcome to Synop!</Text>
                 <Text style={[styles.sheetSubtitle, { color: subtleText }]}>
                   What should we call you?
                 </Text>

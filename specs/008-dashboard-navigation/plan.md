@@ -5,7 +5,7 @@
 
 ## Summary
 
-Refactor the Spotly app from a single-screen space-management interface to a multi-tab dashboard experience. Create a bottom tab navigation bar with four sections (Home, Spaces, Lending, Outside) using Expo Router's built-in tabs layout. The Home tab displays an overview dashboard with recently added items and statistics. The Spaces tab preserves all existing space/container/item functionality. Lending and Outside tabs are placeholder screens for future feature expansion. This establishes a scalable navigation foundation for the app while maintaining backward compatibility with all existing features.
+Refactor the Synop app from a single-screen space-management interface to a multi-tab dashboard experience. Create a bottom tab navigation bar with four sections (Home, Spaces, Lending, Outside) using Expo Router's built-in tabs layout. The Home tab displays an overview dashboard with recently added items and statistics. The Spaces tab preserves all existing space/container/item functionality. Lending and Outside tabs are placeholder screens for future feature expansion. This establishes a scalable navigation foundation for the app while maintaining backward compatibility with all existing features.
 
 ## Technical Context
 

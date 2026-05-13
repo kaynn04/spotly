@@ -64,7 +64,7 @@ Database Layer (expo-sqlite)
 **Key Files**:
 ```typescript
 // src/db/client.ts
-export const db = openDatabaseSync('spotly.db');
+export const db = openDatabaseSync('synop.db');
 
 // src/db/migrations.ts
 export function initializeDatabase() {

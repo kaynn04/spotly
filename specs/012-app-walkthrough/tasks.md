@@ -11,7 +11,7 @@
 **Purpose**: Create the 3 new files and install nothing (react-native-svg is already in Expo).
 
 - [X] T001 Create `app/src/features/walkthrough/models/WalkthroughStep.ts` with `SpotlightRect` and `WalkthroughStep` interfaces and the 6-step `WALKTHROUGH_STEPS` constant array (descriptions from FR-004)
-- [X] T002 Create `app/src/features/walkthrough/services/WalkthroughService.ts` with `isDone()`, `markDone()`, and `reset()` using AsyncStorage key `@spotly/walkthrough_done`
+- [X] T002 Create `app/src/features/walkthrough/services/WalkthroughService.ts` with `isDone()`, `markDone()`, and `reset()` using AsyncStorage key `@synop/walkthrough_done`
 
 **Checkpoint**: Types and persistence ready — overlay and integration can proceed.
 

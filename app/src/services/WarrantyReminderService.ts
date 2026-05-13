@@ -15,7 +15,7 @@ import { SchedulableTriggerInputTypes, AndroidImportance } from 'expo-notificati
 import { Platform } from 'react-native';
 import { ReminderService } from './ReminderService';
 
-const CHANNEL_ID = 'spotly-warranty-reminders';
+const CHANNEL_ID = 'synop-warranty-reminders';
 const DAYS_BEFORE = 30;
 const NOTIFICATION_HOUR = 9;
 

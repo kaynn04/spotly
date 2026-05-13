@@ -116,7 +116,7 @@ export default function HomePage() {
   );
 
   useEffect(() => {
-    const sub = DeviceEventEmitter.addListener('spotly:refresh-home', loadAll);
+    const sub = DeviceEventEmitter.addListener('synop:refresh-home', loadAll);
     return () => sub.remove();
   }, []);
 

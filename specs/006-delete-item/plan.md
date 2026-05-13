@@ -5,7 +5,7 @@
 
 ## Summary
 
-Add permanent delete functionality for items in Spotly. Users can delete items from a space with a confirmation dialog to prevent accidents. The delete button appears inline next to the Move button for UI consistency. Deletion is permanent (no undo) and the item is immediately removed from the database and UI.
+Add permanent delete functionality for items in Synop. Users can delete items from a space with a confirmation dialog to prevent accidents. The delete button appears inline next to the Move button for UI consistency. Deletion is permanent (no undo) and the item is immediately removed from the database and UI.
 
 ## Technical Context
 

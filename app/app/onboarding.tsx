@@ -44,7 +44,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PRIMARY = '#6b7f99';
-const ONBOARDING_DONE_KEY = '@spotly/onboarding_done';
+const ONBOARDING_DONE_KEY = '@synop/onboarding_done';
 
 export async function markOnboardingDone() {
   await AsyncStorage.setItem(ONBOARDING_DONE_KEY, 'true');
@@ -71,7 +71,7 @@ const SLIDES: Slide[] = [
     key: 'welcome',
     source: require('@/assets/images/logo.png'),
     iconColor: PRIMARY,
-    title: 'Welcome to Spotly',
+    title: 'Welcome to Synop',
     subtitle: 'Your personal inventory tracker. Know exactly what you own, where it is, and who has it.',
   },
   {
@@ -86,7 +86,7 @@ const SLIDES: Slide[] = [
     icon: faHandshake,
     iconColor: '#9b7ba0',
     title: 'Track Lending',
-    subtitle: 'Lend items to friends and family. Spotly remembers who has what so you never forget.',
+    subtitle: 'Lend items to friends and family. Synop remembers who has what so you never forget.',
   },
   {
     key: 'outside',
@@ -100,7 +100,7 @@ const SLIDES: Slide[] = [
     icon: faMicrophone,
     iconColor: '#6b7f99',
     title: 'Voice Commands',
-    subtitle: 'Tap the mic button in the nav bar to control Spotly hands-free.',
+    subtitle: 'Tap the mic button in the nav bar to control Synop hands-free.',
     bullets: [
       '🟢  "Add drill and hammer to Garage"',
       '🔵  "Move scissors to Kitchen"',
@@ -114,7 +114,7 @@ const SLIDES: Slide[] = [
     icon: faUser,
     iconColor: PRIMARY,
     title: "What's your name?",
-    subtitle: 'Spotly will use it to greet you on the home screen.',
+    subtitle: 'Synop will use it to greet you on the home screen.',
     isNameSlide: true,
   },
 ];

@@ -19,7 +19,7 @@
 - [X] T002 Wire migration 012 in `app/src/db/migrations.ts` — add import + try/catch block after migration 011
 - [X] T003 Extend `app/src/models/Item.ts` — add `warrantyExpiry?: string | null` and `warrantyReminderId?: string | null` to `Item` and `ItemRow` interfaces
 - [X] T004 Extend `app/src/repositories/ItemRepository.ts` — add `warranty_expiry`, `warranty_reminder_id` to SELECT in `getById()` and `getAll()`, map to model fields, add `updateWarranty(id, expiryDate)` and `setWarrantyReminderId(id, reminderId)` methods
-- [X] T005 [P] Create `app/src/services/WarrantyReminderService.ts` — `scheduleWarrantyReminders(itemId, itemName, locationName, expiryDate, existingReminderId?)` scheduling 30-day + expiry-day notifications at 09:00 using expo-notifications (Android channel `spotly-warranty-reminders`); `cancelWarrantyReminders(reminderId)` delegating to `ReminderService.cancelReminders()`
+- [X] T005 [P] Create `app/src/services/WarrantyReminderService.ts` — `scheduleWarrantyReminders(itemId, itemName, locationName, expiryDate, existingReminderId?)` scheduling 30-day + expiry-day notifications at 09:00 using expo-notifications (Android channel `synop-warranty-reminders`); `cancelWarrantyReminders(reminderId)` delegating to `ReminderService.cancelReminders()`
 - [X] T006 Extend `app/src/services/ItemService.ts` — add `updateWarranty(itemId, expiryDate, locationName)` (cancel old reminders, persist date, schedule new reminders, store IDs) and `clearWarranty(itemId)` (cancel reminders, clear both columns)
 
 **Checkpoint**: DB columns exist, model types updated, all business logic in place — US1 and US2 can now begin.

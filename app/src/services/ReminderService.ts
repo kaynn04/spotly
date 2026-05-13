@@ -12,7 +12,7 @@ import { SchedulableTriggerInputTypes, AndroidImportance } from 'expo-notificati
 import * as Device from 'expo-device';
 import { Alert, Linking, Platform } from 'react-native';
 
-const CHANNEL_ID = 'spotly-lending-reminders';
+const CHANNEL_ID = 'synop-lending-reminders';
 
 // Register the Android notification channel (must be done before scheduling)
 if (Platform.OS === 'android') {
@@ -78,7 +78,7 @@ export class ReminderService {
     // Android 6+ only — check if we can open the battery settings
     Alert.alert(
       'Keep Reminders Reliable',
-      'To receive notifications when the app is closed, allow Spotly to run in the background. Tap "Open Settings" → Battery → Unrestricted.',
+      'To receive notifications when the app is closed, allow Synop to run in the background. Tap "Open Settings" → Battery → Unrestricted.',
       [
         { text: 'Not Now', style: 'cancel' },
         {

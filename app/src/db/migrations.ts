@@ -1,7 +1,7 @@
 /**
  * Database Migrations
  * 
- * Initializes the database schema for the Spotly app
+ * Initializes the database schema for the Synop app
  * Runs on app startup
  * 
  * Implementation: T006 - Create app/src/db/migrations.ts

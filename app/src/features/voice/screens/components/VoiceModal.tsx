@@ -694,7 +694,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
                 Microphone access needed
               </Text>
               <Text style={styles.guideBody}>
-                Spotly needs microphone access to hear your voice commands. Tap below to open Settings and enable it.
+                Synop needs microphone access to hear your voice commands. Tap below to open Settings and enable it.
               </Text>
               <TouchableOpacity style={styles.primaryButton} onPress={() => Linking.openSettings()}>
                 <Text style={styles.primaryButtonText}>Open Settings</Text>

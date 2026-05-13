@@ -37,7 +37,7 @@
 - **Decision**: Notification body includes item name and location (space or container name).
   - 30-day: `"[Item] ([Location]) warranty expires in 30 days."`
   - Expiry day: `"[Item] ([Location]) warranty expires today."`
-- **Rationale**: Spotly's core value is knowing where things are. Including the location makes the notification immediately actionable — users know exactly which item and where it is without opening the app.
+- **Rationale**: Synop's core value is knowing where things are. Including the location makes the notification immediately actionable — users know exactly which item and where it is without opening the app.
 - **Alternatives considered**: Item name only — rejected; inconsistent with app's core purpose.
 
 ---

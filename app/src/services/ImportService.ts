@@ -1,7 +1,7 @@
 /**
  * ImportService
  *
- * Imports inventory data from a Spotly JSON export file.
+ * Imports inventory data from a Synop JSON export file.
  * Supports two modes:
  *   - Merge: inserts new records, skips existing (by ID)
  *   - Replace: wipes all data first, then inserts everything

@@ -54,8 +54,8 @@ import LendingFormModal from '@/src/features/lending/screens/components/LendingF
 
 const PRIMARY = '#6b7f99';
 const LENDING = '#9b72cb';
-const CONTAINER_SORT_KEY = 'spotly:container-detail-sort';
-const CONTAINER_VIEW_KEY = 'spotly:container-detail-view';
+const CONTAINER_SORT_KEY = 'synop:container-detail-sort';
+const CONTAINER_VIEW_KEY = 'synop:container-detail-view';
 type SortMode = 'name-asc' | 'name-desc' | 'newest' | 'oldest';
 type ViewMode = 'list' | 'grid';
 const GRID_GAP = 10;

@@ -83,7 +83,7 @@ export default function OutsidePage() {
     const handleRefresh = async () => {
       await Promise.all([loadActiveSession(), loadRecentSessions()]);
     };
-    const subscription = DeviceEventEmitter.addListener('spotly:refresh-home', handleRefresh);
+    const subscription = DeviceEventEmitter.addListener('synop:refresh-home', handleRefresh);
     return () => subscription.remove();
   }, []);
 

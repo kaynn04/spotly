@@ -95,7 +95,7 @@ An existing user who wants to revisit the walkthrough opens the Settings screen,
   6. *"Settings — manage preferences and more."*
 - **FR-005**: Each step MUST include a "Next" button to advance to the following step, except the final step which MUST show "Done".
 - **FR-006**: Every step MUST include a "Skip" button that immediately dismisses the entire walkthrough.
-- **FR-007**: Dismissing (via "Done" or "Skip") MUST persist walkthrough completion to AsyncStorage under the key `@spotly/walkthrough_done`.
+- **FR-007**: Dismissing (via "Done" or "Skip") MUST persist walkthrough completion to AsyncStorage under the key `@synop/walkthrough_done`.
 - **FR-008**: The Settings screen MUST include a "Restart Walkthrough" option that clears the persisted completion state and initiates the walkthrough from Step 1.
 - **FR-009**: The walkthrough MUST NOT use any third-party walkthrough or tooltip libraries; it MUST be implemented using React Native core primitives (Modal, Animated, View).
 - **FR-010**: Spotlight positioning MUST be derived by measuring the target element's on-screen coordinates using React Native's `measure()` API on element refs.
@@ -104,7 +104,7 @@ An existing user who wants to revisit the walkthrough opens the Settings screen,
 ### Key Entities
 
 - **WalkthroughStep**: A single step in the sequence — contains the step index, description text, and a reference key identifying which UI element to highlight.
-- **WalkthroughState**: The persisted record (AsyncStorage) indicating whether the user has completed or skipped the walkthrough. Value is a boolean flag stored at `@spotly/walkthrough_done`.
+- **WalkthroughState**: The persisted record (AsyncStorage) indicating whether the user has completed or skipped the walkthrough. Value is a boolean flag stored at `@synop/walkthrough_done`.
 
 ## Success Criteria *(mandatory)*
 

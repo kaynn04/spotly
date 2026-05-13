@@ -1,4 +1,4 @@
-# Spotly Constitution
+# Synop Constitution
 
 ## Core Principles
 

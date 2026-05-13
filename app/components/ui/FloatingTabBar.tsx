@@ -53,8 +53,8 @@ const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function Floa
 
   // Listen for hide/show events (e.g. multi-select mode)
   useEffect(() => {
-    const showSub = DeviceEventEmitter.addListener('spotly:show-tab-bar', () => setHidden(false));
-    const hideSub = DeviceEventEmitter.addListener('spotly:hide-tab-bar', () => setHidden(true));
+    const showSub = DeviceEventEmitter.addListener('synop:show-tab-bar', () => setHidden(false));
+    const hideSub = DeviceEventEmitter.addListener('synop:hide-tab-bar', () => setHidden(true));
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
 
@@ -145,10 +145,10 @@ const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function Floa
         visible={showVoiceModal}
         onClose={() => setShowVoiceModal(false)}
         onItemAdded={() => {
-          DeviceEventEmitter.emit('spotly:refresh-home');
+          DeviceEventEmitter.emit('synop:refresh-home');
         }}
         onSpaceCreated={() => {
-          DeviceEventEmitter.emit('spotly:refresh-home');
+          DeviceEventEmitter.emit('synop:refresh-home');
         }}
         onNavigateToItem={(itemId) => {
           setShowVoiceModal(false);

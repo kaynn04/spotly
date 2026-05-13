@@ -1,4 +1,4 @@
-# Spotly — Personal Inventory & Lending Tracker
+# Synop — Personal Inventory & Lending Tracker
 
 A React Native + Expo app for organizing, locating, and managing physical belongings across spaces, containers, and tracking lending to friends and family.
 

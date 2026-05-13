@@ -3,7 +3,7 @@ import { Appearance } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SystemUI from 'expo-system-ui';
 
-const STORAGE_KEY = '@spotly/color-scheme';
+const STORAGE_KEY = '@synop/color-scheme';
 
 function setNativeBg(scheme: 'light' | 'dark') {
   try {
