@@ -51,6 +51,16 @@ export class ContainerService {
         throw error;
       }
 
+      // Check for duplicate name in the same space
+      const existingContainers = await ContainerRepository.getContainersBySpaceId(spaceId);
+      if (existingContainers.some(c => c.name.toLowerCase() === trimmedName.toLowerCase())) {
+        const error = {
+          code: 'DUPLICATE_NAME',
+          message: 'A container with this name already exists in this space.',
+        } as unknown as ServiceError;
+        throw error;
+      }
+
       // Create container in database via repository
       const container = await ContainerRepository.createContainer(trimmedName, spaceId);
 
@@ -106,5 +116,40 @@ export class ContainerService {
    */
   static async moveContainer(containerId: string, targetSpaceId: string): Promise<void> {
     return ContainerRepository.moveContainer(containerId, targetSpaceId);
+  }
+
+  /**
+   * Update container fields (name, photoUri)
+   * 
+   * @param id - The container id to update
+   * @param updates - Object containing fields to update
+   * @throws ServiceError if validation fails or duplicate name found
+   */
+  static async updateContainer(id: string, updates: { name?: string; photoUri?: string | null }): Promise<void> {
+    if (updates.name !== undefined) {
+      const trimmed = updates.name.trim();
+      if (trimmed.length === 0) {
+        const error: ServiceError = { code: 'VALIDATION_ERROR', message: 'Container name cannot be empty.' };
+        throw error;
+      }
+
+      // Check for duplicate name in the same space
+      const container = await ContainerRepository.getContainerById(id);
+      if (container) {
+        const existing = await ContainerRepository.getContainersBySpaceId(container.spaceId);
+        const isDuplicate = existing.some(c => 
+          c.id !== id && 
+          c.name.toLowerCase() === trimmed.toLowerCase()
+        );
+        if (isDuplicate) {
+          throw { code: 'DUPLICATE_NAME', message: 'A container with this name already exists in this space.' } as unknown as ServiceError;
+        }
+      }
+      await ContainerRepository.updateName(id, trimmed);
+    }
+
+    if (updates.photoUri !== undefined) {
+      await ContainerRepository.updatePhotoUri(id, updates.photoUri);
+    }
   }
 }

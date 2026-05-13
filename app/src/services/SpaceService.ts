@@ -50,6 +50,16 @@ export class SpaceService {
         throw error;
       }
 
+      // Check for duplicate name before attempting creation
+      const existingSpaces = await SpaceRepository.getAllSpaces();
+      if (existingSpaces.some(s => s.name.toLowerCase() === trimmedName.toLowerCase())) {
+        const error = {
+          code: 'DUPLICATE_NAME',
+          message: 'A space with this name already exists.',
+        } as unknown as ServiceError;
+        throw error;
+      }
+
       // Create space in database via repository
       const space = await SpaceRepository.createSpace(trimmedName);
 

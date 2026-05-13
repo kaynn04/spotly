@@ -51,6 +51,17 @@ export class ItemService {
         throw error;
       }
 
+      // Check for duplicate name in the same location (space or container)
+      const existingItems = await ItemRepository.getItemsBySpaceId(spaceId);
+      const isDuplicate = existingItems.some(i => 
+        i.name.toLowerCase() === trimmedName.toLowerCase() && 
+        i.containerId === (containerId || null)
+      );
+
+      if (isDuplicate) {
+        throw { code: 'DUPLICATE_NAME', message: 'An item with this name already exists in this location.' } as unknown as ServiceError;
+      }
+
       // Create item in database via repository
       const item = await ItemRepository.createItem(trimmedName, spaceId, containerId, description, quantity, photoUri);
 
@@ -243,6 +254,21 @@ export class ItemService {
         const error: ServiceError = { code: 'VALIDATION_ERROR', message: 'Item name cannot be empty.' };
         throw error;
       }
+
+      // Check for duplicate name on update
+      const item = await ItemRepository.getItemById(itemId);
+      if (item) {
+        const existingItems = await ItemRepository.getItemsBySpaceId(item.spaceId);
+        const isDuplicate = existingItems.some(i => 
+          i.id !== itemId &&
+          i.name.toLowerCase() === trimmed.toLowerCase() && 
+          i.containerId === item.containerId
+        );
+        if (isDuplicate) {
+          throw { code: 'DUPLICATE_NAME', message: 'An item with this name already exists in this location.' } as unknown as ServiceError;
+        }
+      }
+
       updates.name = trimmed;
     }
     return ItemRepository.updateItem(itemId, updates);

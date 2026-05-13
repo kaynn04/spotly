@@ -930,6 +930,37 @@ export default function ContainerDetailScreen() {
         
         const canLend = selectedIds.size === 1;
         const canDelete = selectedIds.size > 0;
+
+        // Logic for Lend/Return button
+        let lendActionLabel = 'Lend';
+        let lendActionIcon = faHandshake;
+        let lendActionColor = LENDING;
+        let lendActionOnPress = handleBulkLend;
+        let lendActionDisabled = true;
+
+        if (selectedIds.size === 1) {
+          const selectedItem = items.find((i) => i.id === [...selectedIds][0]);
+          if (selectedItem) {
+            const activeLendingForItem = activeLendingMap[selectedItem.id];
+            const isOutside = activeOutsideItemIds.has(selectedItem.id);
+
+            if (activeLendingForItem) {
+              lendActionLabel = 'Return';
+              lendActionIcon = faCheck;
+              lendActionColor = PRIMARY;
+              lendActionOnPress = async () => {
+                await handleMarkReturned(activeLendingForItem.id, selectedItem);
+                exitSelectMode();
+              };
+              lendActionDisabled = false;
+            } else if (isOutside) {
+              lendActionDisabled = true; // Cannot lend if outside
+            } else {
+              lendActionOnPress = handleBulkLend;
+              lendActionDisabled = false;
+            }
+          }
+        }
         return (
           <View style={[styles.bulkToolbar, { backgroundColor: cardBg, borderColor, bottom: insets.bottom + 16 }]}>
             <TouchableOpacity
@@ -949,12 +980,12 @@ export default function ContainerDetailScreen() {
               <Text style={[styles.bulkActionLabel, { color: PRIMARY }]}>Move</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.bulkAction, { opacity: canLend ? 1 : 0.4 }]}
-              onPress={handleBulkLend}
-              disabled={!canLend}
+              style={[styles.bulkAction, { opacity: lendActionDisabled ? 0.4 : 1 }]}
+              onPress={lendActionOnPress}
+              disabled={lendActionDisabled}
             >
-              <FontAwesomeIcon icon={faHandshake} size={18} color={LENDING} />
-              <Text style={[styles.bulkActionLabel, { color: LENDING }]}>Lend</Text>
+              <FontAwesomeIcon icon={lendActionIcon} size={18} color={lendActionColor} />
+              <Text style={[styles.bulkActionLabel, { color: lendActionColor }]}>{lendActionLabel}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.bulkAction, { opacity: canDelete ? 1 : 0.4 }]}

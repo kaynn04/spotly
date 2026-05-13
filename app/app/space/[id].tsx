@@ -430,9 +430,13 @@ export default function SpaceDetailScreen() {
         { text: 'Cancel', style: 'cancel' },
         { text: 'Save', onPress: async (newName: string | undefined) => {
           if (newName && newName.trim()) {
-            await ContainerRepository.updateName(c.id, newName.trim());
-            exitSelectMode();
-            await loadContainers();
+            try {
+              await ContainerService.updateContainer(c.id, { name: newName.trim() });
+              exitSelectMode();
+              await loadContainers();
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Failed to rename container');
+            }
           }
         }},
       ], 'plain-text', c.name);
@@ -1183,7 +1187,7 @@ export default function SpaceDetailScreen() {
         const selItemIds = selIds.filter((sid) => items.some((i) => i.id === sid));
         const selContainerIds = selIds.filter((sid) => containers.some((c) => c.id === sid));
         const onlyOneItem = selItemIds.length === 1 && selContainerIds.length === 0;
-        const canEdit = selectedIds.size === 1;
+    const canEdit = selectedIds.size === 1; // Can edit either one item or one container
         // Can move multiple items if none are lent or outside
         let canMove = selItemIds.length > 0 && selContainerIds.length === 0;
         if (canMove) {
@@ -1194,8 +1198,38 @@ export default function SpaceDetailScreen() {
             }
           }
         }
-        const canLend = onlyOneItem;
         const canDelete = selectedIds.size > 0;
+
+        // Logic for Lend/Return button
+        let lendActionLabel = 'Lend';
+        let lendActionIcon = faHandshake;
+        let lendActionColor = LENDING;
+        let lendActionOnPress = handleBulkLend;
+        let lendActionDisabled = true;
+
+        if (onlyOneItem) {
+          const selectedItem = items.find((i) => i.id === selItemIds[0]);
+          if (selectedItem) {
+            const activeLendingForItem = activeLendingMap[selectedItem.id];
+            const isOutside = activeOutsideItemIds.has(selectedItem.id);
+
+            if (activeLendingForItem) {
+              lendActionLabel = 'Return';
+              lendActionIcon = faCheck;
+              lendActionColor = PRIMARY;
+              lendActionOnPress = async () => {
+                await handleMarkReturned(activeLendingForItem.id, selectedItem);
+                exitSelectMode();
+              };
+              lendActionDisabled = false;
+            } else if (isOutside) {
+              lendActionDisabled = true; // Cannot lend if outside
+            } else {
+              lendActionOnPress = handleBulkLend;
+              lendActionDisabled = false;
+            }
+          }
+        }
         return (
           <View style={[styles.bulkToolbar, { backgroundColor: cardBg, borderColor, bottom: insets.bottom + 16 }]}>
             <TouchableOpacity
@@ -1215,12 +1249,12 @@ export default function SpaceDetailScreen() {
               <Text style={[styles.bulkActionLabel, { color: PRIMARY }]}>Move</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.bulkAction, { opacity: canLend ? 1 : 0.4 }]}
-              onPress={handleBulkLend}
-              disabled={!canLend}
+              style={[styles.bulkAction, { opacity: lendActionDisabled ? 0.4 : 1 }]}
+              onPress={lendActionOnPress}
+              disabled={lendActionDisabled}
             >
-              <FontAwesomeIcon icon={faHandshake} size={18} color={LENDING} />
-              <Text style={[styles.bulkActionLabel, { color: LENDING }]}>Lend</Text>
+              <FontAwesomeIcon icon={lendActionIcon} size={18} color={lendActionColor} />
+              <Text style={[styles.bulkActionLabel, { color: lendActionColor }]}>{lendActionLabel}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.bulkAction, { opacity: canDelete ? 1 : 0.4 }]}
