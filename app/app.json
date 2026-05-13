@@ -1,18 +1,18 @@
 {
   "expo": {
-    "name": "app",
-    "slug": "app",
+    "name": "Synop",
+    "slug": "synop",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "app",
+    "scheme": "synop",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#f8f9fa",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "backgroundColor": "#f8f9fa",
-      "bundleIdentifier": "com.kaynn04.spotly",
+      "bundleIdentifier": "com.kaynn04.synop",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -24,10 +24,10 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "backgroundColor": "#000000",
+      "backgroundColor": "#f8f9fa",
       "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
-      "package": "com.kaynn04.spotly"
+      "package": "com.kaynn04.synop"
     },
     "web": {
       "output": "static",

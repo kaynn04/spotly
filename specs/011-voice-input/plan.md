@@ -5,7 +5,7 @@
 
 ## Summary
 
-Voice Input adds a floating action button (FAB) to the Spotly dashboard. Tapping it activates `expo-speech-recognition` (device-native, no API cost). The user speaks "Add [item] to [space] [container]". A `VoiceParserService` (regex keyword extraction) and `VoiceMatcherService` (fuzzysort fuzzy matching) resolve the spoken words against existing inventory. A confirmation card shows the parsed result before anything is saved. On confirm, `ItemService.createItem()` is called — the existing service, unchanged. No new DB tables. No internet required. Requires an EAS Dev Build (already configured).
+Voice Input adds a floating action button (FAB) to the Synop dashboard. Tapping it activates `expo-speech-recognition` (device-native, no API cost). The user speaks "Add [item] to [space] [container]". A `VoiceParserService` (regex keyword extraction) and `VoiceMatcherService` (fuzzysort fuzzy matching) resolve the spoken words against existing inventory. A confirmation card shows the parsed result before anything is saved. On confirm, `ItemService.createItem()` is called — the existing service, unchanged. No new DB tables. No internet required. Requires an EAS Dev Build (already configured).
 
 ## Technical Context
 

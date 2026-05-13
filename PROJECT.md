@@ -1,4 +1,4 @@
-# Spotly — Personal Inventory & Lending Tracker
+# Synop — Personal Inventory & Lending Tracker
 
 **Version**: 1.0 (MVP)  
 **Status**: Active Development  
@@ -9,7 +9,7 @@
 
 ## 📋 Project Overview
 
-**Spotly** is a mobile-first inventory tracking app that helps users organize, locate, and manage their physical belongings. It tracks items across multiple spaces (rooms/locations), containers (boxes/drawers), and supports lending items to friends and family with automatic tracking of returns. The app also includes an "Outside Session" feature for tracking items temporarily taken outside the home.
+**Synop** is a mobile-first inventory tracking app that helps users organize, locate, and manage their physical belongings. It tracks items across multiple spaces (rooms/locations), containers (boxes/drawers), and supports lending items to friends and family with automatic tracking of returns. The app also includes an "Outside Session" feature for tracking items temporarily taken outside the home.
 
 ### Core Problems Solved
 - **Where is it?** Know exactly which space, container, and shelf your item is on
@@ -246,7 +246,7 @@ faTrash            // Delete
 
 ### Installation
 ```bash
-cd spotly/app
+cd synop/app
 
 # Install dependencies
 npm install
@@ -347,7 +347,7 @@ handleMoveToSpace, loadActiveLendings, confirmDeleteItem
 
 // Constants: UPPER_SNAKE_CASE
 PRIMARY = '#6b7f99'
-ONBOARDING_DONE_KEY = '@spotly/onboarding_done'
+ONBOARDING_DONE_KEY = '@synop/onboarding_done'
 
 // Interfaces: PascalCase, no 'I' prefix
 type Space = { id: string; name: string; ... }

@@ -11,7 +11,7 @@
 
 ### Architecture Approach: Clean Layered with Vertical Slices
 
-The lending feature follows Spotly's established pattern: **UI → Service → Repository → SQLite**
+The lending feature follows Synop's established pattern: **UI → Service → Repository → SQLite**
 
 **Key Design Decisions**:
 

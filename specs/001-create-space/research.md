@@ -30,7 +30,7 @@ All ambiguities were addressed during `/speckit.clarify` phase. No NEEDS_CLARIFI
 
 **Decision**: Small scale (< 20 spaces)
 
-**Rationale**: Real-world usage: most users have 3-5 locations (Home, Office, Car, Dorm, etc.). Even power users rarely exceed 20. For MVP, keeping assumptions small aligns with Spotly's "simplicity first" principle. Pagination can be added in V2 if scale becomes an issue.
+**Rationale**: Real-world usage: most users have 3-5 locations (Home, Office, Car, Dorm, etc.). Even power users rarely exceed 20. For MVP, keeping assumptions small aligns with Synop's "simplicity first" principle. Pagination can be added in V2 if scale becomes an issue.
 
 **Alternatives Considered**:
 - Medium scale (20-100): Premature optimization
@@ -112,7 +112,7 @@ All ambiguities were addressed during `/speckit.clarify` phase. No NEEDS_CLARIFI
 
 ### Repository Pattern with Parameterized SQL
 
-**Status**: ✅ Recommended pattern for Spotly architecture
+**Status**: ✅ Recommended pattern for Synop architecture
 
 **Key Points**:
 - Service calls Repository for all DB operations

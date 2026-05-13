@@ -20,14 +20,14 @@ let db: SQLiteDatabase | null = null;
 export function getDatabase(): SQLiteDatabase {
   if (!db) {
     try {
-      db = openDatabaseSync('spotly.db');
+      db = openDatabaseSync('synop.db');
       // Enable foreign keys
       db.execSync('PRAGMA foreign_keys = ON');
     } catch (error) {
       console.warn('[getDatabase] Failed to open database, retrying:', error);
       // Reset and try again
       db = null;
-      db = openDatabaseSync('spotly.db');
+      db = openDatabaseSync('synop.db');
       db.execSync('PRAGMA foreign_keys = ON');
     }
   }

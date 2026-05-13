@@ -55,7 +55,7 @@ Adds a warranty expiry date to any inventory item. The app sends push notificati
 const WARRANTY_COLOR = '#e09b3a';           // amber — distinct from PRIMARY and LENDING purple
 const EXPIRING_SOON_DAYS = 30;              // threshold for "Expiring Soon" badge + early notification
 const NOTIFICATION_HOUR = 9;               // 09:00 local time for all warranty notifications
-const ANDROID_CHANNEL_ID = 'spotly-warranty-reminders';
+const ANDROID_CHANNEL_ID = 'synop-warranty-reminders';
 ```
 
 ---

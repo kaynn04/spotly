@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const STORAGE_KEY = '@spotly/walkthrough_done';
+const STORAGE_KEY = '@synop/walkthrough_done';
 
 export class WalkthroughService {
   static async isDone(): Promise<boolean> {

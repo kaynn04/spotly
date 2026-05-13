@@ -45,8 +45,8 @@ import { OutsideSessionItemRepository } from '../../outside/repositories/Outside
 import { ReminderService } from '../../../services/ReminderService';
 
 const PRIMARY = '#6b7f99';
-const SORT_KEY = 'spotly:lending-sort';
-const VIEW_KEY = 'spotly:lending-view';
+const SORT_KEY = 'synop:lending-sort';
+const VIEW_KEY = 'synop:lending-view';
 type SortMode = 'name-asc' | 'name-desc' | 'newest' | 'oldest';
 type ViewMode = 'list' | 'grid';
 const GRID_GAP = 10;
@@ -162,7 +162,7 @@ export default function LendingPage() {
 
   // Listen for refresh events from voice feature or other sources
   useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener('spotly:refresh-home', loadLendings);
+    const subscription = DeviceEventEmitter.addListener('synop:refresh-home', loadLendings);
     return () => subscription.remove();
   }, [loadLendings]);
 

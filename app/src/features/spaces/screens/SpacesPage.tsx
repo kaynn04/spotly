@@ -60,9 +60,9 @@ type SectionedSearchItem =
   | { kind: 'result'; data: SearchResult };
 
 const PRIMARY = '#6b7f99';
-const VIEW_MODE_KEY = 'spotly:spaces-view-mode';
-const SORT_KEY = 'spotly:spaces-sort';
-const FILTER_KEY = 'spotly:spaces-filter';
+const VIEW_MODE_KEY = 'synop:spaces-view-mode';
+const SORT_KEY = 'synop:spaces-sort';
+const FILTER_KEY = 'synop:spaces-filter';
 type ViewMode = 'list' | 'grid';
 type SortMode = 'name-asc' | 'name-desc' | 'most-items' | 'newest' | 'oldest';
 type FilterMode = 'all' | 'non-empty';
@@ -140,14 +140,14 @@ export default function SpacesPage() {
   useEffect(() => {
     return () => {
       if (selectModeRef.current) {
-        DeviceEventEmitter.emit('spotly:show-tab-bar');
+        DeviceEventEmitter.emit('synop:show-tab-bar');
       }
     };
   }, []);
 
   // Listen for refresh events from voice feature or other sources
   useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener('spotly:refresh-home', loadSpaces);
+    const subscription = DeviceEventEmitter.addListener('synop:refresh-home', loadSpaces);
     return () => subscription.remove();
   }, []);
 
@@ -261,13 +261,13 @@ export default function SpacesPage() {
   const enterSelectMode = (space: SpaceWithCount) => {
     setSelectMode(true);
     setSelectedIds(new Set([space.id]));
-    DeviceEventEmitter.emit('spotly:hide-tab-bar');
+    DeviceEventEmitter.emit('synop:hide-tab-bar');
   };
 
   const exitSelectMode = () => {
     setSelectMode(false);
     setSelectedIds(new Set());
-    DeviceEventEmitter.emit('spotly:show-tab-bar');
+    DeviceEventEmitter.emit('synop:show-tab-bar');
   };
 
   const toggleSelect = (id: string) => {

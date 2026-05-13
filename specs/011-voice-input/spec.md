@@ -167,6 +167,6 @@ A user speaks but the result is wrong — background noise, a misheard word, or 
 - Moving items between locations via voice
 - Multi-language or dialect support
 - Voice input on screens other than the dashboard (out of scope for v1)
-- Wake-word activation ("Hey Spotly") — user must tap the mic button manually
+- Wake-word activation ("Hey Synop") — user must tap the mic button manually
 - Voice output / text-to-speech confirmation readback
 - Offline speech model updates or model selection

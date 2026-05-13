@@ -11,7 +11,7 @@ A first-launch guided walkthrough that spotlights 6 UI elements (home dashboard,
 
 **Language/Version**: TypeScript 5.x (strict mode)
 **Primary Dependencies**: React Native core (Modal, Animated, View, measure()), AsyncStorage, expo-router, react-native-safe-area-context
-**Storage**: AsyncStorage key `@spotly/walkthrough_done` (boolean flag)
+**Storage**: AsyncStorage key `@synop/walkthrough_done` (boolean flag)
 **Testing**: Manual on-device (Android primary)
 **Target Platform**: Android (primary), iOS (best-effort)
 **Project Type**: Mobile app (React Native + Expo managed workflow)

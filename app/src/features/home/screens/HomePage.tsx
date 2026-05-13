@@ -30,6 +30,7 @@ import {
   faGear,
   faHandshake,
   faSuitcase,
+  faShieldAlt,
 } from '@fortawesome/free-solid-svg-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -71,6 +72,7 @@ interface DashboardData {
   stats: { totalItems: number; totalSpaces: number; totalContainers: number };
   recentItems: { id: string; name: string; spaceName: string; containerName: string | null; spaceId: string; containerId: string | null; createdAt: string }[];
   recentlyMoved: DashboardMovedItem[];
+  expiringWarranties: { id: string; name: string; spaceName: string; containerName: string | null; spaceId: string; containerId: string | null; warrantyExpiry: string; daysRemaining: number; urgency: 'critical' | 'warning' }[];
   activeLendings: (Lending & { item_name: string })[];
   activeSession: { id: string; title: string; itemCount: number; checkedCount: number } | null;
   isEmpty: boolean;
@@ -116,7 +118,7 @@ export default function HomePage() {
   );
 
   useEffect(() => {
-    const sub = DeviceEventEmitter.addListener('spotly:refresh-home', loadAll);
+    const sub = DeviceEventEmitter.addListener('synop:refresh-home', loadAll);
     return () => sub.remove();
   }, []);
 
@@ -204,6 +206,7 @@ export default function HomePage() {
         stats: dashboard.stats,
         recentItems: dashboard.recentItems,
         recentlyMoved: dashboard.recentlyMoved,
+        expiringWarranties: dashboard.expiringWarranties,
         activeLendings,
         activeSession: session
           ? { id: session.id, title: session.title, itemCount: session.itemCount, checkedCount: session.checkedCount }
@@ -385,6 +388,69 @@ export default function HomePage() {
                     {data.activeSession.checkedCount}/{data.activeSession.itemCount} items checked
                   </Text>
                 </TouchableOpacity>
+              </View>
+            )}
+
+            {/* ── Expiring warranties ────────────────────────── */}
+            {(data?.expiringWarranties?.length ?? 0) > 0 && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Warranties Expiring Soon</Text>
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/spaces' as any)}>
+                    <Text style={[styles.seeAll, { color: PRIMARY }]}>See all</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+                  {data!.expiringWarranties.slice(0, 3).map((item, index) => {
+                    const route = item.containerId ? `/container/${item.containerId}` : `/space/${item.spaceId}`;
+                    const location = item.containerName
+                      ? `${item.spaceName} › ${item.containerName}`
+                      : item.spaceName;
+                    const urgencyColor = item.urgency === 'critical' ? '#d32f2f' : '#f57c00';
+                    const isLastItem = index === Math.min(data!.expiringWarranties.length, 3) - 1;
+                    
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={[
+                          styles.warrantyRow,
+                          !isLastItem && {
+                            borderBottomWidth: 1,
+                            borderBottomColor: borderColor,
+                          },
+                        ]}
+                        onPress={() => router.push(route as any)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.warrantyDot, { backgroundColor: urgencyColor }]} />
+                        <View style={styles.warrantyContent}>
+                          <Text style={[styles.warrantyName, { color: colors.text }]} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                          <Text style={[styles.warrantyMeta, { color: subtleText }]} numberOfLines={1}>
+                            {location}
+                          </Text>
+                        </View>
+                        <View style={styles.warrantyRight}>
+                          <Text style={[styles.warrantyDays, { color: urgencyColor, fontWeight: '600' }]}>
+                            {item.daysRemaining === 0 ? 'Today' : item.daysRemaining === 1 ? '1 day' : `${item.daysRemaining}d`}
+                          </Text>
+                          <FontAwesomeIcon icon={faChevronRight} size={12} color={subtleText} style={{ marginLeft: 6 }} />
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  {data!.expiringWarranties.length > 3 && (
+                    <TouchableOpacity
+                      style={styles.viewAllRow}
+                      onPress={() => router.push('/(tabs)/spaces' as any)}
+                    >
+                      <Text style={[styles.viewAllText, { color: PRIMARY }]}>
+                        +{data!.expiringWarranties.length - 3} more
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
             )}
 
@@ -653,6 +719,14 @@ const styles = StyleSheet.create({
   lendingContent: { flex: 1 },
   lendingBorrower: { fontSize: 15, fontWeight: '600' },
   lendingMeta: { fontSize: 12, marginTop: 2 },
+  // Warranty rows
+  warrantyRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 14, gap: 12 },
+  warrantyDot: { width: 6, height: 6, borderRadius: 3 },
+  warrantyContent: { flex: 1 },
+  warrantyName: { fontSize: 15, fontWeight: '600' },
+  warrantyMeta: { fontSize: 12, marginTop: 2 },
+  warrantyRight: { flexDirection: 'row', alignItems: 'center' },
+  warrantyDays: { fontSize: 13, marginRight: 6 },
   viewAllRow: { paddingVertical: 12, paddingHorizontal: 14 },
   viewAllText: { fontSize: 13, fontWeight: '600' },
   // Recent items

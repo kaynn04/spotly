@@ -54,8 +54,8 @@ import LendingFormModal from '@/src/features/lending/screens/components/LendingF
 
 const PRIMARY = '#6b7f99';
 const LENDING = '#9b72cb';
-const CONTAINER_SORT_KEY = 'spotly:container-detail-sort';
-const CONTAINER_VIEW_KEY = 'spotly:container-detail-view';
+const CONTAINER_SORT_KEY = 'synop:container-detail-sort';
+const CONTAINER_VIEW_KEY = 'synop:container-detail-view';
 type SortMode = 'name-asc' | 'name-desc' | 'newest' | 'oldest';
 type ViewMode = 'list' | 'grid';
 const GRID_GAP = 10;
@@ -378,6 +378,23 @@ export default function ContainerDetailScreen() {
 
   async function handleMoveContainerToSpace(targetSpaceId: string) {
     if (!containerId) return;
+    
+    // Check if any items in the container are lent or outside
+    const blockedItems = items.filter((item) => {
+      const isOutside = activeOutsideItemIds.has(item.id);
+      const isLent = !!activeLendingMap[item.id];
+      return isOutside || isLent;
+    });
+    
+    if (blockedItems.length > 0) {
+      const blockedNames = blockedItems.map((i) => i.name).join(', ');
+      Alert.alert(
+        'Items are Blocked',
+        `Cannot move container: ${blockedNames} ${blockedItems.length === 1 ? 'is' : 'are'} lent or in an outside session. Complete these tasks first.`
+      );
+      return;
+    }
+    
     try {
       await ContainerService.moveContainer(containerId, targetSpaceId);
       setShowMoveContainerModal(false);
@@ -834,6 +851,19 @@ export default function ContainerDetailScreen() {
                     {sortMode === opt.key && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
                   </TouchableOpacity>
                 ))}
+
+                <View style={[styles.menuDivider, { backgroundColor: borderColor }]} />
+
+                {/* Container section */}
+                <Text style={[styles.menuTitle, { color: subtleText }]}>Container</Text>
+                <TouchableOpacity style={[styles.menuOption]} onPress={() => { setShowContainerMenu(false); setShowMoveContainerModal(true); }} activeOpacity={0.7}>
+                  <FontAwesomeIcon icon={faRightLeft} size={14} color={PRIMARY} />
+                  <Text style={[styles.menuOptionText, { color: colors.text }]}>Move</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.menuOption]} onPress={() => { setShowContainerMenu(false); confirmDeleteContainer(); }} activeOpacity={0.7}>
+                  <FontAwesomeIcon icon={faTrash} size={14} color="#d32f2f" />
+                  <Text style={[styles.menuOptionText, { color: '#d32f2f' }]}>Delete</Text>
+                </TouchableOpacity>
               </ScrollView>
               </View>
             </TouchableWithoutFeedback>

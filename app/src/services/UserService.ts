@@ -7,7 +7,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const USER_NAME_KEY = '@spotly/user_name';
+const USER_NAME_KEY = '@synop/user_name';
 
 export const UserService = {
   async getName(): Promise<string | null> {

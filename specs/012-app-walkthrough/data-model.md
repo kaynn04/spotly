@@ -47,7 +47,7 @@ export interface WalkthroughStep {
 
 ### WalkthroughState
 
-**Persisted**: AsyncStorage key `@spotly/walkthrough_done`
+**Persisted**: AsyncStorage key `@synop/walkthrough_done`
 
 ```typescript
 // Value: 'true' | null (absent = not done)
@@ -58,7 +58,7 @@ export interface WalkthroughStep {
 
 ```typescript
 export class WalkthroughService {
-  static readonly STORAGE_KEY = '@spotly/walkthrough_done';
+  static readonly STORAGE_KEY = '@synop/walkthrough_done';
 
   static async isDone(): Promise<boolean>
   static async markDone(): Promise<void>

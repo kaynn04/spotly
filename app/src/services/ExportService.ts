@@ -67,14 +67,14 @@ export const ExportService = {
     };
 
     const json = JSON.stringify(data, null, 2);
-    const fileName = `spotly-export-${new Date().toISOString().slice(0, 10)}.json`;
+    const fileName = `synop-export-${new Date().toISOString().slice(0, 10)}.json`;
     const filePath = `${FileSystem.cacheDirectory}${fileName}`;
 
     await FileSystem.writeAsStringAsync(filePath, json);
 
     await Sharing.shareAsync(filePath, {
       mimeType: 'application/json',
-      dialogTitle: 'Export Spotly Data',
+      dialogTitle: 'Export Synop Data',
     });
   },
 };

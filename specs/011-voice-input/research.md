@@ -138,7 +138,7 @@ function parseVoiceCommand(transcript: string): ParsedVoiceCommand {
 
 **Decision**: Use `TouchableOpacity` with absolute positioning (no external library)
 
-**Rationale**: Consistent with existing Spotly convention of no external UI libraries. A FAB is just a circular button with `position: absolute`, `bottom`, `right` — trivial to implement inline.
+**Rationale**: Consistent with existing Synop convention of no external UI libraries. A FAB is just a circular button with `position: absolute`, `bottom`, `right` — trivial to implement inline.
 
 **Pattern**:
 ```typescript

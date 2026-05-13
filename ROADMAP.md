@@ -1,4 +1,4 @@
-# Spotly — Product Roadmap
+# Synop — Product Roadmap
 
 **Last Updated**: May 11, 2026  
 **Current Version**: 1.0 (MVP)  
@@ -6,17 +6,17 @@
 
 ---
 
-## What Makes Spotly Different From a Notes App
+## What Makes Synop Different From a Notes App
 
-| Notes App | Spotly |
-|-----------|--------|
-| Flat text lists | Hierarchical: Space → Container → Item |
-| No relationships | Items linked to locations, people, sessions |
+| Notes App | Synop                                                  |
+|-----------|--------------------------------------------------------|
+| Flat text lists | Hierarchical: Space → Container → Item                 |
+| No relationships | Items linked to locations, people, sessions            |
 | No state tracking | Lending status, outside session progress, move history |
-| Manual everything | Auto-return, duplicate prevention, cascade deletes |
-| Read/write text | Scan, photograph, track, remind, share |
+| Manual everything | Auto-return, duplicate prevention, cascade deletes     |
+| Read/write text | Scan, photograph, track, remind, share                 |
 
-**Core insight**: Notes apps store *text*. Spotly tracks *physical objects in physical space* — with relationships, state, history, and intelligence.
+**Core insight**: Notes apps store *text*. Synop tracks *physical objects in physical space* — with relationships, state, history, and intelligence.
 
 ---
 
@@ -53,7 +53,7 @@
 - Filter by: space, container, lending status, category, date added
 - Search results show item location path (Space › Container › Item)
 - Instant "Where is my X?" — the #1 use case
-- **Why it matters**: Notes apps search text. Spotly searches your *physical world*.
+- **Why it matters**: Notes apps search text. Synop searches your *physical world*.
 
 ### 📱 Barcode & QR Scanning
 - Scan product barcodes to auto-fill item name and description
@@ -72,7 +72,7 @@
 
 ## Phase 3 — "Smart Tracking" (Intelligence Layer)
 
-> **Goal**: Spotly doesn't just store — it *thinks* and *reminds*.
+> **Goal**: Synop doesn't just store — it *thinks* and *reminds*.
 
 ### 🔔 Push Notifications & Reminders
 - Lending reminders: "John has had your drill for 14 days"
@@ -103,7 +103,7 @@
 
 ## Phase 4 — "Connected" (Multi-Device & Sharing)
 
-> **Goal**: Spotly works across devices and households.
+> **Goal**: Synop works across devices and households.
 
 ### ☁️ Cloud Backup & Sync
 - Optional cloud backup (user-controlled, privacy-first)
@@ -168,7 +168,7 @@
 
 ## Phase 6 — "Ecosystem" (Platform Play)
 
-> **Goal**: Spotly becomes the platform for physical object management.
+> **Goal**: Synop becomes the platform for physical object management.
 
 ### 📡 NFC Tag Support
 - Write item/container ID to NFC stickers
@@ -192,7 +192,7 @@
 - Public API for third-party integrations
 - Home automation: smart home knows what's where
 - IFTTT/Zapier recipes: "When lending overdue → send reminder email"
-- **Why it matters**: Spotly becomes the source of truth for physical objects
+- **Why it matters**: Synop becomes the source of truth for physical objects
 
 ---
 
@@ -236,11 +236,11 @@
 
 ## Competitive Landscape
 
-| App | Focus | Spotly Advantage |
+| App | Focus | Synop Advantage |
 |-----|-------|-----------------|
-| Google Keep | Notes & lists | Spotly has location hierarchy, lending, sessions |
-| Sortly | Visual inventory | Spotly is free, offline-first, has lending + outside tracking |
-| Memento | Database app | Spotly is purpose-built for physical items, not generic database |
-| Home Inventory | Insurance tracking | Spotly adds lending, outside sessions, real-time tracking |
+| Google Keep | Notes & lists | Synop has location hierarchy, lending, sessions |
+| Sortly | Visual inventory | Synop is free, offline-first, has lending + outside tracking |
+| Memento | Database app | Synop is purpose-built for physical items, not generic database |
+| Home Inventory | Insurance tracking | Synop adds lending, outside sessions, real-time tracking |
 
-**Spotly's moat**: The combination of *spatial hierarchy + lending + outside sessions + offline-first* doesn't exist in any competitor. Each phase widens this gap.
+**Synop's moat**: The combination of *spatial hierarchy + lending + outside sessions + offline-first* doesn't exist in any competitor. Each phase widens this gap.

@@ -19,7 +19,7 @@
 
 ## Overview
 
-Users of Spotly track physical items organized into Spaces and Containers. Many household items — appliances, electronics, tools — come with manufacturer warranties that expire after 1–3 years. Today there is no way to record or be reminded of those expiry dates; users rely on paper receipts or memory, and often miss the window to file a claim or purchase an extended warranty.
+Users of Synop track physical items organized into Spaces and Containers. Many household items — appliances, electronics, tools — come with manufacturer warranties that expire after 1–3 years. Today there is no way to record or be reminded of those expiry dates; users rely on paper receipts or memory, and often miss the window to file a claim or purchase an extended warranty.
 
 The Warranty Tracker feature lets users attach a warranty expiry date to any inventory item. The app proactively notifies the user 30 days before expiry and again on the expiry day itself, giving them time to act. A dedicated dashboard view surfaces all warranties grouped by status (active, expiring soon, expired) so users can manage them at a glance.
 
@@ -29,7 +29,7 @@ The Warranty Tracker feature lets users attach a warranty expiry date to any inv
 
 ### User Story 1 — Attach a Warranty to an Item (Priority: P1)
 
-As a homeowner who just purchased a new appliance, I want to record the warranty expiry date on the item in Spotly so I never lose track of when coverage ends.
+As a homeowner who just purchased a new appliance, I want to record the warranty expiry date on the item in Synop so I never lose track of when coverage ends.
 
 **Why this priority**: This is the foundational capability — without it, no other part of the feature is possible. Every other story depends on at least one warranty existing.
 
@@ -141,7 +141,7 @@ As a homeowner with multiple warranted items, I want to see all my warranties in
 - The Tools tab already exists in the app and has a placeholder entry for Warranty Tracker; this spec covers replacing that placeholder with the live screen.
 - Items can have a warranty date in the past (already-expired warranties); these are valid records and are displayed in the "Expired" group.
 - Notification delivery reliability depends on device platform and user-granted permissions; the app is not responsible for OS-level delivery failures.
-- The feature targets the same devices and OS versions already supported by Spotly (iOS 16+ and Android 10+).
+- The feature targets the same devices and OS versions already supported by Synop (iOS 16+ and Android 10+).
 
 ---
 
