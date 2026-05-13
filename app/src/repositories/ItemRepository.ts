@@ -592,4 +592,48 @@ export class ItemRepository {
       throw serviceError;
     }
   }
+
+  /**
+   * Get all items with warranty expiry dates
+   * 
+   * Used by DashboardService to display expiring warranty items
+   * Returns items with their space and container information
+   * 
+   * @returns Array of items with warranty expiry info
+   */
+  static async getItemsWithWarrantyExpiry(): Promise<Array<{
+    id: string;
+    name: string;
+    spaceName: string;
+    containerName: string | null;
+    spaceId: string;
+    containerId: string | null;
+    warrantyExpiry: string;
+  }>> {
+    try {
+      const db = getDatabase();
+
+      const result = await db.getAllAsync(
+        `SELECT items.id, items.name, items.warranty_expiry, items.space_id, items.container_id, spaces.name as space_name, containers.name as container_name
+         FROM items
+         JOIN spaces ON items.space_id = spaces.id
+         LEFT JOIN containers ON items.container_id = containers.id
+         WHERE items.warranty_expiry IS NOT NULL
+         ORDER BY items.warranty_expiry ASC`
+      );
+
+      return result.map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        spaceName: row.space_name,
+        containerName: row.container_name ?? null,
+        spaceId: row.space_id,
+        containerId: row.container_id ?? null,
+        warrantyExpiry: row.warranty_expiry,
+      }));
+    } catch (error) {
+      console.error('[ItemRepository.getItemsWithWarrantyExpiry] Database error:', error);
+      return [];
+    }
+  }
 }

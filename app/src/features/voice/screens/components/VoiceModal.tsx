@@ -85,6 +85,10 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
   const [showSpacePicker, setShowSpacePicker] = useState(false);
   const [showContainerPicker, setShowContainerPicker] = useState(false);
   const [itemNameOverride, setItemNameOverride] = useState<string | null>(null);
+  // Ref to track if we've already received a result for the current listening session
+  // Prevents transient error events from overwriting a successful result
+  const resultReceivedRef = useRef<boolean>(false);
+
   // Ref to always hold the latest edited item name (avoids closure issues)
   const itemNameRef = useRef<string>('');
   // For multi-add: array of item names
@@ -112,6 +116,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
 
   useSpeechRecognitionEvent('result', (event) => {
     clearListenTimeout();
+    resultReceivedRef.current = true;
     const transcript = event.results[0]?.transcript ?? '';
     if (!transcript.trim()) {
       setSessionState({ phase: 'error', message: "Didn't catch that — try again" });
@@ -130,12 +135,15 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
 
     // 'aborted' is expected when we call abort() ourselves (timeout/cancel) — ignore it
     if (event.error === 'aborted') return;
-    // 'no-speech' means silence was detected — show friendly message
-    if (event.error === 'no-speech') {
-      setSessionState({ phase: 'error', message: "Didn't catch anything — tap to try again" });
+    
+    // If we've already received a result for this session, ignore error events
+    // This prevents transient errors from overwriting a successful result
+    if (resultReceivedRef.current) {
+      console.debug('[VoiceModal] Ignoring error after result already received:', event.error);
       return;
     }
-    // Language pack not yet downloaded
+    
+    // Language pack not yet downloaded — this is fatal
     const msg = event.message || event.error || '';
     if (msg.toLowerCase().includes('not yet downloaded') || event.error === 'language-not-supported') {
       ExpoSpeechRecognitionModule.abort()?.catch(() => {});
@@ -143,9 +151,26 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
       return;
     }
 
-    // For any other error, stop the recognizer to clear audio feedback
-    ExpoSpeechRecognitionModule.abort()?.catch(() => {});
-    setSessionState({ phase: 'error', message: msg || 'Unknown error — try again' });
+    // 'no-speech' means silence was detected — only show error if we're still in listening state
+    // (ignore if result or other state already being processed)
+    if (event.error === 'no-speech') {
+      if (sessionState.phase === 'listening') {
+        setSessionState({ phase: 'error', message: "Didn't catch anything — tap to try again" });
+      }
+      return;
+    }
+
+    // For permission and availability errors, abort and show
+    if (event.error === 'permission-denied' || event.error === 'service-not-available' || event.error === 'recognizer-busy') {
+      ExpoSpeechRecognitionModule.abort()?.catch(() => {});
+      setSessionState({ phase: 'error', message: msg || 'Microphone error — try again' });
+      return;
+    }
+
+    // For any other error (transient/unknown), ignore it and let result/end events handle completion
+    // This prevents flickering errors on subsequent commands where transient errors may fire
+    // but the speech recognition completes successfully anyway
+    console.debug('[VoiceModal] Ignoring transient error:', event.error, msg);
   });
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -158,8 +183,11 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
   };
 
   const startListening = useCallback(async () => {
+    // Clear previous state and flags immediately before starting
+    resultReceivedRef.current = false;
     resetConfirmState();
     setSessionState({ phase: 'listening' });
+    
     try {
       const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
       if (!granted) {
@@ -181,6 +209,8 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
         continuous: false,
         androidRecognitionServicePackage: defaultService?.packageName,
       });
+      
+      // Only set timeout after successfully starting recognition
       timeoutRef.current = setTimeout(() => {
         ExpoSpeechRecognitionModule.abort();
         setSessionState({ phase: 'error', message: 'Listening timed out — try again' });
@@ -581,6 +611,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
 
   const handleCancel = () => {
     clearListenTimeout();
+    resultReceivedRef.current = false;
     ExpoSpeechRecognitionModule.abort();
     setSessionState({ phase: 'idle' });
     resetConfirmState();
@@ -595,6 +626,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
   useEffect(() => {
     if (!visible) {
       clearListenTimeout();
+      resultReceivedRef.current = false;
       ExpoSpeechRecognitionModule.abort()?.catch(() => {});
     }
   }, [visible]);

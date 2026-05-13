@@ -136,6 +136,7 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
                   showsVerticalScrollIndicator={false}
                   bounces={false}
                   style={styles.scrollContent}
+                  contentContainerStyle={{ paddingBottom: 16 }}
                   onScrollBeginDrag={Keyboard.dismiss}
                 >
                   {contextLabel && (
