@@ -20,6 +20,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   DeviceEventEmitter,
+  Image,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { 
@@ -31,6 +32,9 @@ import {
   faHandshake,
   faSuitcase,
   faShieldAlt,
+  faX,
+  faPlus,
+  faFolder,
 } from '@fortawesome/free-solid-svg-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -70,7 +74,7 @@ function formatDate(dateString: string) {
 
 interface DashboardData {
   stats: { totalItems: number; totalSpaces: number; totalContainers: number };
-  recentItems: { id: string; name: string; spaceName: string; containerName: string | null; spaceId: string; containerId: string | null; createdAt: string }[];
+  recentItems: { id: string; name: string; spaceName: string; containerName: string | null; spaceId: string; containerId: string | null; createdAt: string; photoUri: string | null }[];
   recentlyMoved: DashboardMovedItem[];
   expiringWarranties: { id: string; name: string; spaceName: string; containerName: string | null; spaceId: string; containerId: string | null; warrantyExpiry: string; daysRemaining: number; urgency: 'critical' | 'warning' }[];
   activeLendings: (Lending & { item_name: string })[];
@@ -98,6 +102,11 @@ export default function HomePage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const [dismissedGuidanceCards, setDismissedGuidanceCards] = useState<Set<string>>(new Set());
+
+  const dismissGuidanceCard = useCallback((cardType: string) => {
+    setDismissedGuidanceCards((prev) => new Set(prev).add(cardType));
+  }, []);
 
   // Walkthrough
   const { tabBarRef } = useWalkthroughContext();
@@ -306,48 +315,110 @@ export default function HomePage() {
               </TouchableOpacity>
             </View>
 
-            {/* ── Lend guidance (if has items but no lendings) ─ */}
-            {data && !data.isEmpty && data.stats.totalItems > 0 && (data?.activeLendings?.length ?? 0) === 0 && (
+            {/* ── Quick action bar ──────────────────────────────── */}
+            <View style={styles.quickActionGrid}>
               <TouchableOpacity
-                style={[styles.guidanceCard, { backgroundColor: cardBg, borderColor }]}
+                style={[styles.quickActionButton, { backgroundColor: cardBg, borderColor }]}
+                onPress={() => router.push({ pathname: '/(tabs)/spaces' as any, params: { openCreate: '1' } })}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.quickActionIconBox, { backgroundColor: `${PRIMARY}18` }]}>
+                  <FontAwesomeIcon icon={faFolder} size={18} color={PRIMARY} />
+                </View>
+                <Text style={[styles.quickActionLabel, { color: colors.text }]}>Add Space</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.quickActionButton, { backgroundColor: cardBg, borderColor }]}
+                onPress={() => router.push('/(tabs)/spaces' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.quickActionIconBox, { backgroundColor: `${PRIMARY}18` }]}>
+                  <FontAwesomeIcon icon={faBox} size={18} color={PRIMARY} />
+                </View>
+                <Text style={[styles.quickActionLabel, { color: colors.text }]}>Add Item</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.quickActionButton, { backgroundColor: cardBg, borderColor }]}
+                onPress={() => router.push('/(tabs)/spaces' as any)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.quickActionIconBox, { backgroundColor: `${PRIMARY}18` }]}>
+                  <FontAwesomeIcon icon={faBox} size={18} color={PRIMARY} />
+                </View>
+                <Text style={[styles.quickActionLabel, { color: colors.text }]}>Add Container</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.quickActionButton, { backgroundColor: cardBg, borderColor }]}
                 onPress={() => router.push('/(tabs)/lending' as any)}
                 activeOpacity={0.7}
               >
-                <View style={styles.guidanceCardContent}>
-                  <View style={[styles.guidanceIconBox, { backgroundColor: `${PRIMARY}18` }]}>
-                    <FontAwesomeIcon icon={faHandshake} size={20} color={PRIMARY} />
-                  </View>
-                  <View style={styles.guidanceTextBlock}>
-                    <Text style={[styles.guidanceTitle, { color: colors.text }]}>Lend an item</Text>
-                    <Text style={[styles.guidanceSubtitle, { color: subtleText }]}>
-                      Share your items with friends and track who has what
-                    </Text>
-                  </View>
-                  <FontAwesomeIcon icon={faChevronRight} size={13} color={subtleText} />
+                <View style={[styles.quickActionIconBox, { backgroundColor: `${PRIMARY}18` }]}>
+                  <FontAwesomeIcon icon={faHandshake} size={18} color={PRIMARY} />
                 </View>
+                <Text style={[styles.quickActionLabel, { color: colors.text }]}>Lend</Text>
               </TouchableOpacity>
+            </View>
+
+            {/* ── Lend guidance (if has items but no lendings) ─ */}
+            {data && !data.isEmpty && data.stats.totalItems > 0 && (data?.activeLendings?.length ?? 0) === 0 && !dismissedGuidanceCards.has('lend') && (
+              <View style={[styles.guidanceCard, { backgroundColor: cardBg, borderColor }]}>
+                <TouchableOpacity
+                  style={styles.guidanceCardContentWithClose}
+                  onPress={() => router.push('/(tabs)/lending' as any)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.guidanceCardContent}>
+                    <View style={[styles.guidanceIconBox, { backgroundColor: `${PRIMARY}18` }]}>
+                      <FontAwesomeIcon icon={faHandshake} size={20} color={PRIMARY} />
+                    </View>
+                    <View style={styles.guidanceTextBlock}>
+                      <Text style={[styles.guidanceTitle, { color: colors.text }]}>Lend an item</Text>
+                      <Text style={[styles.guidanceSubtitle, { color: subtleText }]}>
+                        Share your items with friends and track who has what
+                      </Text>
+                    </View>
+                    <FontAwesomeIcon icon={faChevronRight} size={13} color={subtleText} />
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.guidanceCloseButton}
+                  onPress={() => dismissGuidanceCard('lend')}
+                  hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                >
+                  <FontAwesomeIcon icon={faX} size={14} color={subtleText} />
+                </TouchableOpacity>
+              </View>
             )}
 
             {/* ── Outside guidance (if has items but no session) */}
-            {data && !data.isEmpty && data.stats.totalItems > 0 && !data?.activeSession && (
-              <TouchableOpacity
-                style={[styles.guidanceCard, { backgroundColor: cardBg, borderColor }]}
-                onPress={() => router.push('/(tabs)/outside' as any)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.guidanceCardContent}>
-                  <View style={[styles.guidanceIconBox, { backgroundColor: `${PRIMARY}18` }]}>
-                    <FontAwesomeIcon icon={faSuitcase} size={20} color={PRIMARY} />
+            {data && !data.isEmpty && data.stats.totalItems > 0 && !data?.activeSession && !dismissedGuidanceCards.has('outside') && (
+              <View style={[styles.guidanceCard, { backgroundColor: cardBg, borderColor }]}>
+                <TouchableOpacity
+                  style={styles.guidanceCardContentWithClose}
+                  onPress={() => router.push('/(tabs)/outside' as any)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.guidanceCardContent}>
+                    <View style={[styles.guidanceIconBox, { backgroundColor: `${PRIMARY}18` }]}>
+                      <FontAwesomeIcon icon={faSuitcase} size={20} color={PRIMARY} />
+                    </View>
+                    <View style={styles.guidanceTextBlock}>
+                      <Text style={[styles.guidanceTitle, { color: colors.text }]}>Start an outside session</Text>
+                      <Text style={[styles.guidanceSubtitle, { color: subtleText }]}>
+                        List items you need to bring for your errands and check them off
+                      </Text>
+                    </View>
+                    <FontAwesomeIcon icon={faChevronRight} size={13} color={subtleText} />
                   </View>
-                  <View style={styles.guidanceTextBlock}>
-                    <Text style={[styles.guidanceTitle, { color: colors.text }]}>Start an outside session</Text>
-                    <Text style={[styles.guidanceSubtitle, { color: subtleText }]}>
-                      List items you need to bring for your errands and check them off
-                    </Text>
-                  </View>
-                  <FontAwesomeIcon icon={faChevronRight} size={13} color={subtleText} />
-                </View>
-              </TouchableOpacity>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.guidanceCloseButton}
+                  onPress={() => dismissGuidanceCard('outside')}
+                  hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                >
+                  <FontAwesomeIcon icon={faX} size={14} color={subtleText} />
+                </TouchableOpacity>
+              </View>
             )}
 
             {/* ── Active outside session ─────────────────────── */}
@@ -531,6 +602,17 @@ export default function HomePage() {
                         onPress={() => router.push(route as any)}
                         activeOpacity={0.7}
                       >
+                        {item.photoUri && (
+                          <Image
+                            source={{ uri: item.photoUri }}
+                            style={styles.recentThumbnail}
+                          />
+                        )}
+                        {!item.photoUri && (
+                          <View style={[styles.recentThumbnailPlaceholder, { backgroundColor: isDark ? '#2c2c2e' : '#e8eaed' }]}>
+                            <FontAwesomeIcon icon={faBox} size={16} color={subtleText} />
+                          </View>
+                        )}
                         <View style={styles.recentContent}>
                           <Text style={[styles.recentName, { color: colors.text }]} numberOfLines={1}>
                             {item.name}
@@ -582,6 +664,17 @@ export default function HomePage() {
                         onPress={() => router.push(route as any)}
                         activeOpacity={0.7}
                       >
+                        {item.photoUri && (
+                          <Image
+                            source={{ uri: item.photoUri }}
+                            style={styles.recentThumbnail}
+                          />
+                        )}
+                        {!item.photoUri && (
+                          <View style={[styles.recentThumbnailPlaceholder, { backgroundColor: isDark ? '#2c2c2e' : '#e8eaed' }]}>
+                            <FontAwesomeIcon icon={faBox} size={16} color={subtleText} />
+                          </View>
+                        )}
                         <View style={styles.recentContent}>
                           <View style={styles.recentNameRow}>
                             <Text style={[styles.recentName, { color: colors.text }]} numberOfLines={1}>
@@ -698,6 +791,11 @@ const styles = StyleSheet.create({
   statCard: { flex: 1, borderRadius: 14, borderWidth: 1, padding: 16, alignItems: 'center' },
   statValue: { fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
   statLabel: { fontSize: 12, fontWeight: '500', marginTop: 4 },
+  // Quick action bar
+  quickActionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
+  quickActionButton: { flex: 1, minWidth: '48%', borderRadius: 14, borderWidth: 1, padding: 16, alignItems: 'center', justifyContent: 'center' },
+  quickActionIconBox: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  quickActionLabel: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
   // Sections
   section: { marginBottom: 20 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
@@ -730,7 +828,9 @@ const styles = StyleSheet.create({
   viewAllRow: { paddingVertical: 12, paddingHorizontal: 14 },
   viewAllText: { fontSize: 13, fontWeight: '600' },
   // Recent items
-  recentRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 14 },
+  recentRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 14, gap: 10 },
+  recentThumbnail: { width: 44, height: 44, borderRadius: 8 },
+  recentThumbnailPlaceholder: { width: 44, height: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   recentContent: { flex: 1 },
   recentNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   recentName: { fontSize: 15, fontWeight: '500', flexShrink: 1 },
@@ -740,13 +840,15 @@ const styles = StyleSheet.create({
   recentRight: { flexDirection: 'row', alignItems: 'center' },
   recentDate: { fontSize: 12 },
   // Guidance card (feature onboarding)
-  guidanceCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 16 },
+  guidanceCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 16, position: 'relative' },
   guidanceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  guidanceCardContentWithClose: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingRight: 32 },
   guidanceCardContent: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   guidanceIconBox: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   guidanceTextBlock: { flex: 1 },
   guidanceTitle: { fontSize: 15, fontWeight: '600', marginBottom: 3 },
   guidanceSubtitle: { fontSize: 13, fontWeight: '400', lineHeight: 18 },
+  guidanceCloseButton: { position: 'absolute', top: 12, right: 12, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   // FAB
   fab: {
     position: 'absolute',

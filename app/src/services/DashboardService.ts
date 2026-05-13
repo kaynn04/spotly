@@ -23,6 +23,7 @@ export interface DashboardItem {
   spaceId: string;
   containerId: string | null;
   createdAt: string;
+  photoUri: string | null;
 }
 
 export interface DashboardMovedItem {
@@ -32,6 +33,7 @@ export interface DashboardMovedItem {
   containerName: string | null;
   updatedAt: string;
   kind: 'item' | 'container';
+  photoUri: string | null;
 }
 
 /**

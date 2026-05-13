@@ -230,12 +230,12 @@ export class ContainerRepository {
 
   static async getRecentlyMovedContainers(
     limit: number = 5
-  ): Promise<Array<{ id: string; name: string; spaceName: string; containerName: null; updatedAt: string }>> {
+  ): Promise<Array<{ id: string; name: string; spaceName: string; containerName: null; updatedAt: string; photoUri: string | null }>> {
     try {
       const db = getDatabase();
       const sanitizedLimit = Math.max(1, Math.min(1000, Math.floor(limit)));
       const result = await db.getAllAsync(
-        `SELECT c.id, c.name, c.updated_at,
+        `SELECT c.id, c.name, c.updated_at, c.photo_uri,
                 s.name as space_name
          FROM containers c
          JOIN spaces s ON c.space_id = s.id
@@ -250,6 +250,7 @@ export class ContainerRepository {
         spaceName: row.space_name,
         containerName: null,
         updatedAt: row.updated_at,
+        photoUri: row.photo_uri ?? null,
       }));
     } catch (error) {
       console.error('[ContainerRepository.getRecentlyMovedContainers] Database error:', error);

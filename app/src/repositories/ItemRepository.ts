@@ -334,7 +334,7 @@ export class ItemRepository {
    */
   static async getRecentItems(
     limit: number = 5
-  ): Promise<Array<{ id: string; name: string; spaceName: string; containerName: string | null; spaceId: string; containerId: string | null; createdAt: string }>> {
+  ): Promise<Array<{ id: string; name: string; spaceName: string; containerName: string | null; spaceId: string; containerId: string | null; createdAt: string; photoUri: string | null }>> {
     try {
       const db = getDatabase();
 
@@ -342,7 +342,7 @@ export class ItemRepository {
       const sanitizedLimit = Math.max(1, Math.min(1000, Math.floor(limit)));
 
       const result = await db.getAllAsync(
-        `SELECT items.id, items.name, items.created_at, items.space_id, items.container_id, spaces.name as space_name, containers.name as container_name
+        `SELECT items.id, items.name, items.created_at, items.space_id, items.container_id, items.photo_uri, spaces.name as space_name, containers.name as container_name
          FROM items
          JOIN spaces ON items.space_id = spaces.id
          LEFT JOIN containers ON items.container_id = containers.id
@@ -359,6 +359,7 @@ export class ItemRepository {
         spaceId: row.space_id,
         containerId: row.container_id ?? null,
         createdAt: row.created_at,
+        photoUri: row.photo_uri ?? null,
       }));
     } catch (error) {
       console.error('[ItemRepository.getRecentItems] Database error:', error);
@@ -368,12 +369,12 @@ export class ItemRepository {
 
   static async getRecentlyMovedItems(
     limit: number = 5
-  ): Promise<Array<{ id: string; name: string; spaceName: string; containerName: string | null; updatedAt: string }>> {
+  ): Promise<Array<{ id: string; name: string; spaceName: string; containerName: string | null; updatedAt: string; photoUri: string | null }>> {
     try {
       const db = getDatabase();
       const sanitizedLimit = Math.max(1, Math.min(1000, Math.floor(limit)));
       const result = await db.getAllAsync(
-        `SELECT i.id, i.name, i.updated_at,
+        `SELECT i.id, i.name, i.updated_at, i.photo_uri,
                 s.name as space_name,
                 c.name as container_name
          FROM items i
@@ -390,6 +391,7 @@ export class ItemRepository {
         spaceName: row.space_name,
         containerName: row.container_name ?? null,
         updatedAt: row.updated_at,
+        photoUri: row.photo_uri ?? null,
       }));
     } catch (error) {
       console.error('[ItemRepository.getRecentlyMovedItems] Database error:', error);
