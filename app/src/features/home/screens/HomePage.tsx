@@ -33,8 +33,6 @@ import {
   faSuitcase,
   faShieldAlt,
   faX,
-  faPlus,
-  faFolder,
 } from '@fortawesome/free-solid-svg-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -312,50 +310,6 @@ export default function HomePage() {
                   {data?.stats.totalContainers ?? 0}
                 </Text>
                 <Text style={[styles.statLabel, { color: subtleText }]}>Containers</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* ── Quick action bar ──────────────────────────────── */}
-            <View style={styles.quickActionGrid}>
-              <TouchableOpacity
-                style={[styles.quickActionButton, { backgroundColor: cardBg, borderColor }]}
-                onPress={() => router.push({ pathname: '/(tabs)/spaces' as any, params: { openCreate: '1' } })}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.quickActionIconBox, { backgroundColor: `${PRIMARY}18` }]}>
-                  <FontAwesomeIcon icon={faFolder} size={18} color={PRIMARY} />
-                </View>
-                <Text style={[styles.quickActionLabel, { color: colors.text }]}>Add Space</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.quickActionButton, { backgroundColor: cardBg, borderColor }]}
-                onPress={() => router.push('/(tabs)/spaces' as any)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.quickActionIconBox, { backgroundColor: `${PRIMARY}18` }]}>
-                  <FontAwesomeIcon icon={faBox} size={18} color={PRIMARY} />
-                </View>
-                <Text style={[styles.quickActionLabel, { color: colors.text }]}>Add Item</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.quickActionButton, { backgroundColor: cardBg, borderColor }]}
-                onPress={() => router.push('/(tabs)/spaces' as any)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.quickActionIconBox, { backgroundColor: `${PRIMARY}18` }]}>
-                  <FontAwesomeIcon icon={faBox} size={18} color={PRIMARY} />
-                </View>
-                <Text style={[styles.quickActionLabel, { color: colors.text }]}>Add Container</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.quickActionButton, { backgroundColor: cardBg, borderColor }]}
-                onPress={() => router.push('/(tabs)/lending' as any)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.quickActionIconBox, { backgroundColor: `${PRIMARY}18` }]}>
-                  <FontAwesomeIcon icon={faHandshake} size={18} color={PRIMARY} />
-                </View>
-                <Text style={[styles.quickActionLabel, { color: colors.text }]}>Lend</Text>
               </TouchableOpacity>
             </View>
 
@@ -791,11 +745,6 @@ const styles = StyleSheet.create({
   statCard: { flex: 1, borderRadius: 14, borderWidth: 1, padding: 16, alignItems: 'center' },
   statValue: { fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
   statLabel: { fontSize: 12, fontWeight: '500', marginTop: 4 },
-  // Quick action bar
-  quickActionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
-  quickActionButton: { flex: 1, minWidth: '48%', borderRadius: 14, borderWidth: 1, padding: 16, alignItems: 'center', justifyContent: 'center' },
-  quickActionIconBox: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  quickActionLabel: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
   // Sections
   section: { marginBottom: 20 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
