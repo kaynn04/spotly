@@ -66,6 +66,7 @@ export default function ItemDetailScreen() {
   const [showLendModal, setShowLendModal] = useState(false);
   const [borrowerName, setBorrowerName] = useState('');
   const [lendNote, setLendNote] = useState('');
+  const [dueDate, setDueDate] = useState<Date | null>(null);
   const [lendLoading, setLendLoading] = useState(false);
 
   // Menu state
@@ -570,7 +571,8 @@ export default function ItemDetailScreen() {
         {/* Warranty Date Picker */}
         <DatePickerSheet
           visible={showWarrantyPicker}
-          onClose={handleWarrantyDone}
+          onClose={() => setShowWarrantyPicker(false)}
+          onConfirm={handleWarrantyDone}
           onChange={setWarrantyPickerDate}
           value={warrantyPickerDate}
           minimumDate={new Date()}
@@ -602,7 +604,7 @@ export default function ItemDetailScreen() {
             ) : (
               <TouchableOpacity
                 style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]}
-                onPress={() => { setShowMenu(false); if (isOutside) { outsideGuard(); } else { setBorrowerName(''); setLendNote(''); setShowLendModal(true); } }}
+              onPress={() => { setShowMenu(false); if (isOutside) { outsideGuard(); } else { setBorrowerName(''); setLendNote(''); setDueDate(null); setShowLendModal(true); } }}
               >
                 <FontAwesomeIcon icon={faHandshake} size={18} color={isOutside ? '#e67e22' : PRIMARY} />
                 <Text style={[styles.menuItemText, { color: isOutside ? '#e67e22' : colors.text }]}>Lend item</Text>
@@ -624,8 +626,10 @@ export default function ItemDetailScreen() {
         onBorrowerNameChange={setBorrowerName}
         note={lendNote}
         onNoteChange={setLendNote}
+        dueDate={dueDate}
+        onDueDateChange={setDueDate}
         onSubmit={handleLendSubmit}
-        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); }}
+        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setDueDate(null); }}
         loading={lendLoading}
       />
 

@@ -101,6 +101,7 @@ export default function ContainerDetailScreen() {
   const [selectedLendItem, setSelectedLendItem] = useState<Item | null>(null);
   const [borrowerName, setBorrowerName] = useState('');
   const [lendNote, setLendNote] = useState('');
+  const [dueDate, setDueDate] = useState<Date | null>(null);
   const [lendLoading, setLendLoading] = useState(false);
   const [activeLendingMap, setActiveLendingMap] = useState<Record<string, Lending>>({});
   const [activeOutsideItemIds, setActiveOutsideItemIds] = useState<Set<string>>(new Set());
@@ -356,6 +357,7 @@ export default function ContainerDetailScreen() {
     setSelectedLendItem(item);
     setBorrowerName('');
     setLendNote('');
+    setDueDate(null);
     setShowLendModal(true);
   };
 
@@ -845,8 +847,10 @@ export default function ContainerDetailScreen() {
         onBorrowerNameChange={setBorrowerName}
         note={lendNote}
         onNoteChange={setLendNote}
+        dueDate={dueDate}
+        onDueDateChange={setDueDate}
         onSubmit={handleLendSubmit}
-        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setSelectedLendItem(null); }}
+        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setDueDate(null); setSelectedLendItem(null); }}
         loading={lendLoading}
       />
       <ItemActionSheet
@@ -889,7 +893,7 @@ export default function ContainerDetailScreen() {
                   icon: faHandshake,
                   label: 'Lend',
                   description: isOutside ? 'In active outside session' : 'Track who you lent this item to',
-                  onPress: isOutside ? outsideGuard : () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setShowLendModal(true); },
+                  onPress: isOutside ? outsideGuard : () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setDueDate(null); setShowLendModal(true); },
                 },
             {
               icon: faTrash,

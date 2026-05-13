@@ -70,6 +70,7 @@ export default function LendingFormModal({
 
   // Show inline picker on Android (shown inline), modal-style on iOS
   const [showPicker, setShowPicker] = useState(false);
+  const [tempDate, setTempDate] = useState<Date>(new Date());
 
   const sheetTranslateY = useRef(new Animated.Value(0)).current;
   const panResponder = useRef(
@@ -171,7 +172,10 @@ export default function LendingFormModal({
                   <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 12 }]}>Due Date (optional)</Text>
                   <TouchableOpacity
                     style={[styles.dueDateRow, { backgroundColor: inputBg, borderColor }]}
-                    onPress={() => setShowPicker(true)}
+                    onPress={() => {
+                      setTempDate(dueDate ?? new Date());
+                      setShowPicker(true);
+                    }}
                     disabled={loading}
                   >
                     <FontAwesomeIcon icon={faCalendar} size={14} color={subtleText} />
@@ -194,9 +198,13 @@ export default function LendingFormModal({
                   {showPicker && (
                     <DatePickerSheet
                       visible={showPicker}
-                      value={dueDate ?? new Date()}
+                      value={tempDate}
                       minimumDate={new Date()}
-                      onChange={(d) => onDueDateChange(d)}
+                      onChange={setTempDate}
+                      onConfirm={() => {
+                        onDueDateChange(tempDate);
+                        setShowPicker(false);
+                      }}
                       onClose={() => setShowPicker(false)}
                       cardBg={cardBg}
                       borderColor={borderColor}

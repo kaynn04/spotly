@@ -289,7 +289,8 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
       </View>
       <DatePickerSheet
         visible={showWarrantyPicker}
-        onClose={() => {
+        onClose={() => setShowWarrantyPicker(false)}
+        onConfirm={() => {
           setShowWarrantyPicker(false);
           setWarrantyDate(warrantyPickerDate);
         }}
