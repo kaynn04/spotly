@@ -37,10 +37,12 @@ import { Lending } from '@/src/features/lending/models/Lending';
 import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
 import { OutsideService } from '@/src/features/outside/services/OutsideService';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faBox, faHandshake, faCheck, faTrash, faMapPin, faFolder, faEllipsisVertical, faChevronLeft } from '@fortawesome/free-solid-svg-icons';
+import { faBox, faHandshake, faCheck, faTrash, faMapPin, faFolder, faEllipsisVertical, faChevronLeft, faShield } from '@fortawesome/free-solid-svg-icons';
+import DatePickerSheet from '@/src/features/lending/screens/components/DatePickerSheet';
 
 const PRIMARY = '#6b7f99';
 const LENDING = '#9b72cb';
+const WARRANTY = '#e09b3a';
 
 export default function ItemDetailScreen() {
   const { id: itemId } = useLocalSearchParams<{ id: string }>();
@@ -74,6 +76,10 @@ export default function ItemDetailScreen() {
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [allSpaces, setAllSpaces] = useState<Space[]>([]);
   const [spaceContainers, setSpaceContainers] = useState<Record<string, Container[]>>({});
+
+  // Warranty state
+  const [showWarrantyPicker, setShowWarrantyPicker] = useState(false);
+  const [warrantyLoading, setWarrantyLoading] = useState(false);
 
   const lendingService = useMemo(
     () => new LendingService(new LendingRepository(), new ItemRepository()),
@@ -269,6 +275,64 @@ export default function ItemDetailScreen() {
         },
       },
     ]);
+  }
+
+  // Warranty
+  const [warrantyPickerDate, setWarrantyPickerDate] = useState<Date>(new Date());
+
+  function openWarrantyPicker() {
+    setWarrantyPickerDate(
+      item?.warrantyExpiry ? new Date(item.warrantyExpiry + 'T00:00:00') : new Date()
+    );
+    setShowWarrantyPicker(true);
+  }
+
+  async function handleWarrantyDone() {
+    if (!item) return;
+    setShowWarrantyPicker(false);
+    setWarrantyLoading(true);
+    try {
+      const locationName = item.container?.name ?? item.space?.name ?? 'Unknown';
+      await ItemService.updateWarranty(item.id, warrantyPickerDate, locationName);
+      await loadItem();
+    } catch {
+      Alert.alert('Error', 'Failed to save warranty date');
+    } finally {
+      setWarrantyLoading(false);
+    }
+  }
+
+  async function handleClearWarranty() {
+    if (!item) return;
+    Alert.alert('Remove Warranty', 'Remove the warranty date and cancel reminders?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          setWarrantyLoading(true);
+          try {
+            await ItemService.clearWarranty(item.id);
+            await loadItem();
+          } catch {
+            Alert.alert('Error', 'Failed to remove warranty');
+          } finally {
+            setWarrantyLoading(false);
+          }
+        },
+      },
+    ]);
+  }
+
+  function getWarrantyStatus(expiryStr: string): { label: string; color: string } {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiry = new Date(expiryStr);
+    expiry.setHours(0, 0, 0, 0);
+    const days = Math.ceil((expiry.getTime() - today.getTime()) / 86400000);
+    if (days < 0) return { label: 'Expired', color: '#e53e3e' };
+    if (days <= 30) return { label: 'Expiring Soon', color: WARRANTY };
+    return { label: 'Active', color: '#6b9e7a' };
   }
 
   if (loading) {
@@ -469,6 +533,53 @@ export default function ItemDetailScreen() {
           </Text>
         </View>
 
+        {/* Warranty */}
+        <View style={[styles.fieldCard, { backgroundColor: cardBg, borderColor }]}>
+          <View style={styles.warrantyHeader}>
+            <FontAwesomeIcon icon={faShield} size={14} color={WARRANTY} />
+            <Text style={[styles.fieldLabel, { color: subtleText, marginBottom: 0 }]}>Warranty</Text>
+            {item.warrantyExpiry && (
+              <View style={[styles.warrantyBadge, { backgroundColor: `${getWarrantyStatus(item.warrantyExpiry).color}18` }]}>
+                <Text style={[styles.warrantyBadgeText, { color: getWarrantyStatus(item.warrantyExpiry).color }]}>
+                  {getWarrantyStatus(item.warrantyExpiry).label}
+                </Text>
+              </View>
+            )}
+          </View>
+          {warrantyLoading ? (
+            <ActivityIndicator size="small" color={WARRANTY} style={{ marginTop: 8 }} />
+          ) : item.warrantyExpiry ? (
+            <View style={styles.warrantyRow}>
+              <Text style={[styles.fieldValue, { color: colors.text, flex: 1 }]}>
+                {new Date(item.warrantyExpiry + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+              </Text>
+              <TouchableOpacity onPress={openWarrantyPicker} style={styles.warrantyEditBtn}>
+                <Text style={[styles.warrantyEditText, { color: WARRANTY }]}>Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleClearWarranty} style={styles.warrantyEditBtn}>
+                <Text style={[styles.warrantyEditText, { color: '#e53e3e' }]}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity onPress={openWarrantyPicker} style={{ marginTop: 6 }}>
+              <Text style={[styles.fieldValue, { color: subtleText }]}>Tap to add warranty expiry date</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Warranty Date Picker */}
+        <DatePickerSheet
+          visible={showWarrantyPicker}
+          onClose={handleWarrantyDone}
+          onChange={setWarrantyPickerDate}
+          value={warrantyPickerDate}
+          minimumDate={new Date()}
+          textColor={colors.text}
+          subtleText={subtleText}
+          cardBg={cardBg}
+          borderColor={borderColor}
+          isDark={isDark}
+        />
 
       </ScrollView>
 
@@ -676,4 +787,11 @@ const styles = StyleSheet.create({
   currentBadgeText: { fontSize: 11, fontWeight: '600' },
   moveCancelBtn: { marginTop: 12, borderWidth: 1.5, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   moveCancelText: { fontSize: 15, fontWeight: '600' },
+
+  warrantyHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  warrantyBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
+  warrantyBadgeText: { fontSize: 11, fontWeight: '600' },
+  warrantyRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  warrantyEditBtn: { paddingVertical: 2 },
+  warrantyEditText: { fontSize: 14, fontWeight: '600' },
 });

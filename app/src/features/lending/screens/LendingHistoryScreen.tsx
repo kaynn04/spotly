@@ -34,7 +34,6 @@ export default function LendingHistoryScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const insets = useSafeAreaInsets();
   const isDark = colorScheme === 'dark';
 
   const repositories = useMemo(() => ({
@@ -52,7 +51,6 @@ export default function LendingHistoryScreen() {
   const [error, setError] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('ALL');
 
-  const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
   const subtleText = isDark ? '#8e8e93' : '#a0aec0';
 

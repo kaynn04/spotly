@@ -21,6 +21,8 @@ export interface Item {
   createdAt: string;             // ISO 8601 timestamp, immutable
   updatedAt?: string | null;     // ISO 8601 timestamp, last modification
   photoUri?: string | null;      // Optional: local file path to item photo
+  warrantyExpiry?: string | null;     // ISO date "YYYY-MM-DD" — optional warranty expiry
+  warrantyReminderId?: string | null; // comma-separated expo-notifications IDs for warranty reminders
   space?: { name: string } | null;       // Optional: space details with name
   container?: { name: string } | null;   // Optional: container details with name
 }
@@ -40,6 +42,8 @@ export interface ItemRow {
   created_at: string;
   updated_at?: string | null;
   photo_uri?: string | null;     // Optional: local photo file path
+  warranty_expiry?: string | null;     // ISO date, nullable
+  warranty_reminder_id?: string | null; // comma-separated notification IDs, nullable
 }
 
 /**

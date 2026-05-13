@@ -12,7 +12,7 @@ import {
   Modal,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
+  Pressable,
   Keyboard,
   ScrollView,
   ActivityIndicator,
@@ -21,15 +21,19 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faShield, faCalendarAlt, faTimes } from '@fortawesome/free-solid-svg-icons';
 import PhotoPickerSheet from '@/components/PhotoPickerSheet';
+import DatePickerSheet from '@/src/features/lending/screens/components/DatePickerSheet';
 import { PhotoService } from '@/src/services/PhotoService';
+import { Colors } from '@/constants/theme';
 
 const PRIMARY = '#6b7f99';
 
 interface ItemFormModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (name: string, description?: string, quantity?: number, photoUri?: string | null) => Promise<void>;
+  onSubmit: (name: string, description?: string, quantity?: number, photoUri?: string | null, warrantyExpiry?: Date | null) => Promise<void>;
   contextLabel?: string;
   editMode?: boolean;
   initialName?: string;
@@ -50,6 +54,9 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
   const [error, setError] = useState<string | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [showPhotoPicker, setShowPhotoPicker] = useState(false);
+  const [warrantyDate, setWarrantyDate] = useState<Date | null>(null);
+  const [showWarrantyPicker, setShowWarrantyPicker] = useState(false);
+  const [warrantyPickerDate, setWarrantyPickerDate] = useState<Date>(new Date());
 
   useEffect(() => {
     if (visible && editMode) {
@@ -62,6 +69,7 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
       setDescription('');
       setQuantity('1');
       setPhotoUri(null);
+      setWarrantyDate(null);
     }
   }, [visible]);
 
@@ -80,6 +88,7 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
     setQuantity('1');
     setError(null);
     setPhotoUri(null);
+    setWarrantyDate(null);
     onClose();
   };
 
@@ -89,11 +98,12 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
     setError(null);
     try {
       const qty = Math.max(1, parseInt(quantity) || 1);
-      await onSubmit(name.trim(), description.trim() || undefined, qty, photoUri);
+      await onSubmit(name.trim(), description.trim() || undefined, qty, photoUri, warrantyDate);
       setName('');
       setDescription('');
       setQuantity('1');
       setPhotoUri(null);
+      setWarrantyDate(null);
       onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to add item');
@@ -109,10 +119,12 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
       animationType="slide"
       onRequestClose={handleCancel}
     >
-        <TouchableWithoutFeedback onPress={handleCancel}>
-          <View style={styles.overlay}>
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+      {/* Overlay with backdrop */}
+      <View style={styles.overlay}>
+        {/* Backdrop tap area */}
+        <Pressable style={{ flex: 1 }} onPress={handleCancel} />
+        {/* Sheet — let touches through for scrolling */}
+        <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
                 {/* Handle */}
                 <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
@@ -124,6 +136,7 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
                   showsVerticalScrollIndicator={false}
                   bounces={false}
                   style={styles.scrollContent}
+                  onScrollBeginDrag={Keyboard.dismiss}
                 >
                   {contextLabel && (
                     <View style={[styles.contextPill, { backgroundColor: inputBg, borderColor }]}>
@@ -213,6 +226,32 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
                     </TouchableOpacity>
                   )}
 
+                  {/* Warranty (optional) */}
+                  <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 14 }]}>Warranty Expiry (optional)</Text>
+                  {warrantyDate ? (
+                    <View style={[styles.warrantySetRow, { backgroundColor: inputBg, borderColor }]}>
+                      <FontAwesomeIcon icon={faShield} size={16} color="#e09b3a" />
+                      <Text style={[styles.warrantyDateText, { color: textColor }]}>
+                        {warrantyDate.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                      </Text>
+                      <TouchableOpacity onPress={() => setWarrantyDate(null)} hitSlop={8}>
+                        <FontAwesomeIcon icon={faTimes} size={14} color={subtleText} />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.warrantyAddBtn, { backgroundColor: inputBg, borderColor }]}
+                      onPress={() => {
+                        setWarrantyPickerDate(new Date());
+                        setShowWarrantyPicker(true);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <FontAwesomeIcon icon={faCalendarAlt} size={16} color={subtleText} />
+                      <Text style={[styles.warrantyAddText, { color: subtleText }]}>Set Warranty Date</Text>
+                    </TouchableOpacity>
+                  )}
+
                   <View style={styles.inputMeta}>
                     {error ? (
                       <Text style={styles.errorText}>{error}</Text>
@@ -246,10 +285,23 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
                     )}
                   </TouchableOpacity>
                 </View>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
+        </View>
+      </View>
+      <DatePickerSheet
+        visible={showWarrantyPicker}
+        onClose={() => {
+          setShowWarrantyPicker(false);
+          setWarrantyDate(warrantyPickerDate);
+        }}
+        onChange={setWarrantyPickerDate}
+        value={warrantyPickerDate}
+        minimumDate={new Date()}
+        textColor={textColor}
+        subtleText={subtleText}
+        cardBg={cardBg}
+        borderColor={borderColor}
+        isDark={isDark}
+      />
       <PhotoPickerSheet
         visible={showPhotoPicker}
         onClose={() => setShowPhotoPicker(false)}
@@ -313,4 +365,8 @@ const styles = StyleSheet.create({
   photoRemoveBtn: { marginTop: 2 },
   photoAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1.5 },
   photoAddText: { fontSize: 15, fontWeight: '500' },
+  warrantySetRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1.5 },
+  warrantyDateText: { flex: 1, fontSize: 15, fontWeight: '500' },
+  warrantyAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1.5 },
+  warrantyAddText: { fontSize: 15, fontWeight: '500' },
 });

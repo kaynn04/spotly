@@ -7,7 +7,7 @@
  * Shows a bottom-sheet modal with three scrollable columns (Month · Day · Year).
  */
 
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -51,30 +51,51 @@ interface DrumColumnProps {
 
 function DrumColumn({ items, selectedIndex, onSelect, textColor, subtleText }: DrumColumnProps) {
   const ref = useRef<ScrollView>(null);
+  const isScrolling = useRef(false);
+  const [activeIndex, setActiveIndex] = useState(selectedIndex);
 
-  // Scroll to position on mount / external change
+  // Sync local active index when parent changes (and not scrolling)
   useEffect(() => {
-    ref.current?.scrollTo({ y: selectedIndex * ITEM_HEIGHT, animated: false });
+    if (!isScrolling.current) {
+      setActiveIndex(selectedIndex);
+      ref.current?.scrollTo({ y: selectedIndex * ITEM_HEIGHT, animated: false });
+    }
   }, [selectedIndex]);
 
-  const handleMomentumEnd = useCallback(
+  const handleScroll = useCallback(
     (e: any) => {
+      if (!isScrolling.current) return;
       const raw = e.nativeEvent.contentOffset.y / ITEM_HEIGHT;
       const idx = Math.max(0, Math.min(items.length - 1, Math.round(raw)));
+      setActiveIndex(idx);
+    },
+    [items.length]
+  );
+
+  const settle = useCallback(
+    (e: any) => {
+      isScrolling.current = false;
+      const raw = e.nativeEvent.contentOffset.y / ITEM_HEIGHT;
+      const idx = Math.max(0, Math.min(items.length - 1, Math.round(raw)));
+      setActiveIndex(idx);
       onSelect(idx);
       ref.current?.scrollTo({ y: idx * ITEM_HEIGHT, animated: true });
     },
     [items.length, onSelect]
   );
 
-  const handleScrollEnd = useCallback(
+  const handleDragStart = useCallback(() => {
+    isScrolling.current = true;
+  }, []);
+
+  const handleDragEnd = useCallback(
     (e: any) => {
-      // Fallback for Android where momentumScrollEnd may not fire
-      const raw = e.nativeEvent.contentOffset.y / ITEM_HEIGHT;
-      const idx = Math.max(0, Math.min(items.length - 1, Math.round(raw)));
-      onSelect(idx);
+      const v = e.nativeEvent.velocity?.y ?? 0;
+      if (Math.abs(v) < 0.05) {
+        settle(e);
+      }
     },
-    [items.length, onSelect]
+    [settle]
   );
 
   return (
@@ -85,8 +106,10 @@ function DrumColumn({ items, selectedIndex, onSelect, textColor, subtleText }: D
         showsVerticalScrollIndicator={false}
         snapToInterval={ITEM_HEIGHT}
         decelerationRate="fast"
-        onMomentumScrollEnd={handleMomentumEnd}
-        onScrollEndDrag={handleScrollEnd}
+        onScrollBeginDrag={handleDragStart}
+        onScroll={handleScroll}
+        onScrollEndDrag={handleDragEnd}
+        onMomentumScrollEnd={settle}
         contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * HALF }}
         scrollEventThrottle={16}
       >
@@ -96,9 +119,9 @@ function DrumColumn({ items, selectedIndex, onSelect, textColor, subtleText }: D
               style={[
                 styles.drumLabel,
                 {
-                  color: i === selectedIndex ? textColor : subtleText,
-                  fontWeight: i === selectedIndex ? '600' : '400',
-                  opacity: Math.abs(i - selectedIndex) > HALF ? 0.25 : 1,
+                  color: i === activeIndex ? textColor : subtleText,
+                  fontWeight: i === activeIndex ? '600' : '400',
+                  opacity: Math.abs(i - activeIndex) > HALF ? 0.25 : 1,
                 },
               ]}
             >
@@ -184,7 +207,10 @@ export default function DatePickerSheet({
         <View style={[styles.sheet, { backgroundColor: cardBg, borderTopColor: borderColor }]}>
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: borderColor }]}>
-            <Text style={[styles.title, { color: textColor }]}>Select Due Date</Text>
+            <TouchableOpacity onPress={onClose} style={styles.cancelBtn}>
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[styles.title, { color: textColor }]}>Select Date</Text>
             <TouchableOpacity onPress={onClose} style={styles.doneBtn}>
               <Text style={styles.doneBtnText}>Done</Text>
             </TouchableOpacity>
@@ -244,6 +270,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   title: { fontSize: 16, fontWeight: '700' },
+  cancelBtn: { paddingVertical: 4, paddingHorizontal: 8 },
+  cancelBtnText: { fontSize: 16, fontWeight: '600', color: '#999' },
   doneBtn: { paddingVertical: 4, paddingHorizontal: 8 },
   doneBtnText: { fontSize: 16, fontWeight: '600', color: '#6b7f99' },
 
