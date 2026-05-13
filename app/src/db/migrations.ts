@@ -48,6 +48,12 @@ export async function initializeDatabase() {
       ON spaces(created_at);
     `);
 
+    // Ensure space names are unique
+    await db.execAsync(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_spaces_name 
+      ON spaces(name);
+    `);
+
     // Create containers table
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS containers (
@@ -64,6 +70,12 @@ export async function initializeDatabase() {
     await db.execAsync(`
       CREATE INDEX IF NOT EXISTS idx_containers_space_id 
       ON containers(space_id);
+    `);
+
+    // Ensure container names are unique within a space
+    await db.execAsync(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_containers_name_space 
+      ON containers(name, space_id);
     `);
 
     // Check if items table exists and has correct schema
@@ -100,6 +112,12 @@ export async function initializeDatabase() {
     await db.execAsync(`
       CREATE INDEX IF NOT EXISTS idx_items_container_id 
       ON items(container_id);
+    `);
+
+    // Ensure item names are unique within their location (Space or Container)
+    await db.execAsync(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_items_name_location 
+      ON items(name, space_id, IFNULL(container_id, 'root'));
     `);
 
     // Add description and quantity columns if they don't exist

@@ -163,6 +163,10 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
                     />
                   </View>
 
+                  {error && (
+                    <Text style={[styles.errorText, { marginTop: 6 }]}>{error}</Text>
+                  )}
+
                   {/* Description */}
                   <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 14 }]}>Description (optional)</Text>
                   <View style={[styles.inputWrapper, { backgroundColor: inputBg, borderColor }]}>
@@ -251,14 +255,6 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
                       <Text style={[styles.warrantyAddText, { color: subtleText }]}>Set Warranty Date</Text>
                     </TouchableOpacity>
                   )}
-
-                  <View style={styles.inputMeta}>
-                    {error ? (
-                      <Text style={styles.errorText}>{error}</Text>
-                    ) : (
-                      <Text style={[styles.hint, { color: subtleText }]}>Long-press items later to manage</Text>
-                    )}
-                  </View>
                 </ScrollView>
 
                 {/* Buttons - fixed at bottom */}
