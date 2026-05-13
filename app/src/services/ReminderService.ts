@@ -99,6 +99,9 @@ export class ReminderService {
    *   - 1 day before due (09:00)
    *   - On the due day (09:00)
    *
+   * If existingReminderId is provided, those notifications are cancelled first
+   * before scheduling new ones (e.g. when a due date is changed).
+   *
    * Returns a comma-joined string of notification IDs (store in DB).
    * Returns null if permission denied or due date is in the past.
    */
@@ -106,8 +109,12 @@ export class ReminderService {
     lendingId: string,
     borrowerName: string,
     itemName: string,
-    dueDate: Date
+    dueDate: Date,
+    existingReminderId?: string | null
   ): Promise<string | null> {
+    if (existingReminderId) {
+      await ReminderService.cancelReminders(existingReminderId);
+    }
     const granted = await ReminderService.requestPermissions();
     if (!granted) return null;
 

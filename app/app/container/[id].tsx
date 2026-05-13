@@ -81,7 +81,7 @@ export default function ContainerDetailScreen() {
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [showContainerPhotoPicker, setShowContainerPhotoPicker] = useState(false);
   const [showMoveModal, setShowMoveModal] = useState(false);
-  const [selectedMoveItemId, setSelectedMoveItemId] = useState<string | null>(null);
+  const [selectedMoveItemIds, setSelectedMoveItemIds] = useState<Set<string>>(new Set());
   const [actionSheetItem, setActionSheetItem] = useState<Item | null>(null);
   const [showContainerMenu, setShowContainerMenu] = useState(false);
   const [showMoveContainerModal, setShowMoveContainerModal] = useState(false);
@@ -312,22 +312,28 @@ export default function ContainerDetailScreen() {
   };
 
   const handleBulkMove = () => {
-    if (selectedIds.size !== 1) return;
-    const itemId = [...selectedIds][0];
-    const item = items.find((i) => i.id === itemId);
-    if (!item) return;
-    const isOutside = activeOutsideItemIds.has(item.id);
-    const isLent = !!activeLendingMap[item.id];
-    if (isOutside) {
-      Alert.alert('Item is Outside', 'This item is in an active outside session. Complete or remove it from the session before moving it.');
+    if (selectedIds.size === 0) return;
+    
+    // Check if any selected items are lent or outside
+    const blockedItems = [...selectedIds].filter((itemId) => {
+      const isOutside = activeOutsideItemIds.has(itemId);
+      const isLent = !!activeLendingMap[itemId];
+      return isOutside || isLent;
+    });
+    
+    if (blockedItems.length > 0) {
+      const blockedNames = blockedItems
+        .map((id) => items.find((i) => i.id === id)?.name ?? id)
+        .join(', ');
+      Alert.alert(
+        'Items are Blocked',
+        `Cannot move: ${blockedNames}. Complete outside sessions and mark lent items as returned first.`
+      );
       return;
     }
-    if (isLent) {
-      Alert.alert('Item is Lent Out', 'This item is currently lent out. Mark it as returned before moving it.');
-      return;
-    }
+    
     exitSelectMode();
-    setSelectedMoveItemId(itemId);
+    setSelectedMoveItemIds(new Set(selectedIds));
     setShowMoveModal(true);
   };
 
@@ -412,41 +418,57 @@ export default function ContainerDetailScreen() {
   }
 
   async function handleMoveToRootSpace() {
-    if (!selectedMoveItemId || !space) return;
+    if (selectedMoveItemIds.size === 0 || !space) return;
     try {
-      await ItemService.moveItemToContainer(selectedMoveItemId, space.id, '');
+      await Promise.all([...selectedMoveItemIds].map((itemId) =>
+        ItemService.moveItemToContainer(itemId, space.id, '')
+      ));
       setShowMoveModal(false);
-      setSelectedMoveItemId(null);
+      setSelectedMoveItemIds(new Set());
       await loadItems();
-    } catch { Alert.alert('Error', 'Failed to move item'); }
+    } catch {
+      Alert.alert('Error', 'Failed to move some items');
+    }
   }
 
   async function handleMoveToSpace(targetSpaceId: string) {
-    if (!selectedMoveItemId || !space) return;
+    if (selectedMoveItemIds.size === 0 || !space) return;
     try {
-      await ItemService.moveItem(selectedMoveItemId, space.id, targetSpaceId);
+      await Promise.all([...selectedMoveItemIds].map((itemId) =>
+        ItemService.moveItem(itemId, space.id, targetSpaceId)
+      ));
       setShowMoveModal(false);
-      setSelectedMoveItemId(null);
+      setSelectedMoveItemIds(new Set());
       await loadItems();
-    } catch { Alert.alert('Error', 'Failed to move item'); }
+    } catch {
+      Alert.alert('Error', 'Failed to move some items');
+    }
   }
 
   async function handleMoveToContainer(targetSpaceId: string, targetContainerId: string) {
-    if (!selectedMoveItemId) return;
+    if (selectedMoveItemIds.size === 0) return;
     try {
-      await ItemService.moveItemToContainer(selectedMoveItemId, targetSpaceId, targetContainerId);
+      await Promise.all([...selectedMoveItemIds].map((itemId) =>
+        ItemService.moveItemToContainer(itemId, targetSpaceId, targetContainerId)
+      ));
       setShowMoveModal(false);
-      setSelectedMoveItemId(null);
+      setSelectedMoveItemIds(new Set());
       await loadItems();
-    } catch { Alert.alert('Error', 'Failed to move item'); }
+    } catch {
+      Alert.alert('Error', 'Failed to move some items');
+    }
   }
 
-  async function handleAddItem(name: string, description?: string, quantity?: number, photoUri?: string | null) {
+  async function handleAddItem(name: string, description?: string, quantity?: number, photoUri?: string | null, warrantyExpiry?: Date | null) {
     if (!space || !containerId) return;
     const item = await ItemService.createItem(space.id, name, containerId, description, quantity);
     if (photoUri) {
       const savedUri = await PhotoService.savePhoto(photoUri, item.id);
       await ItemRepository.updatePhotoUri(item.id, savedUri);
+    }
+    if (warrantyExpiry) {
+      const locationName = container?.name ?? space?.name ?? 'Unknown';
+      await ItemService.updateWarranty(item.id, warrantyExpiry, locationName);
     }
     await loadItems();
   }
@@ -678,7 +700,7 @@ export default function ContainerDetailScreen() {
         <View style={styles.sheetOverlay}>
           <View style={[styles.moveSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
             <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
-            <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move Item</Text>
+            <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move {selectedMoveItemIds.size} Item{selectedMoveItemIds.size !== 1 ? 's' : ''}</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
               {/* In this space: root + other containers (current container shown disabled) */}
               {space && (
@@ -854,7 +876,7 @@ export default function ContainerDetailScreen() {
               icon: faBox,
               label: 'Move',
               description: isOutside ? 'In active outside session' : isLent ? 'Item is currently lent out' : 'Move to another space or container',
-              onPress: isOutside ? outsideGuard : isLent ? lendingGuard : () => { setSelectedMoveItemId(item.id); setShowMoveModal(true); },
+              onPress: isOutside ? outsideGuard : isLent ? lendingGuard : () => { setSelectedMoveItemIds(new Set([item.id])); setShowMoveModal(true); },
             },
             isLent
               ? {
@@ -890,7 +912,18 @@ export default function ContainerDetailScreen() {
       {/* Bulk action toolbar */}
       {selectMode && (() => {
         const canEdit = selectedIds.size === 1;
-        const canMove = selectedIds.size === 1;
+        
+        // Can move multiple items if none are lent or outside
+        let canMove = selectedIds.size > 0;
+        if (canMove) {
+          for (const id of selectedIds) {
+            if (activeOutsideItemIds.has(id) || activeLendingMap[id]) {
+              canMove = false;
+              break;
+            }
+          }
+        }
+        
         const canLend = selectedIds.size === 1;
         const canDelete = selectedIds.size > 0;
         return (

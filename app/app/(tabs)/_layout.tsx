@@ -50,7 +50,7 @@ export default function TabLayout() {
         <Tabs.Screen name="index" options={{ title: 'Home' }} />
         <Tabs.Screen name="spaces" options={{ title: 'Spaces' }} />
         <Tabs.Screen name="lending" options={{ title: 'Lending' }} />
-        <Tabs.Screen name="outside" options={{ title: 'Outside' }} />
+        <Tabs.Screen name="outside" options={{ title: 'Tools' }} />
       </Tabs>
     </ScrollHideProvider>
     </WalkthroughProvider>

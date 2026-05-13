@@ -91,7 +91,7 @@ export default function SpaceDetailScreen() {
   const [showAddContainerModal, setShowAddContainerModal] = useState(false);
   const [showSpacePhotoPicker, setShowSpacePhotoPicker] = useState(false);
   const [showMoveModal, setShowMoveModal] = useState(false);
-  const [selectedMoveItemId, setSelectedMoveItemId] = useState<string | null>(null);
+  const [selectedMoveItemIds, setSelectedMoveItemIds] = useState<Set<string>>(new Set());
   const [spaceContainers, setSpaceContainers] = useState<Record<string, Container[]>>({});
 
   const [showLendModal, setShowLendModal] = useState(false);
@@ -273,8 +273,8 @@ export default function SpaceDetailScreen() {
     ]);
   }
 
-  async function openMoveModalForItem(itemId: string) {
-    setSelectedMoveItemId(itemId);
+  async function openMoveModal(itemIds: Set<string>) {
+    setSelectedMoveItemIds(itemIds);
     try {
       const spaces = await SpaceService.getAllSpaces();
       setAllSpaces(spaces);
@@ -293,25 +293,29 @@ export default function SpaceDetailScreen() {
   }
 
   async function handleMoveToContainer(targetSpaceId: string, containerId: string) {
-    if (!selectedMoveItemId) return;
+    if (selectedMoveItemIds.size === 0) return;
     try {
-      await ItemService.moveItemToContainer(selectedMoveItemId, targetSpaceId, containerId);
+      await Promise.all([...selectedMoveItemIds].map((itemId) =>
+        ItemService.moveItemToContainer(itemId, targetSpaceId, containerId)
+      ));
       setShowMoveModal(false);
-      setSelectedMoveItemId(null);
+      setSelectedMoveItemIds(new Set());
       await loadItems();
     } catch { Alert.alert('Error', 'Failed to move item'); }
   }
 
   async function handleMoveToSpace(targetSpaceId: string) {
-    if (!selectedMoveItemId || !id) return;
+    if (selectedMoveItemIds.size === 0 || !id) return;
     try {
-      if (targetSpaceId === id) {
-        await ItemService.moveItemToContainer(selectedMoveItemId, id, '');
-      } else {
-        await ItemService.moveItem(selectedMoveItemId, id, targetSpaceId);
-      }
+      await Promise.all([...selectedMoveItemIds].map((itemId) => {
+        if (targetSpaceId === id) {
+          return ItemService.moveItemToContainer(itemId, id, '');
+        } else {
+          return ItemService.moveItem(itemId, id, targetSpaceId);
+        }
+      }));
       setShowMoveModal(false);
-      setSelectedMoveItemId(null);
+      setSelectedMoveItemIds(new Set());
       await loadItems();
     } catch { Alert.alert('Error', 'Failed to move item'); }
   }
@@ -435,22 +439,28 @@ export default function SpaceDetailScreen() {
   };
 
   const handleBulkMove = () => {
-    if (selectedIds.size !== 1 || !items.some((i) => i.id === [...selectedIds][0])) return;
-    const itemId = [...selectedIds][0];
-    const item = items.find((i) => i.id === itemId);
-    if (!item) return;
-    const isOutside = activeOutsideItemIds.has(item.id);
-    const isLent = !!activeLendingMap[item.id];
-    if (isOutside) {
-      Alert.alert('Item is Outside', 'This item is in an active outside session. Complete or remove it from the session before moving it.');
+    const selItemIds = [...selectedIds].filter((sid) => items.some((i) => i.id === sid));
+    if (selItemIds.length === 0) return;
+
+    // Check if any selected items are lent or outside
+    const blockedItems = selItemIds.filter((itemId) =>
+      activeOutsideItemIds.has(itemId) || !!activeLendingMap[itemId]
+    );
+
+    if (blockedItems.length > 0) {
+      const blockedNames = blockedItems
+        .map((bid) => items.find((i) => i.id === bid)?.name ?? bid)
+        .join(', ');
+      Alert.alert(
+        'Items are Blocked',
+        `Cannot move: ${blockedNames}. Complete outside sessions and mark lent items as returned first.`
+      );
       return;
     }
-    if (isLent) {
-      Alert.alert('Item is Lent Out', 'This item is currently lent out. Mark it as returned before moving it.');
-      return;
-    }
+
+    const moveIds = new Set(selItemIds);
     exitSelectMode();
-    openMoveModalForItem(itemId);
+    openMoveModal(moveIds);
   };
 
   const handleBulkLend = () => {
@@ -490,12 +500,16 @@ export default function SpaceDetailScreen() {
     await loadItems();
   };
 
-  async function handleAddItem(name: string, description?: string, quantity?: number, photoUri?: string | null) {
+  async function handleAddItem(name: string, description?: string, quantity?: number, photoUri?: string | null, warrantyExpiry?: Date | null) {
     // Create item first to get the ID, then save photo if provided
     const item = await ItemService.createItem(id!, name, null, description, quantity);
     if (photoUri) {
       const savedUri = await PhotoService.savePhoto(photoUri, item.id);
       await ItemRepository.updatePhotoUri(item.id, savedUri);
+    }
+    if (warrantyExpiry) {
+      const locationName = space?.name ?? 'Unknown';
+      await ItemService.updateWarranty(item.id, warrantyExpiry, locationName);
     }
     await loadItems();
   }
@@ -915,13 +929,13 @@ export default function SpaceDetailScreen() {
         <View style={styles.sheetOverlay}>
           <View style={[styles.moveSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
             <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
-            <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move Item</Text>
+            <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move {selectedMoveItemIds.size} Item{selectedMoveItemIds.size !== 1 ? 's' : ''}</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
               {allSpaces.map((s) => {
-                const movingItem = items.find(i => i.id === selectedMoveItemId);
+                const movingItems = items.filter(i => selectedMoveItemIds.has(i.id));
                 const isCurrentSpace = s.id === id;
                 const spaceContainerList = spaceContainers[s.id] ?? [];
-                const isRootCurrent = isCurrentSpace && !movingItem?.containerId;
+                const isRootCurrent = isCurrentSpace && movingItems.length > 0 && movingItems.every(i => !i.containerId);
                 return (
                   <View key={s.id}>
                     <Text style={[styles.moveSectionLabel, { color: subtleText }]}>
@@ -943,7 +957,7 @@ export default function SpaceDetailScreen() {
                       )}
                     </TouchableOpacity>
                     {spaceContainerList.map((c) => {
-                      const isContainerCurrent = c.id === movingItem?.containerId;
+                      const isContainerCurrent = movingItems.length > 0 && movingItems.every(i => i.containerId === c.id);
                       return (
                         <TouchableOpacity
                           key={c.id}
@@ -1019,7 +1033,7 @@ export default function SpaceDetailScreen() {
               icon: faBox,
               label: 'Move',
               description: isOutside ? 'In active outside session' : isLent ? 'Item is currently lent out' : 'Move to another space or container',
-              onPress: isOutside ? outsideGuard : isLent ? lendingGuard : () => openMoveModalForItem(item.id),
+              onPress: isOutside ? outsideGuard : isLent ? lendingGuard : () => openMoveModal(new Set([item.id])),
             },
             isLent
               ? {
@@ -1166,7 +1180,16 @@ export default function SpaceDetailScreen() {
         const selContainerIds = selIds.filter((sid) => containers.some((c) => c.id === sid));
         const onlyOneItem = selItemIds.length === 1 && selContainerIds.length === 0;
         const canEdit = selectedIds.size === 1;
-        const canMove = onlyOneItem;
+        // Can move multiple items if none are lent or outside
+        let canMove = selItemIds.length > 0 && selContainerIds.length === 0;
+        if (canMove) {
+          for (const itemId of selItemIds) {
+            if (activeOutsideItemIds.has(itemId) || activeLendingMap[itemId]) {
+              canMove = false;
+              break;
+            }
+          }
+        }
         const canLend = onlyOneItem;
         const canDelete = selectedIds.size > 0;
         return (

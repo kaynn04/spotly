@@ -10,6 +10,7 @@
 import type { Item, ServiceError } from '../models/Item';
 import { ItemRepository } from '../repositories/ItemRepository';
 import { PhotoService } from './PhotoService';
+import { WarrantyReminderService } from './WarrantyReminderService';
 
 /**
  * ItemService handles all item-related business logic
@@ -189,10 +190,14 @@ export class ItemService {
    */
   static async deleteItem(itemId: string): Promise<void> {
     try {
-      // Fetch item to get the stored photoUri before deleting
+      // Fetch item to get the stored photoUri and warrantyReminderId before deleting
       const item = await ItemRepository.getItemById(itemId);
       if (item?.photoUri) {
         await PhotoService.deletePhoto(item.photoUri);
+      }
+      // Cancel warranty notifications before deleting
+      if (item?.warrantyReminderId) {
+        try { await WarrantyReminderService.cancelWarrantyReminders(item.warrantyReminderId); } catch { /* non-fatal */ }
       }
       // Delete item from database via repository
       await ItemRepository.deleteItem(itemId);
@@ -241,5 +246,57 @@ export class ItemService {
       updates.name = trimmed;
     }
     return ItemRepository.updateItem(itemId, updates);
+  }
+
+  /**
+   * Set or update the warranty expiry date for an item.
+   * Cancels any existing warranty reminders and schedules new ones.
+   *
+   * @param itemId - The item to update
+   * @param expiryDate - The new expiry date
+   * @param locationName - Space or container name (used in notification body)
+   */
+  static async updateWarranty(itemId: string, expiryDate: Date, locationName: string): Promise<void> {
+    const item = await ItemRepository.getItemById(itemId);
+    if (!item) {
+      const error: ServiceError = { code: 'NOT_FOUND', message: 'Item not found.' };
+      throw error;
+    }
+
+    // Persist the expiry date (ISO date string "YYYY-MM-DD")
+    const isoDate = expiryDate.toISOString().split('T')[0];
+    await ItemRepository.updateWarranty(itemId, isoDate);
+
+    // Schedule notifications (cancel existing first if rescheduling)
+    try {
+      const reminderId = await WarrantyReminderService.scheduleWarrantyReminders(
+        itemId,
+        item.name,
+        locationName,
+        expiryDate,
+        item.warrantyReminderId
+      );
+      await ItemRepository.setWarrantyReminderId(itemId, reminderId);
+    } catch {
+      // Non-fatal — warranty date still saved even if notification scheduling fails
+    }
+  }
+
+  /**
+   * Remove the warranty from an item and cancel its scheduled notifications.
+   *
+   * @param itemId - The item to clear warranty from
+   */
+  static async clearWarranty(itemId: string): Promise<void> {
+    const item = await ItemRepository.getItemById(itemId);
+    if (item?.warrantyReminderId) {
+      try {
+        await WarrantyReminderService.cancelWarrantyReminders(item.warrantyReminderId);
+      } catch {
+        // Non-fatal
+      }
+    }
+    await ItemRepository.updateWarranty(itemId, null);
+    await ItemRepository.setWarrantyReminderId(itemId, null);
   }
 }

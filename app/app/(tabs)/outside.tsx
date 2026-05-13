@@ -1,3 +1,3 @@
-import OutsidePage from '@/src/features/outside/screens/OutsidePage';
+import ToolsPage from "@/src/features/tools/screens/ToolsPage";
 
-export default OutsidePage;
+export default ToolsPage;

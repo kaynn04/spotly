@@ -417,6 +417,8 @@ export class ItemRepository {
           i.container_id,
           i.created_at,
           i.photo_uri,
+          i.warranty_expiry,
+          i.warranty_reminder_id,
           s.name as space,
           c.name as container
         FROM items i
@@ -434,6 +436,8 @@ export class ItemRepository {
         containerId: row.container_id,
         createdAt: row.created_at,
         photoUri: row.photo_uri ?? null,
+        warrantyExpiry: row.warranty_expiry ?? null,
+        warrantyReminderId: row.warranty_reminder_id ?? null,
         space: row.space ? { name: row.space } : null,
         container: row.container ? { name: row.container } : null,
       }));
@@ -467,6 +471,8 @@ export class ItemRepository {
           i.container_id,
           i.created_at,
           i.photo_uri,
+          i.warranty_expiry,
+          i.warranty_reminder_id,
           s.name as space,
           c.name as container
         FROM items i
@@ -489,6 +495,8 @@ export class ItemRepository {
         containerId: result.container_id,
         createdAt: result.created_at,
         photoUri: result.photo_uri ?? null,
+        warrantyExpiry: result.warranty_expiry ?? null,
+        warrantyReminderId: result.warranty_reminder_id ?? null,
         space: result.space ? { name: result.space } : null,
         container: result.container ? { name: result.container } : null,
       };
@@ -545,6 +553,42 @@ export class ItemRepository {
     } catch (error) {
       console.error('[ItemRepository.updatePhotoUri] Database error:', error);
       const serviceError: ServiceError = { code: 'DB_ERROR', message: 'Failed to update item photo.' };
+      throw serviceError;
+    }
+  }
+
+  /**
+   * Update warranty_expiry for an item (null to clear)
+   */
+  static async updateWarranty(id: string, expiryDate: string | null): Promise<void> {
+    try {
+      const db = getDatabase();
+      const now = new Date().toISOString();
+      await db.runAsync(
+        'UPDATE items SET warranty_expiry = ?, updated_at = ? WHERE id = ?',
+        [expiryDate, now, id]
+      );
+    } catch (error) {
+      console.error('[ItemRepository.updateWarranty] Database error:', error);
+      const serviceError: ServiceError = { code: 'DB_ERROR', message: 'Failed to update warranty.' };
+      throw serviceError;
+    }
+  }
+
+  /**
+   * Store the comma-separated notification IDs for warranty reminders (null to clear)
+   */
+  static async setWarrantyReminderId(id: string, reminderId: string | null): Promise<void> {
+    try {
+      const db = getDatabase();
+      const now = new Date().toISOString();
+      await db.runAsync(
+        'UPDATE items SET warranty_reminder_id = ?, updated_at = ? WHERE id = ?',
+        [reminderId, now, id]
+      );
+    } catch (error) {
+      console.error('[ItemRepository.setWarrantyReminderId] Database error:', error);
+      const serviceError: ServiceError = { code: 'DB_ERROR', message: 'Failed to store warranty reminder.' };
       throw serviceError;
     }
   }

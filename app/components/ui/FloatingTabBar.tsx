@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 import type { SpotlightRect } from '@/src/features/walkthrough/models/WalkthroughStep';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faHome, faBook, faHandshake, faSuitcase, faMicrophone } from '@fortawesome/free-solid-svg-icons';
+import { faHome, faBook, faHandshake, faWrench, faMicrophone } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -39,7 +39,7 @@ const TAB_ICONS: Record<string, any> = {
   index: faHome,
   spaces: faBook,
   lending: faHandshake,
-  outside: faSuitcase,
+  outside: faWrench,
 };
 
 const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function FloatingTabBar({ state, navigation }, ref) {

@@ -17,6 +17,7 @@ import { addSpacePhotoUri } from './migrations/008-add-space-photo-uri';
 import { addContainerPhotoUri } from './migrations/009-add-container-photo-uri';
 import { createLendingPhotosTable } from './migrations/010-create-lending-photos-table';
 import { addLendingDueDate } from './migrations/011-add-lending-due-date';
+import { addItemWarranty } from './migrations/012-add-item-warranty';
 
 /**
  * Initialize the database schema
@@ -186,6 +187,13 @@ export async function initializeDatabase() {
       await addLendingDueDate(db);
     } catch (err) {
       console.error('⚠ Lending due_date migration failed:', err);
+    }
+
+    // Add warranty_expiry + warranty_reminder_id columns to items (Migration 012)
+    try {
+      await addItemWarranty(db);
+    } catch (err) {
+      console.error('⚠ Item warranty migration failed:', err);
     }
 
     console.log('✓ Database initialized (migrations completed with possible non-critical errors)');

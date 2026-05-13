@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import * as SystemUI from 'expo-system-ui';
 
@@ -64,6 +65,24 @@ export default function RootLayout() {
     checkOnboarding();
   }, [dbReady, router]);
 
+  // Effect 3: Notification deep-link — tapping a warranty/reminder notification opens the item
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const itemId = response.notification.request.content.data?.itemId as string | undefined;
+      if (itemId) router.push(`/item/${itemId}` as any);
+    });
+    return () => sub.remove();
+  }, [router]);
+
+  // Effect 3: Notification deep-link — tapping a warranty/reminder notification opens the item
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const itemId = response.notification.request.content.data?.itemId as string | undefined;
+      if (itemId) router.push(`/item/${itemId}` as any);
+    });
+    return () => sub.remove();
+  }, [router]);
+
   if (!dbReady) return null;
 
   const theme = {
@@ -99,6 +118,7 @@ export default function RootLayout() {
           <Stack.Screen name="lending/history" />
           <Stack.Screen name="outside/[id]" />
           <Stack.Screen name="outside/history" />
+          <Stack.Screen name="tools/warranty-tracker" />
           <Stack.Screen name="settings" />
         </Stack>
         <StatusBar style="auto" backgroundColor={navBg} translucent={false} />
