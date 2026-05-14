@@ -51,14 +51,16 @@ export class ItemService {
         throw error;
       }
 
-      // Check for duplicate name globally (across all items)
+      // Check for duplicate name within the same location (space or container)
       const allItems = await ItemRepository.getAll();
       const isDuplicate = allItems.some(i => 
-        i.name.toLowerCase() === trimmedName.toLowerCase()
+        i.name.toLowerCase() === trimmedName.toLowerCase() &&
+        i.spaceId === spaceId &&
+        i.containerId === (containerId ?? null)
       );
 
       if (isDuplicate) {
-        throw { code: 'DUPLICATE_NAME', message: 'An item with this name already exists.' } as unknown as ServiceError;
+        throw { code: 'DUPLICATE_NAME', message: 'An item with this name already exists in this location.' } as unknown as ServiceError;
       }
 
       // Create item in database via repository
@@ -254,16 +256,18 @@ export class ItemService {
         throw error;
       }
 
-      // Check for duplicate name on update (globally)
+      // Check for duplicate name on update (within the same location)
       const item = await ItemRepository.getItemById(itemId);
       if (item) {
         const allItems = await ItemRepository.getAll();
         const isDuplicate = allItems.some(i => 
           i.id !== itemId &&
-          i.name.toLowerCase() === trimmed.toLowerCase()
+          i.name.toLowerCase() === trimmed.toLowerCase() &&
+          i.spaceId === item.spaceId &&
+          i.containerId === item.containerId
         );
         if (isDuplicate) {
-          throw { code: 'DUPLICATE_NAME', message: 'An item with this name already exists.' } as unknown as ServiceError;
+          throw { code: 'DUPLICATE_NAME', message: 'An item with this name already exists in this location.' } as unknown as ServiceError;
         }
       }
 
