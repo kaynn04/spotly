@@ -26,7 +26,7 @@ import {
 } from 'react-native';
 import type { SpotlightRect } from '@/src/features/walkthrough/models/WalkthroughStep';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faHome, faBook, faHandshake, faWrench, faPlus, faTimes, faBoxOpen, faCube, faBox, faMapPin, faFolder, faChevronLeft } from '@fortawesome/free-solid-svg-icons';
+import { faHome, faBook, faHandshake, faWrench, faPlus, faTimes, faBoxOpen, faCube, faBox, faMapPin, faFolder, faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -295,166 +295,154 @@ function AddActionsSheet({
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
-  const slideAnim = useRef(new Animated.Value(400)).current;
-  const overlayAnim = useRef(new Animated.Value(0)).current;
-  const [modalVisible, setModalVisible] = useState(false);
-  // Android: the system Dialog swallows the very first touch after a Modal is shown
-  // (to bring focus to the window). We wait for the native `onShow` callback before
-  // enabling interactions so that first-tap is never dropped.
-  const [sheetInteractive, setSheetInteractive] = useState(false);
 
-  useEffect(() => {
-    if (visible) {
-      setModalVisible(true);
-      // sheetInteractive is enabled via onShow callback below
-      Animated.parallel([
-        Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }),
-        Animated.timing(overlayAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-      ]).start();
-    } else {
-      setSheetInteractive(false);
-      Animated.parallel([
-        Animated.timing(slideAnim, { toValue: 400, duration: 220, useNativeDriver: true }),
-        Animated.timing(overlayAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
-      ]).start(() => setModalVisible(false));
-    }
-  }, [visible]);
+  const cardBg = isDark ? '#1c1c1e' : '#ffffff';
+  const textColor = isDark ? '#ffffff' : '#2c3e50';
+  const subtleText = isDark ? '#8e8e93' : '#a0aec0';
+  const borderColor = isDark ? '#3a3a3c' : '#e2e6ea';
 
-  const bg = isDark ? '#1c1c1e' : '#ffffff';
-  const border = isDark ? '#2c2c2e' : '#e2e6ea';
-  const subtleText = '#8e8e93';
-  const textColor = isDark ? '#ffffff' : '#1c1c1e';
   const stepTitle = step === 'pick-space' ? 'Select Space' : step === 'pick-location' ? 'Select Location' : 'Add New';
 
   return (
     <Modal
-      visible={modalVisible}
+      visible={visible}
       transparent
-      animationType="none"
+      animationType="slide"
       onRequestClose={onClose}
-      onShow={() => setSheetInteractive(true)}
     >
-      {/* Dimmed overlay — tap to dismiss */}
-      <Animated.View style={[StyleSheet.absoluteFill, sheetStyles.overlayBg, { opacity: overlayAnim }]}>
-        <TouchableWithoutFeedback onPress={onClose}>
-          <View style={StyleSheet.absoluteFill} />
-        </TouchableWithoutFeedback>
-      </Animated.View>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={sheetStyles.overlay}>
+          <TouchableWithoutFeedback onPress={() => {}}>
+            <View style={[sheetStyles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+              {/* Handle */}
+              <View style={[sheetStyles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
-      {/* Bottom sheet — pointerEvents disabled until onShow fires to avoid Android first-touch swallow */}
-      <Animated.View
-        pointerEvents={sheetInteractive ? 'auto' : 'none'}
-        style={[
-          sheetStyles.sheet,
-          { backgroundColor: bg, paddingBottom: insets.bottom + 16, transform: [{ translateY: slideAnim }] },
-        ]}
-      >
-        <View style={[sheetStyles.handle, { backgroundColor: border }]} />
-
-        {/* Header */}
-        <View style={sheetStyles.header}>
-          {step !== 'actions' ? (
-            <Pressable onPress={onBack} style={sheetStyles.sideBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <FontAwesomeIcon icon={faChevronLeft} size={14} color={subtleText} />
-            </Pressable>
-          ) : (
-            <View style={sheetStyles.sideBtn} />
-          )}
-          <Text style={[sheetStyles.title, { color: textColor }]}>{stepTitle}</Text>
-          <Pressable onPress={onClose} style={sheetStyles.sideBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <FontAwesomeIcon icon={faTimes} size={14} color={subtleText} />
-          </Pressable>
-        </View>
-
-        {/* Step: main actions */}
-        {step === 'actions' && ADD_ACTIONS.map(({ action, icon, label, description }) => (
-          <Pressable
-            key={action}
-            style={({ pressed }) => [sheetStyles.actionRow, { borderBottomColor: border, opacity: pressed ? 0.6 : 1 }]}
-            onPress={() => onAction(action)}
-          >
-            <View style={[sheetStyles.actionIcon, { backgroundColor: `${PRIMARY}15` }]}>
-              <FontAwesomeIcon icon={icon} size={16} color={PRIMARY} />
-            </View>
-            <View style={sheetStyles.actionText}>
-              <Text style={[sheetStyles.actionLabel, { color: textColor }]}>{label}</Text>
-              <Text style={[sheetStyles.actionDesc, { color: subtleText }]}>{description}</Text>
-            </View>
-          </Pressable>
-        ))}
-
-        {/* Step: pick space for container */}
-        {step === 'pick-space' && (
-          pickerLoading ? (
-            <View style={sheetStyles.loadingBox}><ActivityIndicator size="small" color={PRIMARY} /></View>
-          ) : (
-            <ScrollView style={sheetStyles.pickerScroll} showsVerticalScrollIndicator={false}>
-              {allSpaces.length === 0
-                ? <Text style={[sheetStyles.emptyText, { color: subtleText }]}>No spaces yet. Create a space first.</Text>
-                : allSpaces.map((s) => (
-                  <TouchableOpacity
-                    key={s.id}
-                    style={[sheetStyles.pickerRow, { borderBottomColor: border }]}
-                    onPress={() => onSpaceSelect(s.id)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[sheetStyles.pickerIcon, { backgroundColor: `${PRIMARY}15` }]}>
-                      <FontAwesomeIcon icon={faBox} size={15} color={PRIMARY} />
-                    </View>
-                    <Text style={[sheetStyles.pickerLabel, { color: textColor }]}>{s.name}</Text>
+              {/* Header */}
+              <View style={sheetStyles.header}>
+                {step !== 'actions' ? (
+                  <TouchableOpacity onPress={onBack} style={sheetStyles.sideBtn} activeOpacity={0.7}>
+                    <FontAwesomeIcon icon={faChevronLeft} size={14} color={subtleText} />
                   </TouchableOpacity>
-                ))
-              }
-            </ScrollView>
-          )
-        )}
+                ) : (
+                  <View style={sheetStyles.sideBtn} />
+                )}
+                <Text style={[sheetStyles.title, { color: textColor }]}>{stepTitle}</Text>
+                <TouchableOpacity onPress={onClose} style={sheetStyles.sideBtn} activeOpacity={0.7}>
+                  <FontAwesomeIcon icon={faTimes} size={14} color={subtleText} />
+                </TouchableOpacity>
+              </View>
 
-        {/* Step: pick location for item */}
-        {step === 'pick-location' && (
-          pickerLoading ? (
-            <View style={sheetStyles.loadingBox}><ActivityIndicator size="small" color={PRIMARY} /></View>
-          ) : (
-            <ScrollView style={sheetStyles.pickerScroll} showsVerticalScrollIndicator={false}>
-              {allSpaces.length === 0
-                ? <Text style={[sheetStyles.emptyText, { color: subtleText }]}>No spaces yet. Create a space first.</Text>
-                : allSpaces.map((s) => {
-                  const containers = spaceContainers[s.id] ?? [];
-                  return (
-                    <View key={s.id}>
-                      <Text style={[sheetStyles.pickerSectionLabel, { color: subtleText }]}>{s.name.toUpperCase()}</Text>
-                      {/* Space root */}
-                      <TouchableOpacity
-                        style={[sheetStyles.pickerRow, { borderBottomColor: border }]}
-                        onPress={() => onLocationSelect(s.id, null)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={[sheetStyles.pickerIcon, { backgroundColor: `${PRIMARY}15` }]}>
-                          <FontAwesomeIcon icon={faMapPin} size={15} color={PRIMARY} />
-                        </View>
-                        <Text style={[sheetStyles.pickerLabel, { color: textColor }]}>{s.name} (root)</Text>
-                      </TouchableOpacity>
-                      {/* Containers inside */}
-                      {containers.map((c) => (
+              {/* Step: main actions */}
+              {step === 'actions' && ADD_ACTIONS.map(({ action, icon, label, description }, idx) => (
+                <TouchableOpacity
+                  key={action}
+                  style={[
+                    sheetStyles.actionRow,
+                    idx < ADD_ACTIONS.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: borderColor },
+                  ]}
+                  onPress={() => onAction(action)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[sheetStyles.actionIcon, { backgroundColor: `${PRIMARY}15` }]}>
+                    <FontAwesomeIcon icon={icon} size={18} color={PRIMARY} />
+                  </View>
+                  <View style={sheetStyles.actionTextBlock}>
+                    <Text style={[sheetStyles.actionLabel, { color: textColor }]}>{label}</Text>
+                    <Text style={[sheetStyles.actionDesc, { color: subtleText }]}>{description}</Text>
+                  </View>
+                  <FontAwesomeIcon icon={faChevronRight} size={12} color={subtleText} />
+                </TouchableOpacity>
+              ))}
+
+              {/* Step: pick space for container */}
+              {step === 'pick-space' && (
+                pickerLoading ? (
+                  <View style={sheetStyles.loadingBox}><ActivityIndicator size="small" color={PRIMARY} /></View>
+                ) : (
+                  <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={sheetStyles.pickerScroll}>
+                    {allSpaces.length === 0
+                      ? <Text style={[sheetStyles.emptyText, { color: subtleText }]}>No spaces yet. Create a space first.</Text>
+                      : allSpaces.map((s, idx) => (
                         <TouchableOpacity
-                          key={c.id}
-                          style={[sheetStyles.pickerRow, sheetStyles.pickerRowIndented, { borderBottomColor: border }]}
-                          onPress={() => onLocationSelect(s.id, c.id)}
+                          key={s.id}
+                          style={[
+                            sheetStyles.actionRow,
+                            idx < allSpaces.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: borderColor },
+                          ]}
+                          onPress={() => onSpaceSelect(s.id)}
                           activeOpacity={0.7}
                         >
-                          <View style={[sheetStyles.pickerIcon, { backgroundColor: `${PRIMARY}15` }]}>
-                            <FontAwesomeIcon icon={faFolder} size={15} color={PRIMARY} />
+                          <View style={[sheetStyles.actionIcon, { backgroundColor: `${PRIMARY}15` }]}>
+                            <FontAwesomeIcon icon={faBox} size={18} color={PRIMARY} />
                           </View>
-                          <Text style={[sheetStyles.pickerLabel, { color: textColor }]}>{c.name}</Text>
+                          <View style={sheetStyles.actionTextBlock}>
+                            <Text style={[sheetStyles.actionLabel, { color: textColor }]}>{s.name}</Text>
+                          </View>
+                          <FontAwesomeIcon icon={faChevronRight} size={12} color={subtleText} />
                         </TouchableOpacity>
-                      ))}
-                    </View>
-                  );
-                })
-              }
-            </ScrollView>
-          )
-        )}
-      </Animated.View>
+                      ))
+                    }
+                  </ScrollView>
+                )
+              )}
+
+              {/* Step: pick location for item */}
+              {step === 'pick-location' && (
+                pickerLoading ? (
+                  <View style={sheetStyles.loadingBox}><ActivityIndicator size="small" color={PRIMARY} /></View>
+                ) : (
+                  <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={sheetStyles.pickerScroll}>
+                    {allSpaces.length === 0
+                      ? <Text style={[sheetStyles.emptyText, { color: subtleText }]}>No spaces yet. Create a space first.</Text>
+                      : allSpaces.map((s) => {
+                          const containers = spaceContainers[s.id] ?? [];
+                          return (
+                            <View key={s.id}>
+                              <Text style={[sheetStyles.sectionLabel, { color: subtleText }]}>{s.name.toUpperCase()}</Text>
+                              <TouchableOpacity
+                                style={[sheetStyles.actionRow, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: borderColor }]}
+                                onPress={() => onLocationSelect(s.id, null)}
+                                activeOpacity={0.7}
+                              >
+                                <View style={[sheetStyles.actionIcon, { backgroundColor: `${PRIMARY}15` }]}>
+                                  <FontAwesomeIcon icon={faMapPin} size={18} color={PRIMARY} />
+                                </View>
+                                <View style={sheetStyles.actionTextBlock}>
+                                  <Text style={[sheetStyles.actionLabel, { color: textColor }]}>{s.name} (root)</Text>
+                                </View>
+                                <FontAwesomeIcon icon={faChevronRight} size={12} color={subtleText} />
+                              </TouchableOpacity>
+                              {containers.map((c, cidx) => (
+                                <TouchableOpacity
+                                  key={c.id}
+                                  style={[
+                                    sheetStyles.actionRow,
+                                    sheetStyles.indented,
+                                    cidx < containers.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: borderColor },
+                                  ]}
+                                  onPress={() => onLocationSelect(s.id, c.id)}
+                                  activeOpacity={0.7}
+                                >
+                                  <View style={[sheetStyles.actionIcon, { backgroundColor: `${PRIMARY}15` }]}>
+                                    <FontAwesomeIcon icon={faFolder} size={18} color={PRIMARY} />
+                                  </View>
+                                  <View style={sheetStyles.actionTextBlock}>
+                                    <Text style={[sheetStyles.actionLabel, { color: textColor }]}>{c.name}</Text>
+                                  </View>
+                                  <FontAwesomeIcon icon={faChevronRight} size={12} color={subtleText} />
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          );
+                        })
+                    }
+                  </ScrollView>
+                )
+              )}
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 }
@@ -574,39 +562,39 @@ const styles = StyleSheet.create({
 });
 
 const sheetStyles = StyleSheet.create({
-  overlayBg: {
+  overlay: {
+    flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
   },
   sheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 8,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    maxHeight: '85%',
   },
   handle: {
     width: 36,
     height: 4,
     borderRadius: 2,
     alignSelf: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 8,
+    marginBottom: 12,
   },
   title: {
-    fontSize: 17,
+    fontSize: 20,
     fontWeight: '700',
+    letterSpacing: -0.3,
   },
   sideBtn: {
-    width: 28,
-    height: 28,
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -614,69 +602,46 @@ const sheetStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 14,
   },
   actionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  actionText: {
+  actionTextBlock: {
     flex: 1,
-    gap: 2,
   },
   actionLabel: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
   },
   actionDesc: {
-    fontSize: 12,
+    fontSize: 13,
+    marginTop: 2,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  indented: {
+    paddingLeft: 16,
   },
   loadingBox: {
-    paddingVertical: 32,
+    paddingVertical: 40,
     alignItems: 'center',
   },
   pickerScroll: {
     maxHeight: 340,
   },
-  pickerSectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 4,
-  },
-  pickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 13,
-    paddingHorizontal: 20,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 14,
-  },
-  pickerRowIndented: {
-    paddingLeft: 36,
-  },
-  pickerIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pickerLabel: {
-    fontSize: 15,
-    fontWeight: '500',
-    flex: 1,
-  },
   emptyText: {
     fontSize: 14,
     textAlign: 'center',
-    padding: 24,
+    paddingVertical: 32,
   },
 });

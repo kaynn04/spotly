@@ -102,10 +102,12 @@ export default function WalkthroughOverlay({
           />
         </Svg>
 
-        {/* Skip button */}
-        <Pressable style={styles.skipButton} onPress={onSkip} hitSlop={12}>
-          <Text style={styles.skipText}>Skip</Text>
-        </Pressable>
+        {/* Skip button — hidden on the last step */}
+        {!isLastStep && (
+          <Pressable style={styles.skipButton} onPress={onSkip} hitSlop={12}>
+            <Text style={styles.skipText}>Skip</Text>
+          </Pressable>
+        )}
 
         {/* Tooltip card */}
         <View

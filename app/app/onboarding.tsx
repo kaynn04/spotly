@@ -5,7 +5,7 @@
  *   1. Welcome slide
  *   2. Spaces & Containers concept
  *   3. Lending tracker concept
- *   4. Outside sessions concept
+ *   4. Tools concept
  *   5. Name input — personalises the home greeting
  *
  * On completion, sets AsyncStorage flags so it never shows again.
@@ -35,7 +35,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import {
   faFolder,
   faHandshake,
-  faSuitcase,
+  faWrench,
   faUser,
   faMicrophone,
 } from '@fortawesome/free-solid-svg-icons';
@@ -90,10 +90,10 @@ const SLIDES: Slide[] = [
   },
   {
     key: 'outside',
-    icon: faSuitcase,
+    icon: faWrench,
     iconColor: '#c4956a',
-    title: 'Outside Sessions',
-    subtitle: 'Taking items out of the house? Create a checklist session and track when everything comes back.',
+    title: 'Tools',
+    subtitle: 'A set of utilities to help you manage your inventory — from outside session tracking to other handy features.',
   },
   {
     key: 'voice',
