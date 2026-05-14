@@ -74,6 +74,14 @@ const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function Floa
   const [spaceContainers, setSpaceContainers] = useState<Record<string, Container[]>>({});
   const [pickerLoading, setPickerLoading] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const actionProcessingRef = useRef(false);
+
+  // Reset sheet step when sheet closes
+  useEffect(() => {
+    if (!showSheet) {
+      setSheetStep('actions');
+    }
+  }, [showSheet]);
 
   useEffect(() => {
     const showSub = DeviceEventEmitter.addListener('synop:show-tab-bar', () => setHidden(false));
@@ -118,46 +126,106 @@ const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function Floa
   }
 
   async function handleAction(action: AddAction) {
-    if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Debounce: prevent rapid clicks
+    if (actionProcessingRef.current) return;
+    actionProcessingRef.current = true;
+    
+    try {
+      if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    if (action === 'space') {
-      closeSheet(() => router.push({ pathname: '/(tabs)/spaces' as any, params: { openCreate: '1' } }));
-    } else if (action === 'lend') {
-      closeSheet(() => router.push({ pathname: '/(tabs)/lending' as any, params: { openCreate: '1' } }));
-    } else if (action === 'container') {
-      setPickerLoading(true);
-      setSheetStep('pick-space');
-      try {
-        setAllSpaces(await SpaceService.getAllSpaces());
-      } finally {
-        setPickerLoading(false);
+      if (action === 'space') {
+        closeSheet(() => {
+          try {
+            router.push({ pathname: '/(tabs)/spaces' as any, params: { openCreate: '1' } });
+          } catch (err) {
+            console.error('[FloatingTabBar] Navigation to spaces failed:', err);
+            actionProcessingRef.current = false;
+          }
+        });
+      } else if (action === 'lend') {
+        closeSheet(() => {
+          try {
+            router.push({ pathname: '/(tabs)/lending' as any, params: { openCreate: '1' } });
+          } catch (err) {
+            console.error('[FloatingTabBar] Navigation to lending failed:', err);
+            actionProcessingRef.current = false;
+          }
+        });
+      } else if (action === 'container') {
+        setPickerLoading(true);
+        setSheetStep('pick-space');
+        try {
+          const spaces = await SpaceService.getAllSpaces();
+          setAllSpaces(spaces);
+        } catch (err) {
+          console.error('[FloatingTabBar] Failed to load spaces:', err);
+          setSheetStep('actions');
+        } finally {
+          setPickerLoading(false);
+          actionProcessingRef.current = false;
+        }
+      } else if (action === 'item') {
+        setPickerLoading(true);
+        setSheetStep('pick-location');
+        try {
+          const spaces = await SpaceService.getAllSpaces();
+          const map: Record<string, Container[]> = {};
+          await Promise.all(spaces.map(async (s) => {
+            map[s.id] = await ContainerService.getContainersBySpaceId(s.id);
+          }));
+          setAllSpaces(spaces);
+          setSpaceContainers(map);
+        } catch (err) {
+          console.error('[FloatingTabBar] Failed to load locations:', err);
+          setSheetStep('actions');
+        } finally {
+          setPickerLoading(false);
+          actionProcessingRef.current = false;
+        }
       }
-    } else if (action === 'item') {
-      setPickerLoading(true);
-      setSheetStep('pick-location');
-      try {
-        const spaces = await SpaceService.getAllSpaces();
-        const map: Record<string, Container[]> = {};
-        await Promise.all(spaces.map(async (s) => {
-          map[s.id] = await ContainerService.getContainersBySpaceId(s.id);
-        }));
-        setAllSpaces(spaces);
-        setSpaceContainers(map);
-      } finally {
-        setPickerLoading(false);
-      }
+    } catch (err) {
+      console.error('[FloatingTabBar] handleAction error:', err);
+      actionProcessingRef.current = false;
     }
   }
 
   function handleSpaceSelect(spaceId: string) {
-    closeSheet(() => router.push({ pathname: '/space/[id]' as any, params: { id: spaceId, openAddContainer: '1' } }));
+    try {
+      closeSheet(() => {
+        try {
+          router.push({ pathname: '/space/[id]' as any, params: { id: spaceId, openAddContainer: '1' } });
+        } finally {
+          actionProcessingRef.current = false;
+        }
+      });
+    } catch (err) {
+      console.error('[FloatingTabBar] handleSpaceSelect error:', err);
+      actionProcessingRef.current = false;
+    }
   }
 
   function handleLocationSelect(spaceId: string, containerId: string | null) {
-    if (containerId) {
-      closeSheet(() => router.push({ pathname: '/container/[id]' as any, params: { id: containerId, openAddItem: '1' } }));
-    } else {
-      closeSheet(() => router.push({ pathname: '/space/[id]' as any, params: { id: spaceId, openAddItem: '1' } }));
+    try {
+      if (containerId) {
+        closeSheet(() => {
+          try {
+            router.push({ pathname: '/container/[id]' as any, params: { id: containerId, openAddItem: '1' } });
+          } finally {
+            actionProcessingRef.current = false;
+          }
+        });
+      } else {
+        closeSheet(() => {
+          try {
+            router.push({ pathname: '/space/[id]' as any, params: { id: spaceId, openAddItem: '1' } });
+          } finally {
+            actionProcessingRef.current = false;
+          }
+        });
+      }
+    } catch (err) {
+      console.error('[FloatingTabBar] handleLocationSelect error:', err);
+      actionProcessingRef.current = false;
     }
   }
 
