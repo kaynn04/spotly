@@ -415,6 +415,8 @@ export class ItemRepository {
         SELECT 
           i.id,
           i.name,
+          i.description,
+          i.quantity,
           i.space_id,
           i.container_id,
           i.created_at,

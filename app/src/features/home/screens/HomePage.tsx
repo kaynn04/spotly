@@ -112,6 +112,8 @@ export default function HomePage() {
   // Walkthrough
   const { tabBarRef, measureScreenRef } = useWalkthroughContext();
   const dashboardRef = useRef<View>(null);
+  const voiceInputRef = useRef<View>(null);
+  const appearanceToggleHomeRef = useRef<View>(null);
   const settingsRef = useRef<View>(null);
   const [walkthroughVisible, setWalkthroughVisible] = useState(false);
   const [walkthroughIndex, setWalkthroughIndex] = useState(0);
@@ -155,6 +157,20 @@ export default function HomePage() {
       if (step.targetRef === 'dashboard') {
         return await new Promise<SpotlightRect>((resolve, reject) => {
           dashboardRef.current?.measure((_, __, width, height, pageX, pageY) => {
+            resolve({ x: pageX, y: pageY, width, height });
+          }) ?? reject(new Error('no ref'));
+        });
+      }
+      if (step.targetRef === 'voice-input-header') {
+        return await new Promise<SpotlightRect>((resolve, reject) => {
+          voiceInputRef.current?.measure((_, __, width, height, pageX, pageY) => {
+            resolve({ x: pageX, y: pageY, width, height });
+          }) ?? reject(new Error('no ref'));
+        });
+      }
+      if (step.targetRef === 'appearance-toggle-header') {
+        return await new Promise<SpotlightRect>((resolve, reject) => {
+          appearanceToggleHomeRef.current?.measure((_, __, width, height, pageX, pageY) => {
             resolve({ x: pageX, y: pageY, width, height });
           }) ?? reject(new Error('no ref'));
         });
@@ -259,6 +275,7 @@ export default function HomePage() {
           </View>
           <View style={styles.headerRight}>
             <TouchableOpacity
+              ref={voiceInputRef}
               onPress={() => setShowVoiceModal(true)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={[styles.themeToggle, { backgroundColor: isDark ? '#2c2c2e' : '#e8eaed' }]}
@@ -266,6 +283,7 @@ export default function HomePage() {
               <FontAwesomeIcon icon={faMicrophone} size={15} color={PRIMARY} />
             </TouchableOpacity>
             <TouchableOpacity
+              ref={appearanceToggleHomeRef}
               onPress={toggleColorScheme}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={[styles.themeToggle, { backgroundColor: isDark ? '#2c2c2e' : '#e8eaed' }]}

@@ -51,7 +51,7 @@ export class ContainerService {
         throw error;
       }
 
-      // Check for duplicate name globally (across all spaces)
+      // Check for duplicate name globally (across all containers)
       const existingContainers = await ContainerRepository.getAllContainers();
       if (existingContainers.some(c => c.name.toLowerCase() === trimmedName.toLowerCase())) {
         const error = {

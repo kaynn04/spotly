@@ -28,7 +28,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faFileAlt, faFileArchive, faTrash, faPen, faEllipsisVertical, faList, faGrip, faArrowDownAZ, faArrowDownZA, faCubes, faCalendarPlus, faCalendar, faFilter, faCheck } from '@fortawesome/free-solid-svg-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { useScrollHide } from '@/hooks/use-scroll-hide';
@@ -81,8 +81,6 @@ export default function SpacesPage() {
   const { handleScroll } = useScrollHide();
   const tabBarPadding = useTabBarPadding();
 
-  const { openCreate } = useLocalSearchParams<{ openCreate?: string }>();
-
   const [spaces, setSpaces] = useState<SpaceWithCount[]>([]);
   const [loading, setLoading] = useState(false);
   const [formVisible, setFormVisible] = useState(false);
@@ -95,9 +93,6 @@ export default function SpacesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [editingSpace, setEditingSpace] = useState<SpaceWithCount | null>(null);
-
-  // Guard to prevent multiple simultaneous form openings
-  const formOpeningRef = useRef(false);
 
   // Load persisted preferences
   useEffect(() => {
@@ -112,20 +107,10 @@ export default function SpacesPage() {
     }).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (openCreate === '1' && !formOpeningRef.current) {
-      formOpeningRef.current = true;
-      setFormVisible(true);
-    }
-  }, [openCreate]);
-
   // Listen for event from + button to open add-space form
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('synop:open-add-space', () => {
-      if (!formOpeningRef.current) {
-        formOpeningRef.current = true;
-        setFormVisible(true);
-      }
+      setFormVisible(true);
     });
     return () => sub.remove();
   }, []);
@@ -762,7 +747,6 @@ export default function SpacesPage() {
         visible={formVisible}
         onClose={() => {
           setFormVisible(false);
-          formOpeningRef.current = false;
         }}
         onSubmit={handleCreateSpace}
       />

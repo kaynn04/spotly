@@ -18,6 +18,7 @@ import { addContainerPhotoUri } from './migrations/009-add-container-photo-uri';
 import { createLendingPhotosTable } from './migrations/010-create-lending-photos-table';
 import { addLendingDueDate } from './migrations/011-add-lending-due-date';
 import { addItemWarranty } from './migrations/012-add-item-warranty';
+import { addGlobalUniqueConstraints } from './migrations/013-add-global-unique-constraints';
 
 /**
  * Initialize the database schema
@@ -212,6 +213,13 @@ export async function initializeDatabase() {
       await addItemWarranty(db);
     } catch (err) {
       console.error('⚠ Item warranty migration failed:', err);
+    }
+
+    // Add global unique constraints for items and containers (Migration 013)
+    try {
+      await addGlobalUniqueConstraints(db);
+    } catch (err) {
+      console.error('⚠ Global unique constraints migration failed:', err);
     }
 
     console.log('✓ Database initialized (migrations completed with possible non-critical errors)');
