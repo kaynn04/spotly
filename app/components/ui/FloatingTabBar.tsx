@@ -17,16 +17,18 @@ import {
   StyleSheet,
   Platform,
   DeviceEventEmitter,
+  Modal,
+  Text,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import type { SpotlightRect } from '@/src/features/walkthrough/models/WalkthroughStep';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faHome, faBook, faHandshake, faWrench, faMicrophone } from '@fortawesome/free-solid-svg-icons';
+import { faHome, faBook, faHandshake, faWrench, faPlus, faTimes, faBoxOpen, faCube, faBox } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useScrollHide } from '@/hooks/use-scroll-hide';
 import { useRouter } from 'expo-router';
-import VoiceModal from '@/src/features/voice/screens/components/VoiceModal';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
 export interface TabBarHandle {
@@ -48,7 +50,7 @@ const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function Floa
   const isDark = colorScheme === 'dark';
   const { translateY } = useScrollHide();
   const router = useRouter();
-  const [showVoiceModal, setShowVoiceModal] = useState(false);
+  const [showAddSheet, setShowAddSheet] = useState(false);
   const [hidden, setHidden] = useState(false);
 
   // Listen for hide/show events (e.g. multi-select mode)
@@ -126,11 +128,11 @@ const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function Floa
             />
           );
 
-          // Insert mic button before the centerIndex tab
+          // Insert + button before the centerIndex tab
           if (idx === centerIndex) {
             return (
-              <React.Fragment key={`mic-${route.key}`}>
-                <MicButton onPress={() => setShowVoiceModal(true)} micRef={micRef} />
+              <React.Fragment key={`plus-${route.key}`}>
+                <PlusButton onPress={() => setShowAddSheet(true)} plusRef={micRef} />
                 {tabItem}
               </React.Fragment>
             );
@@ -141,18 +143,21 @@ const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function Floa
       </Animated.View>
       )}
 
-      <VoiceModal
-        visible={showVoiceModal}
-        onClose={() => setShowVoiceModal(false)}
-        onItemAdded={() => {
-          DeviceEventEmitter.emit('synop:refresh-home');
-        }}
-        onSpaceCreated={() => {
-          DeviceEventEmitter.emit('synop:refresh-home');
-        }}
-        onNavigateToItem={(itemId) => {
-          setShowVoiceModal(false);
-          router.push({ pathname: '../item/[id]' as any, params: { id: itemId } });
+      <AddActionsSheet
+        visible={showAddSheet}
+        onClose={() => setShowAddSheet(false)}
+        onSelect={(action) => {
+          setShowAddSheet(false);
+          if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          if (action === 'space') {
+            router.push({ pathname: '/(tabs)/spaces' as any, params: { openCreate: '1' } });
+          } else if (action === 'container') {
+            router.push('/(tabs)/spaces' as any);
+          } else if (action === 'item') {
+            router.push('/(tabs)/spaces' as any);
+          } else if (action === 'lend') {
+            router.push({ pathname: '/(tabs)/lending' as any, params: { openCreate: '1' } });
+          }
         }}
       />
     </>
@@ -161,14 +166,108 @@ const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function Floa
 
 export default FloatingTabBar;
 
-/** Center mic button — raised above the pill */
-function MicButton({ onPress, micRef }: { onPress: () => void; micRef?: React.RefObject<View | null> }) {
+/** Center + button — raised above the pill */
+function PlusButton({ onPress, plusRef }: { onPress: () => void; plusRef?: React.RefObject<View | null> }) {
   return (
     <Pressable onPress={onPress} style={styles.micTab}>
-      <View ref={micRef} style={styles.micButton}>
-        <FontAwesomeIcon icon={faMicrophone} size={20} color="#fff" />
+      <View ref={plusRef} style={styles.micButton}>
+        <FontAwesomeIcon icon={faPlus} size={20} color="#fff" />
       </View>
     </Pressable>
+  );
+}
+
+type AddAction = 'space' | 'container' | 'item' | 'lend';
+
+const ADD_ACTIONS: { action: AddAction; icon: any; label: string; description: string }[] = [
+  { action: 'space', icon: faBox, label: 'Add Space', description: 'Create a new storage space' },
+  { action: 'container', icon: faBoxOpen, label: 'Add Container', description: 'Add a container inside a space' },
+  { action: 'item', icon: faCube, label: 'Add Item', description: 'Track a new item' },
+  { action: 'lend', icon: faHandshake, label: 'Lend', description: 'Lend an item to someone' },
+];
+
+function AddActionsSheet({
+  visible,
+  onClose,
+  onSelect,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (action: AddAction) => void;
+}) {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const insets = useSafeAreaInsets();
+  const slideAnim = useRef(new Animated.Value(300)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 11,
+      }).start();
+    } else {
+      slideAnim.setValue(300);
+    }
+  }, [visible]);
+
+  const bg = isDark ? '#1c1c1e' : '#ffffff';
+  const border = isDark ? '#2c2c2e' : '#e2e6ea';
+  const subtleText = isDark ? '#8e8e93' : '#8e8e93';
+  const textColor = isDark ? '#ffffff' : '#1c1c1e';
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={sheetStyles.overlay}>
+          <TouchableWithoutFeedback>
+            <Animated.View
+              style={[
+                sheetStyles.sheet,
+                {
+                  backgroundColor: bg,
+                  paddingBottom: insets.bottom + 16,
+                  transform: [{ translateY: slideAnim }],
+                },
+              ]}
+            >
+              {/* Handle */}
+              <View style={[sheetStyles.handle, { backgroundColor: border }]} />
+
+              {/* Header */}
+              <View style={sheetStyles.header}>
+                <Text style={[sheetStyles.title, { color: textColor }]}>Add New</Text>
+                <Pressable onPress={onClose} style={sheetStyles.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <FontAwesomeIcon icon={faTimes} size={14} color={subtleText} />
+                </Pressable>
+              </View>
+
+              {/* Actions */}
+              {ADD_ACTIONS.map(({ action, icon, label, description }) => (
+                <Pressable
+                  key={action}
+                  style={({ pressed }) => [
+                    sheetStyles.actionRow,
+                    { borderBottomColor: border, opacity: pressed ? 0.6 : 1 },
+                  ]}
+                  onPress={() => onSelect(action)}
+                >
+                  <View style={[sheetStyles.actionIcon, { backgroundColor: `${PRIMARY}15` }]}>
+                    <FontAwesomeIcon icon={icon} size={16} color={PRIMARY} />
+                  </View>
+                  <View style={sheetStyles.actionText}>
+                    <Text style={[sheetStyles.actionLabel, { color: textColor }]}>{label}</Text>
+                    <Text style={[sheetStyles.actionDesc, { color: subtleText }]}>{description}</Text>
+                  </View>
+                </Pressable>
+              ))}
+            </Animated.View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
   );
 }
 
@@ -283,5 +382,69 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: PRIMARY,
+  },
+});
+
+const sheetStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 8,
+    paddingHorizontal: 0,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  closeBtn: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 14,
+  },
+  actionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionText: {
+    flex: 1,
+    gap: 2,
+  },
+  actionLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  actionDesc: {
+    fontSize: 12,
   },
 });
