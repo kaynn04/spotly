@@ -46,7 +46,7 @@ export const WALKTHROUGH_STEPS: WalkthroughStep[] = [
   {
     id: 'outside-tab',
     index: 5,
-    description: 'Outside — items stored beyond your spaces.',
+    description: 'Tools — utilities to help you manage your inventory.',
     targetRef: 'tab-outside',
     spotlightPadding: 10,
   },
