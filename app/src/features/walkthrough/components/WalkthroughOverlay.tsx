@@ -14,7 +14,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PRIMARY = '#6b7f99';
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 8;
 
 interface WalkthroughOverlayProps {
   visible: boolean;
