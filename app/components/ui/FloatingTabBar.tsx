@@ -129,16 +129,13 @@ const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function Floa
     if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     if (action === 'space') {
-      closeSheet(() => {
-        // Navigate to spaces tab first, then emit event to open the form
-        navigation.navigate('spaces');
-        setTimeout(() => DeviceEventEmitter.emit('synop:open-add-space'), 100);
-      });
+      // Navigate immediately so SpacesPage starts mounting while the sheet animates closed.
+      // Emit the event in the closeSheet callback (~300 ms later) so the listener is registered.
+      navigation.navigate('spaces');
+      closeSheet(() => DeviceEventEmitter.emit('synop:open-add-space'));
     } else if (action === 'lend') {
-      closeSheet(() => {
-        navigation.navigate('lending');
-        setTimeout(() => DeviceEventEmitter.emit('synop:open-add-lending'), 100);
-      });
+      navigation.navigate('lending');
+      closeSheet(() => DeviceEventEmitter.emit('synop:open-add-lending'));
     } else if (action === 'container') {
       setPickerLoading(true);
       setSheetStep('pick-space');
@@ -301,15 +298,21 @@ function AddActionsSheet({
   const slideAnim = useRef(new Animated.Value(400)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const [modalVisible, setModalVisible] = useState(false);
+  // Android: the system Dialog swallows the very first touch after a Modal is shown
+  // (to bring focus to the window). We wait for the native `onShow` callback before
+  // enabling interactions so that first-tap is never dropped.
+  const [sheetInteractive, setSheetInteractive] = useState(false);
 
   useEffect(() => {
     if (visible) {
       setModalVisible(true);
+      // sheetInteractive is enabled via onShow callback below
       Animated.parallel([
         Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }),
         Animated.timing(overlayAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
       ]).start();
     } else {
+      setSheetInteractive(false);
       Animated.parallel([
         Animated.timing(slideAnim, { toValue: 400, duration: 220, useNativeDriver: true }),
         Animated.timing(overlayAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
@@ -324,7 +327,13 @@ function AddActionsSheet({
   const stepTitle = step === 'pick-space' ? 'Select Space' : step === 'pick-location' ? 'Select Location' : 'Add New';
 
   return (
-    <Modal visible={modalVisible} transparent animationType="none" onRequestClose={onClose}>
+    <Modal
+      visible={modalVisible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+      onShow={() => setSheetInteractive(true)}
+    >
       {/* Dimmed overlay — tap to dismiss */}
       <Animated.View style={[StyleSheet.absoluteFill, sheetStyles.overlayBg, { opacity: overlayAnim }]}>
         <TouchableWithoutFeedback onPress={onClose}>
@@ -332,8 +341,9 @@ function AddActionsSheet({
         </TouchableWithoutFeedback>
       </Animated.View>
 
-      {/* Bottom sheet */}
+      {/* Bottom sheet — pointerEvents disabled until onShow fires to avoid Android first-touch swallow */}
       <Animated.View
+        pointerEvents={sheetInteractive ? 'auto' : 'none'}
         style={[
           sheetStyles.sheet,
           { backgroundColor: bg, paddingBottom: insets.bottom + 16, transform: [{ translateY: slideAnim }] },
