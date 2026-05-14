@@ -15,7 +15,6 @@ import {
   Modal,
   TouchableOpacity,
   ScrollView,
-  Platform,
 } from 'react-native';
 
 const ITEM_HEIGHT = 44;
@@ -32,10 +31,10 @@ function daysInMonth(month: number, year: number): number {
   return new Date(year, month + 1, 0).getDate();
 }
 
-function buildYears(): number[] {
-  const now = new Date().getFullYear();
+function buildYears(minimumDate?: Date): number[] {
+  const start = minimumDate ? minimumDate.getFullYear() : new Date().getFullYear();
   const years: number[] = [];
-  for (let y = now; y <= now + 10; y++) years.push(y);
+  for (let y = start; y <= start + 10; y++) years.push(y);
   return years;
 }
 
@@ -47,56 +46,57 @@ interface DrumColumnProps {
   onSelect: (index: number) => void;
   textColor: string;
   subtleText: string;
+  disabledBefore?: number; // indexes < this value are shown faded
 }
 
-function DrumColumn({ items, selectedIndex, onSelect, textColor, subtleText }: DrumColumnProps) {
+function DrumColumn({ items, selectedIndex, onSelect, textColor, subtleText, disabledBefore = 0 }: DrumColumnProps) {
   const ref = useRef<ScrollView>(null);
-  const isScrolling = useRef(false);
   const [activeIndex, setActiveIndex] = useState(selectedIndex);
+  const pendingSnapRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasMomentumRef = useRef(false);
 
-  // Sync local active index when parent changes (and not scrolling)
+  // Sync position when parent changes (e.g. minimumDate clamp snaps back)
   useEffect(() => {
-    if (!isScrolling.current) {
-      setActiveIndex(selectedIndex);
-      ref.current?.scrollTo({ y: selectedIndex * ITEM_HEIGHT, animated: false });
-    }
+    setActiveIndex(selectedIndex);
+    ref.current?.scrollTo({ y: selectedIndex * ITEM_HEIGHT, animated: false });
   }, [selectedIndex]);
 
-  const handleScroll = useCallback(
-    (e: any) => {
-      if (!isScrolling.current) return;
-      const raw = e.nativeEvent.contentOffset.y / ITEM_HEIGHT;
-      const idx = Math.max(0, Math.min(items.length - 1, Math.round(raw)));
-      setActiveIndex(idx);
-    },
-    [items.length]
-  );
+  const snapTo = useCallback((rawY: number) => {
+    const idx = Math.max(0, Math.min(items.length - 1, Math.round(rawY / ITEM_HEIGHT)));
+    setActiveIndex(idx);
+    ref.current?.scrollTo({ y: idx * ITEM_HEIGHT, animated: true });
+    onSelect(idx);
+  }, [items.length, onSelect]);
 
-  const settle = useCallback(
-    (e: any) => {
-      isScrolling.current = false;
-      const raw = e.nativeEvent.contentOffset.y / ITEM_HEIGHT;
-      const idx = Math.max(0, Math.min(items.length - 1, Math.round(raw)));
-      setActiveIndex(idx);
-      onSelect(idx);
-      ref.current?.scrollTo({ y: idx * ITEM_HEIGHT, animated: true });
-    },
-    [items.length, onSelect]
-  );
+  const handleScroll = useCallback((e: any) => {
+    const raw = e.nativeEvent.contentOffset.y / ITEM_HEIGHT;
+    const idx = Math.max(0, Math.min(items.length - 1, Math.round(raw)));
+    setActiveIndex(idx);
+  }, [items.length]);
 
-  const handleDragStart = useCallback(() => {
-    isScrolling.current = true;
+  const handleScrollEndDrag = useCallback((e: any) => {
+    hasMomentumRef.current = false;
+    const y = e.nativeEvent.contentOffset.y;
+    // Wait briefly — if momentum starts, cancel this snap
+    pendingSnapRef.current = setTimeout(() => {
+      if (!hasMomentumRef.current) {
+        snapTo(y);
+      }
+    }, 80);
+  }, [snapTo]);
+
+  const handleMomentumScrollBegin = useCallback(() => {
+    hasMomentumRef.current = true;
+    if (pendingSnapRef.current) {
+      clearTimeout(pendingSnapRef.current);
+      pendingSnapRef.current = null;
+    }
   }, []);
 
-  const handleDragEnd = useCallback(
-    (e: any) => {
-      const v = e.nativeEvent.velocity?.y ?? 0;
-      if (Math.abs(v) < 0.05) {
-        settle(e);
-      }
-    },
-    [settle]
-  );
+  const handleMomentumScrollEnd = useCallback((e: any) => {
+    hasMomentumRef.current = false;
+    snapTo(e.nativeEvent.contentOffset.y);
+  }, [snapTo]);
 
   return (
     <View style={styles.column}>
@@ -106,29 +106,34 @@ function DrumColumn({ items, selectedIndex, onSelect, textColor, subtleText }: D
         showsVerticalScrollIndicator={false}
         snapToInterval={ITEM_HEIGHT}
         decelerationRate="fast"
-        onScrollBeginDrag={handleDragStart}
         onScroll={handleScroll}
-        onScrollEndDrag={handleDragEnd}
-        onMomentumScrollEnd={settle}
+        onScrollEndDrag={handleScrollEndDrag}
+        onMomentumScrollBegin={handleMomentumScrollBegin}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
         contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * HALF }}
         scrollEventThrottle={16}
       >
-        {items.map((label, i) => (
-          <View key={i} style={styles.drumItem}>
-            <Text
-              style={[
-                styles.drumLabel,
-                {
-                  color: i === activeIndex ? textColor : subtleText,
-                  fontWeight: i === activeIndex ? '600' : '400',
-                  opacity: Math.abs(i - activeIndex) > HALF ? 0.25 : 1,
-                },
-              ]}
-            >
-              {label}
-            </Text>
-          </View>
-        ))}
+        {items.map((label, i) => {
+          const isSelected = i === activeIndex;
+          const isPast = i < disabledBefore;
+          const distFromCenter = Math.abs(i - activeIndex);
+          return (
+            <View key={i} style={styles.drumItem}>
+              <Text
+                style={[
+                  styles.drumLabel,
+                  {
+                    color: isPast ? subtleText : isSelected ? textColor : subtleText,
+                    fontWeight: isSelected ? '600' : '400',
+                    opacity: isPast ? 0.3 : distFromCenter > HALF ? 0.25 : 1,
+                  },
+                ]}
+              >
+                {label}
+              </Text>
+            </View>
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -163,17 +168,31 @@ export default function DatePickerSheet({
   subtleText,
   isDark,
 }: DatePickerSheetProps) {
-  const YEARS = buildYears();
+  const YEARS = buildYears(minimumDate);
 
-  const monthIndex = value.getMonth();       // 0-11
-  const day = value.getDate();               // 1-31
+  // Normalize minimumDate to start of day for clean comparisons
+  const minDay = minimumDate
+    ? new Date(minimumDate.getFullYear(), minimumDate.getMonth(), minimumDate.getDate())
+    : undefined;
+
+  const monthIndex = value.getMonth();
+  const day = value.getDate();
   const year = value.getFullYear();
 
   const yearIndex = Math.max(0, YEARS.indexOf(year));
   const maxDay = daysInMonth(monthIndex, year);
   const days = Array.from({ length: maxDay }, (_, i) => String(i + 1));
-
   const clampedDayIndex = Math.min(day - 1, maxDay - 1);
+
+  // Which indexes in each column are before the minimum date
+  const minYear = minDay?.getFullYear() ?? 0;
+  const minMonth = minDay?.getMonth() ?? 0;
+  const minDate = minDay?.getDate() ?? 1;
+
+  const disabledYearBefore = 0; // years start from minYear so none are disabled
+  const disabledMonthBefore = year === minYear ? minMonth : 0;
+  const disabledDayBefore =
+    year === minYear && monthIndex === minMonth ? minDate - 1 : 0;
 
   const buildDate = useCallback(
     (mIdx: number, dIdx: number, yIdx: number): Date => {
@@ -182,10 +201,10 @@ export default function DatePickerSheet({
       const maxD = daysInMonth(m, y);
       const d = Math.min(dIdx + 1, maxD);
       const date = new Date(y, m, d);
-      if (minimumDate && date < minimumDate) return minimumDate;
+      if (minDay && date < minDay) return new Date(minDay);
       return date;
     },
-    [YEARS, minimumDate]
+    [YEARS, minDay]
   );
 
   const handleMonth = useCallback(
@@ -229,6 +248,7 @@ export default function DatePickerSheet({
               onSelect={handleMonth}
               textColor={textColor}
               subtleText={subtleText}
+              disabledBefore={disabledMonthBefore}
             />
             <DrumColumn
               items={days}
@@ -236,6 +256,7 @@ export default function DatePickerSheet({
               onSelect={handleDay}
               textColor={textColor}
               subtleText={subtleText}
+              disabledBefore={disabledDayBefore}
             />
             <DrumColumn
               items={YEARS.map(String)}
@@ -243,6 +264,7 @@ export default function DatePickerSheet({
               onSelect={handleYear}
               textColor={textColor}
               subtleText={subtleText}
+              disabledBefore={disabledYearBefore}
             />
           </View>
         </View>
