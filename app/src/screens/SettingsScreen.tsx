@@ -5,7 +5,7 @@
  * Sections: Profile, Appearance, Data, About
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -41,6 +41,7 @@ import type { ImportMode } from '@/src/services/ImportService';
 import { resetDatabase, initializeDatabase } from '@/src/db/migrations';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WalkthroughService } from '@/src/features/walkthrough/services/WalkthroughService';
+import { useWalkthroughContext } from '@/src/features/walkthrough/context/WalkthroughContext';
 
 const PRIMARY = '#6b7f99';
 const DANGER = '#d32f2f';
@@ -52,6 +53,7 @@ export default function SettingsScreen() {
   const toggleColorScheme = useToggleColorScheme();
   const insets = useSafeAreaInsets();
   const isDark = colorScheme === 'dark';
+  const { registerScreenRef } = useWalkthroughContext();
 
   const [userName, setUserName] = useState('');
   const [editingName, setEditingName] = useState(false);
@@ -59,6 +61,13 @@ export default function SettingsScreen() {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [resetting, setResetting] = useState(false);
+
+  const appearanceToggleRef = useRef<View | null>(null);
+
+  // Register appearance toggle ref with walkthrough context
+  useEffect(() => {
+    registerScreenRef('appearance-toggle', appearanceToggleRef);
+  }, [registerScreenRef]);
 
   const handleRestartWalkthrough = async () => {
     await WalkthroughService.reset();
@@ -207,9 +216,10 @@ export default function SettingsScreen() {
     iconColor: string,
     label: string,
     onPress: () => void,
-    options?: { rightText?: string; danger?: boolean; loading?: boolean; rightElement?: React.ReactNode }
+    options?: { rightText?: string; danger?: boolean; loading?: boolean; rightElement?: React.ReactNode; ref?: React.RefObject<View> }
   ) => (
     <TouchableOpacity
+      ref={options?.ref}
       style={[styles.row, { borderBottomColor: borderColor }]}
       onPress={onPress}
       activeOpacity={0.7}
@@ -312,6 +322,7 @@ export default function SettingsScreen() {
             isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
             toggleColorScheme,
             {
+              ref: appearanceToggleRef,
               rightElement: (
                 <View style={[styles.themeBadge, { backgroundColor: isDark ? '#2c2c2e' : '#e8eaed' }]}>
                   <FontAwesomeIcon
