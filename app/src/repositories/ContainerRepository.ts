@@ -12,6 +12,11 @@ import type { Container, ContainerRow, ServiceError } from '../models/Container'
 import { getDatabase } from '../db/client';
 import { generateUUID } from '../utils/uuid';
 
+function isUniqueConstraintError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.toLowerCase().includes('unique constraint');
+}
+
 /**
  * ContainerRepository handles all container-related database operations
  * Uses parameterized SQL queries for safety
@@ -51,6 +56,14 @@ export class ContainerRepository {
         photoUri: null,
       };
     } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        const serviceError: ServiceError = {
+          code: 'DUPLICATE_NAME',
+          message: 'A container with this name already exists.',
+        };
+        throw serviceError;
+      }
+
       // Convert database error to ServiceError
       const serviceError: ServiceError = {
         code: 'DB_ERROR',
@@ -312,6 +325,14 @@ export class ContainerRepository {
       const now = new Date().toISOString();
       await db.runAsync('UPDATE containers SET name = ?, updated_at = ? WHERE id = ?', [name, now, id]);
     } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        const serviceError: ServiceError = {
+          code: 'DUPLICATE_NAME',
+          message: 'A container with this name already exists.',
+        };
+        throw serviceError;
+      }
+
       console.error('[ContainerRepository.updateName] Database error:', error);
       const serviceError: ServiceError = { code: 'DB_ERROR', message: 'Failed to update container name.' };
       throw serviceError;

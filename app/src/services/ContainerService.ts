@@ -51,6 +51,15 @@ export class ContainerService {
         throw error;
       }
 
+      const existingContainers = await ContainerRepository.getAllContainers();
+      if (existingContainers.some((container) => container.name.toLowerCase() === trimmedName.toLowerCase())) {
+        const error: ServiceError = {
+          code: 'DUPLICATE_NAME',
+          message: 'A container with this name already exists.',
+        };
+        throw error;
+      }
+
       // Create container in database via repository
       // Database enforces global UNIQUE constraint on container names
       const container = await ContainerRepository.createContainer(trimmedName, spaceId);
@@ -125,6 +134,15 @@ export class ContainerService {
       }
 
       // Database enforces global UNIQUE constraint on container names
+      const existingContainers = await ContainerRepository.getAllContainers();
+      if (existingContainers.some((container) => container.id !== id && container.name.toLowerCase() === trimmed.toLowerCase())) {
+        const error: ServiceError = {
+          code: 'DUPLICATE_NAME',
+          message: 'A container with this name already exists.',
+        };
+        throw error;
+      }
+
       await ContainerRepository.updateName(id, trimmed);
     }
 
