@@ -490,8 +490,9 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
       setSessionState({ phase: 'success', action: 'return', itemName: returnItemName, location: returnBorrowerName });
       onItemAdded?.();
       setTimeout(() => { onClose(); setSessionState({ phase: 'idle' }); }, 1500);
-    } catch {
-      setSessionState({ phase: 'error', message: 'Failed to mark as returned — try again' });
+    } catch (err: any) {
+      const errorMessage = err?.message || 'Failed to mark as returned — try again';
+      setSessionState({ phase: 'error', message: errorMessage });
     }
   };
 
@@ -505,8 +506,9 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
       setSessionState({ phase: 'success', action: 'lend', itemName: item.name, location: borrower });
       onItemAdded?.();
       setTimeout(() => { onClose(); setSessionState({ phase: 'idle' }); }, 1500);
-    } catch {
-      setSessionState({ phase: 'error', message: 'Failed to lend item — try again' });
+    } catch (err: any) {
+      const errorMessage = err?.message || 'Failed to lend item — try again';
+      setSessionState({ phase: 'error', message: errorMessage });
     }
   };
 
@@ -522,8 +524,9 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
         onClose();
         setSessionState({ phase: 'idle' });
       }, 1500);
-    } catch {
-      setSessionState({ phase: 'error', message: 'Failed to create container — try again' });
+    } catch (err: any) {
+      const errorMessage = err?.message || 'Failed to create container — try again';
+      setSessionState({ phase: 'error', message: errorMessage });
     }
   };
 
@@ -537,8 +540,9 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
         onClose();
         setSessionState({ phase: 'idle' });
       }, 1500);
-    } catch {
-      setSessionState({ phase: 'error', message: 'Failed to create space — try again' });
+    } catch (err: any) {
+      const errorMessage = err?.message || 'Failed to create space — try again';
+      setSessionState({ phase: 'error', message: errorMessage });
     }
   };
 
@@ -597,14 +601,14 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
         onClose();
         setSessionState({ phase: 'idle' });
       }, 1500);
-    } catch {
-      const errorMsg = isMultiAdd
+    } catch (err: any) {
+      const errorMsg = err?.message || (isMultiAdd
         ? 'Failed to add items — try again'
         : sessionState.phase === 'confirming'
         ? (sessionState.parsed.action === 'move'
           ? 'Failed to move item — try again'
           : 'Failed to add item — try again')
-        : 'Operation failed — try again';
+        : 'Operation failed — try again');
       setSessionState({ phase: 'error', message: errorMsg });
     }
   };

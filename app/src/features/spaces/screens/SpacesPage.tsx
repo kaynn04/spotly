@@ -96,6 +96,9 @@ export default function SpacesPage() {
   const [deleting, setDeleting] = useState(false);
   const [editingSpace, setEditingSpace] = useState<SpaceWithCount | null>(null);
 
+  // Guard to prevent multiple simultaneous form openings
+  const formOpeningRef = useRef(false);
+
   // Load persisted preferences
   useEffect(() => {
     Promise.all([
@@ -110,7 +113,8 @@ export default function SpacesPage() {
   }, []);
 
   useEffect(() => {
-    if (openCreate === '1') {
+    if (openCreate === '1' && !formOpeningRef.current) {
+      formOpeningRef.current = true;
       setFormVisible(true);
     }
   }, [openCreate]);
@@ -118,7 +122,10 @@ export default function SpacesPage() {
   // Listen for event from + button to open add-space form
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('synop:open-add-space', () => {
-      setFormVisible(true);
+      if (!formOpeningRef.current) {
+        formOpeningRef.current = true;
+        setFormVisible(true);
+      }
     });
     return () => sub.remove();
   }, []);
@@ -753,7 +760,10 @@ export default function SpacesPage() {
 
       <SpaceFormModal
         visible={formVisible}
-        onClose={() => setFormVisible(false)}
+        onClose={() => {
+          setFormVisible(false);
+          formOpeningRef.current = false;
+        }}
         onSubmit={handleCreateSpace}
       />
 
