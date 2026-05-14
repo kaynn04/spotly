@@ -445,13 +445,19 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
 
       const parsed = VoiceMatcherService.resolve(parts, spaces, containers);
 
-      // Pre-populate confirmed IDs for exact matches
+      // Pre-populate confirmed IDs for exact matches, or single fuzzy matches
       if (parsed.space.status === 'exact') {
         setConfirmedSpaceId(parsed.space.record.id);
         if (!resolvedSpaceId) {
           const cs = await ContainerService.getContainersBySpaceId(parsed.space.record.id);
           setSpaceContainers(cs);
         }
+      } else if (parsed.space.status === 'fuzzy' && parsed.space.candidates.length === 1) {
+        // Auto-select if there's only one fuzzy match
+        const spaceId = parsed.space.candidates[0].id;
+        setConfirmedSpaceId(spaceId);
+        const cs = await ContainerService.getContainersBySpaceId(spaceId);
+        setSpaceContainers(cs);
       }
       if (parsed.container !== 'absent' && parsed.container.status === 'exact') {
         setConfirmedContainerId(parsed.container.record.id);
