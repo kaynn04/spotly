@@ -565,13 +565,15 @@ export default function SpacesPage() {
             </View>
           ) : (
             spaces.length > 0 && !isSearching && (
-              <TouchableOpacity
-                style={styles.menuBtn}
-                onPress={() => setShowMenu(true)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <FontAwesomeIcon icon={faEllipsisVertical} size={18} color={subtleText} />
-              </TouchableOpacity>
+              <View style={styles.headerActions}>
+                <TouchableOpacity
+                  style={[styles.addSpaceBtn, { backgroundColor: PRIMARY }]}
+                  onPress={() => setFormVisible(true)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.addSpaceBtnText}>+ Add Space</Text>
+                </TouchableOpacity>
+              </View>
             )
           )}
         </View>
@@ -613,6 +615,13 @@ export default function SpacesPage() {
         ) : spaces.length > 0 ? (
           <View style={styles.sectionLabelRow}>
             <Text style={[styles.sectionLabel, { color: subtleText }]}>YOUR SPACES <Text style={styles.longPressHint}>{'\u00B7'} Long press to select</Text></Text>
+            <TouchableOpacity
+              style={styles.menuBtn}
+              onPress={() => setShowMenu(true)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <FontAwesomeIcon icon={faEllipsisVertical} size={16} color={subtleText} />
+            </TouchableOpacity>
           </View>
         ) : null}
       </View>
@@ -897,7 +906,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    marginBottom: 10,
     paddingTop: 4,
   },
   title: { fontSize: 32, fontWeight: '700', letterSpacing: -0.5 },
@@ -928,8 +937,8 @@ const styles = StyleSheet.create({
   clearBtn: { padding: 4 },
   clearBtnText: { fontSize: 16 },
   resultHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5, marginBottom: 10 },
-  sectionLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5, marginBottom: 6 },
+  sectionLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   longPressHint: { fontSize: 11, fontStyle: 'italic' },
   sectionHeader: { fontSize: 12, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', paddingTop: 12, paddingBottom: 6 },
 
@@ -1010,21 +1019,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryButtonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  fab: {
-    position: 'absolute',
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  addSpaceBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
   },
-  fabText: { color: '#fff', fontSize: 28, fontWeight: '300', lineHeight: 32 },
+  addSpaceBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 
   // Grid view
   gridRow: { gap: GRID_GAP },

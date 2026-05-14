@@ -26,11 +26,11 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faMagnifyingGlass, faTimes, faChevronRight, faHandshake, faPlus, faMapPin, faFolder, faEllipsisVertical, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faCheck, faList, faGrip } from '@fortawesome/free-solid-svg-icons';
+import { faMagnifyingGlass, faTimes, faChevronRight, faHandshake, faPlus, faMapPin, faFolder, faEllipsisVertical, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faCheck, faList, faGrip, faClockRotateLeft } from '@fortawesome/free-solid-svg-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { useScrollHide } from '@/hooks/use-scroll-hide';
@@ -55,6 +55,7 @@ const GRID_COLUMNS = 2;
 
 export default function LendingPage() {
   const router = useRouter();
+  const { openCreate } = useLocalSearchParams<{ openCreate?: string }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
@@ -166,6 +167,14 @@ export default function LendingPage() {
     return () => subscription.remove();
   }, [loadLendings]);
 
+  // Auto-open item picker when navigated with openCreate=1
+  useEffect(() => {
+    if (openCreate === '1') {
+      openItemPicker();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openCreate]);
+
   const openItemPicker = async () => {
     setItemPickerLoading(true);
     setItemPickerSearch('');
@@ -229,8 +238,6 @@ export default function LendingPage() {
       setLendNote('');
       setLendDueDate(null);
       await loadLendings();
-      // Navigate to detail so user can add before photos immediately
-      router.push(`/lending/${created.id}`);
     } catch (err: any) {
       Alert.alert('Error', err.code === 'DUPLICATE_ACTIVE_LENDING'
         ? 'This item is already lent out'
@@ -360,17 +367,17 @@ export default function LendingPage() {
             <TouchableOpacity
               style={[styles.historyPill, { borderColor, backgroundColor: cardBg }]}
               onPress={() => router.push('/lending/history')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Text style={[styles.historyPillText, { color: PRIMARY }]}>History</Text>
+              <FontAwesomeIcon icon={faClockRotateLeft} size={15} color={PRIMARY} />
             </TouchableOpacity>
-            {lendings.length > 0 && (
-              <TouchableOpacity
-                onPress={() => setShowMenu(true)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <FontAwesomeIcon icon={faEllipsisVertical} size={18} color={subtleText} />
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              style={[styles.lendItemBtn, { backgroundColor: PRIMARY }]}
+              onPress={openItemPicker}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.lendItemBtnText}>+ Lend Item</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -416,8 +423,12 @@ export default function LendingPage() {
                   <Text style={[styles.sectionLabel, { color: subtleText }]}>
                     ACTIVE{' '}
                     <Text style={styles.sectionLabelHint}>{'\u00B7'} {filteredLendings.length} item{filteredLendings.length !== 1 ? 's' : ''}</Text>
-                  </Text>
-                </View>
+                  </Text>                  <TouchableOpacity
+                    onPress={() => setShowMenu(true)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <FontAwesomeIcon icon={faEllipsisVertical} size={16} color={subtleText} />
+                  </TouchableOpacity>                </View>
                 {viewMode === 'grid' ? (
                   <FlatList
                     data={filteredLendings}
@@ -467,17 +478,6 @@ export default function LendingPage() {
           </View>
         )}
       </ScrollView>
-      {/* FAB — only shown when lendings exist */}
-      {lendings.length > 0 && (
-        <TouchableOpacity
-          style={[styles.fab, { backgroundColor: PRIMARY, bottom: insets.bottom + 84 }]}
-          onPress={openItemPicker}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.fabText}>+</Text>
-        </TouchableOpacity>
-      )}
-
       {/* Item Picker Modal */}
       <Modal visible={showItemPicker} transparent animationType="slide" onRequestClose={closeItemPicker}>
         <TouchableWithoutFeedback onPress={closeItemPicker}>
@@ -652,12 +652,19 @@ const styles = StyleSheet.create({
   title: { fontSize: 30, fontWeight: '700', letterSpacing: -0.5 },
   subtitle: { fontSize: 13, marginTop: 2 },
   historyPill: {
-    paddingHorizontal: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lendItemBtn: {
+    paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 20,
-    borderWidth: 1,
   },
-  historyPillText: { fontSize: 14, fontWeight: '600' },
+  lendItemBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 
   centerContainer: { justifyContent: 'center', alignItems: 'center', minHeight: 200 },
 
@@ -675,7 +682,7 @@ const styles = StyleSheet.create({
   },
   countBadgeText: { fontSize: 12, fontWeight: '700' },
 
-  sectionLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  sectionLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
   sectionLabelHint: { fontSize: 11, fontStyle: 'italic', fontWeight: '400' },
 
