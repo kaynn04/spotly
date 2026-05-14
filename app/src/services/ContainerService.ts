@@ -51,12 +51,12 @@ export class ContainerService {
         throw error;
       }
 
-      // Check for duplicate name within the same space (not globally)
+      // Check for duplicate name globally (across all containers)
       const existingContainers = await ContainerRepository.getAllContainers();
-      if (existingContainers.some(c => c.name.toLowerCase() === trimmedName.toLowerCase() && c.spaceId === spaceId)) {
+      if (existingContainers.some(c => c.name.toLowerCase() === trimmedName.toLowerCase())) {
         const error = {
           code: 'DUPLICATE_NAME',
-          message: 'A container with this name already exists in this space.',
+          message: 'A container with this name already exists.',
         } as unknown as ServiceError;
         throw error;
       }
@@ -133,17 +133,16 @@ export class ContainerService {
         throw error;
       }
 
-      // Check for duplicate name within the same space
+      // Check for duplicate name globally
       const container = await ContainerRepository.getContainerById(id);
       if (container) {
         const existing = await ContainerRepository.getAllContainers();
         const isDuplicate = existing.some(c => 
           c.id !== id && 
-          c.name.toLowerCase() === trimmed.toLowerCase() &&
-          c.spaceId === container.spaceId
+          c.name.toLowerCase() === trimmed.toLowerCase()
         );
         if (isDuplicate) {
-          throw { code: 'DUPLICATE_NAME', message: 'A container with this name already exists in this space.' } as unknown as ServiceError;
+          throw { code: 'DUPLICATE_NAME', message: 'A container with this name already exists.' } as unknown as ServiceError;
         }
       }
       await ContainerRepository.updateName(id, trimmed);
