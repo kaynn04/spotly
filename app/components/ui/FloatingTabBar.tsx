@@ -74,6 +74,7 @@ const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function Floa
   const [spaceContainers, setSpaceContainers] = useState<Record<string, Container[]>>({});
   const [pickerLoading, setPickerLoading] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const actionLockedRef = useRef(false);
 
   // Reset sheet step when sheet closes
   useEffect(() => {
@@ -114,6 +115,8 @@ const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function Floa
   }));
 
   function openSheet() {
+    if (showSheet) return;
+    actionLockedRef.current = false;
     setSheetStep('actions');
     setShowSheet(true);
   }
@@ -122,10 +125,20 @@ const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function Floa
   function closeSheet(then?: () => void) {
     setShowSheet(false);
     // Wait for the close animation (220ms) to finish before navigating
-    if (then) setTimeout(then, 300);
+    if (then) {
+      setTimeout(() => {
+        then();
+        actionLockedRef.current = false;
+      }, 300);
+    } else {
+      actionLockedRef.current = false;
+    }
   }
 
   async function handleAction(action: AddAction) {
+    if (actionLockedRef.current) return;
+    actionLockedRef.current = true;
+
     if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     if (action === 'space') {
@@ -146,6 +159,7 @@ const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function Floa
         setSheetStep('actions');
       } finally {
         setPickerLoading(false);
+        actionLockedRef.current = false;
       }
     } else if (action === 'item') {
       setPickerLoading(true);
@@ -163,6 +177,7 @@ const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function Floa
         setSheetStep('actions');
       } finally {
         setPickerLoading(false);
+        actionLockedRef.current = false;
       }
     }
   }

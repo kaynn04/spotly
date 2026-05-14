@@ -12,6 +12,11 @@ import type { Item, ItemRow, ServiceError } from '../models/Item';
 import { getDatabase } from '../db/client';
 import { generateUUID } from '../utils/uuid';
 
+function isUniqueConstraintError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.toLowerCase().includes('unique constraint');
+}
+
 /**
  * ItemRepository handles all item-related database operations
  * Uses parameterized SQL queries for safety
@@ -63,6 +68,14 @@ export class ItemRepository {
         createdAt: now,
       };
     } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        const serviceError: ServiceError = {
+          code: 'DUPLICATE_NAME',
+          message: 'An item with this name already exists.',
+        };
+        throw serviceError;
+      }
+
       // Convert database error to ServiceError
       const serviceError: ServiceError = {
         code: 'DB_ERROR',
@@ -540,6 +553,14 @@ export class ItemRepository {
 
       await db.runAsync(`UPDATE items SET ${fields.join(', ')} WHERE id = ?`, values);
     } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        const serviceError: ServiceError = {
+          code: 'DUPLICATE_NAME',
+          message: 'An item with this name already exists.',
+        };
+        throw serviceError;
+      }
+
       console.error('[ItemRepository.updateItem] Database error:', error);
       const serviceError: ServiceError = { code: 'DB_ERROR', message: 'Failed to update item.' };
       throw serviceError;

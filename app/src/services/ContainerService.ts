@@ -51,17 +51,17 @@ export class ContainerService {
         throw error;
       }
 
-      // Check for duplicate name globally (across all containers)
       const existingContainers = await ContainerRepository.getAllContainers();
-      if (existingContainers.some(c => c.name.toLowerCase() === trimmedName.toLowerCase())) {
-        const error = {
+      if (existingContainers.some((container) => container.name.toLowerCase() === trimmedName.toLowerCase())) {
+        const error: ServiceError = {
           code: 'DUPLICATE_NAME',
           message: 'A container with this name already exists.',
-        } as unknown as ServiceError;
+        };
         throw error;
       }
 
       // Create container in database via repository
+      // Database enforces global UNIQUE constraint on container names
       const container = await ContainerRepository.createContainer(trimmedName, spaceId);
 
       return container;
@@ -133,18 +133,16 @@ export class ContainerService {
         throw error;
       }
 
-      // Check for duplicate name globally
-      const container = await ContainerRepository.getContainerById(id);
-      if (container) {
-        const existing = await ContainerRepository.getAllContainers();
-        const isDuplicate = existing.some(c => 
-          c.id !== id && 
-          c.name.toLowerCase() === trimmed.toLowerCase()
-        );
-        if (isDuplicate) {
-          throw { code: 'DUPLICATE_NAME', message: 'A container with this name already exists.' } as unknown as ServiceError;
-        }
+      // Database enforces global UNIQUE constraint on container names
+      const existingContainers = await ContainerRepository.getAllContainers();
+      if (existingContainers.some((container) => container.id !== id && container.name.toLowerCase() === trimmed.toLowerCase())) {
+        const error: ServiceError = {
+          code: 'DUPLICATE_NAME',
+          message: 'A container with this name already exists.',
+        };
+        throw error;
       }
+
       await ContainerRepository.updateName(id, trimmed);
     }
 

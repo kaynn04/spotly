@@ -9,8 +9,6 @@
  * and delegates to the database for consistency.
  */
 
-import { getDatabase } from '../client';
-
 export async function addGlobalUniqueConstraints(db: any) {
   try {
     // Check if global unique index for items already exists

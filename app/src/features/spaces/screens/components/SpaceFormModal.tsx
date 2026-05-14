@@ -4,7 +4,7 @@
  * Bottom sheet -- create a new space, uniform with SessionFormModal
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -45,12 +45,16 @@ export default function SpaceFormModal({ visible, onClose, onSubmit, initialName
   const [error, setError] = useState<string | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [showPhotoPicker, setShowPhotoPicker] = useState(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     if (visible) {
+      submittingRef.current = false;
       setName(initialName ?? '');
       setPhotoUri(initialPhotoUri ?? null);
       setError(null);
+    } else {
+      submittingRef.current = false;
     }
   }, [visible]);
 
@@ -71,7 +75,9 @@ export default function SpaceFormModal({ visible, onClose, onSubmit, initialName
   };
 
   const handleSubmit = async () => {
+    if (submittingRef.current) return;
     if (!name.trim()) { setError('Please enter a space name'); return; }
+    submittingRef.current = true;
     setLoading(true);
     setError(null);
     try {
@@ -81,6 +87,7 @@ export default function SpaceFormModal({ visible, onClose, onSubmit, initialName
       onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to create space');
+      submittingRef.current = false;
     } finally {
       setLoading(false);
     }
