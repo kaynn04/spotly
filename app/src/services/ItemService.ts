@@ -51,15 +51,14 @@ export class ItemService {
         throw error;
       }
 
-      // Check for duplicate name in the same location (space or container)
-      const existingItems = await ItemRepository.getItemsBySpaceId(spaceId);
-      const isDuplicate = existingItems.some(i => 
-        i.name.toLowerCase() === trimmedName.toLowerCase() && 
-        i.containerId === (containerId || null)
+      // Check for duplicate name globally (across all items)
+      const allItems = await ItemRepository.getAll();
+      const isDuplicate = allItems.some(i => 
+        i.name.toLowerCase() === trimmedName.toLowerCase()
       );
 
       if (isDuplicate) {
-        throw { code: 'DUPLICATE_NAME', message: 'An item with this name already exists in this location.' } as unknown as ServiceError;
+        throw { code: 'DUPLICATE_NAME', message: 'An item with this name already exists.' } as unknown as ServiceError;
       }
 
       // Create item in database via repository
@@ -255,17 +254,16 @@ export class ItemService {
         throw error;
       }
 
-      // Check for duplicate name on update
+      // Check for duplicate name on update (globally)
       const item = await ItemRepository.getItemById(itemId);
       if (item) {
-        const existingItems = await ItemRepository.getItemsBySpaceId(item.spaceId);
-        const isDuplicate = existingItems.some(i => 
+        const allItems = await ItemRepository.getAll();
+        const isDuplicate = allItems.some(i => 
           i.id !== itemId &&
-          i.name.toLowerCase() === trimmed.toLowerCase() && 
-          i.containerId === item.containerId
+          i.name.toLowerCase() === trimmed.toLowerCase()
         );
         if (isDuplicate) {
-          throw { code: 'DUPLICATE_NAME', message: 'An item with this name already exists in this location.' } as unknown as ServiceError;
+          throw { code: 'DUPLICATE_NAME', message: 'An item with this name already exists.' } as unknown as ServiceError;
         }
       }
 

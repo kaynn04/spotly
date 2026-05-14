@@ -445,16 +445,25 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
 
       const parsed = VoiceMatcherService.resolve(parts, spaces, containers);
 
-      // Pre-populate confirmed IDs for exact matches
+      // Pre-populate confirmed IDs for exact matches, or single fuzzy matches
       if (parsed.space.status === 'exact') {
         setConfirmedSpaceId(parsed.space.record.id);
         if (!resolvedSpaceId) {
           const cs = await ContainerService.getContainersBySpaceId(parsed.space.record.id);
           setSpaceContainers(cs);
         }
+      } else if (parsed.space.status === 'fuzzy' && parsed.space.candidates.length === 1) {
+        // Auto-select if there's only one fuzzy match
+        const spaceId = parsed.space.candidates[0].id;
+        setConfirmedSpaceId(spaceId);
+        const cs = await ContainerService.getContainersBySpaceId(spaceId);
+        setSpaceContainers(cs);
       }
       if (parsed.container !== 'absent' && parsed.container.status === 'exact') {
         setConfirmedContainerId(parsed.container.record.id);
+      } else if (parsed.container !== 'absent' && parsed.container.status === 'fuzzy' && parsed.container.candidates.length === 1) {
+        // Auto-select if there's only one fuzzy match
+        setConfirmedContainerId(parsed.container.candidates[0].id);
       } else if (parsed.container === 'absent') {
         setConfirmedContainerId(null);
       }
@@ -490,8 +499,9 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
       setSessionState({ phase: 'success', action: 'return', itemName: returnItemName, location: returnBorrowerName });
       onItemAdded?.();
       setTimeout(() => { onClose(); setSessionState({ phase: 'idle' }); }, 1500);
-    } catch {
-      setSessionState({ phase: 'error', message: 'Failed to mark as returned — try again' });
+    } catch (err: any) {
+      const errorMessage = err?.message || 'Failed to mark as returned — try again';
+      setSessionState({ phase: 'error', message: errorMessage });
     }
   };
 
@@ -505,8 +515,9 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
       setSessionState({ phase: 'success', action: 'lend', itemName: item.name, location: borrower });
       onItemAdded?.();
       setTimeout(() => { onClose(); setSessionState({ phase: 'idle' }); }, 1500);
-    } catch {
-      setSessionState({ phase: 'error', message: 'Failed to lend item — try again' });
+    } catch (err: any) {
+      const errorMessage = err?.message || 'Failed to lend item — try again';
+      setSessionState({ phase: 'error', message: errorMessage });
     }
   };
 
@@ -522,8 +533,9 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
         onClose();
         setSessionState({ phase: 'idle' });
       }, 1500);
-    } catch {
-      setSessionState({ phase: 'error', message: 'Failed to create container — try again' });
+    } catch (err: any) {
+      const errorMessage = err?.message || 'Failed to create container — try again';
+      setSessionState({ phase: 'error', message: errorMessage });
     }
   };
 
@@ -537,8 +549,9 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
         onClose();
         setSessionState({ phase: 'idle' });
       }, 1500);
-    } catch {
-      setSessionState({ phase: 'error', message: 'Failed to create space — try again' });
+    } catch (err: any) {
+      const errorMessage = err?.message || 'Failed to create space — try again';
+      setSessionState({ phase: 'error', message: errorMessage });
     }
   };
 
@@ -597,14 +610,14 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
         onClose();
         setSessionState({ phase: 'idle' });
       }, 1500);
-    } catch {
-      const errorMsg = isMultiAdd
+    } catch (err: any) {
+      const errorMsg = err?.message || (isMultiAdd
         ? 'Failed to add items — try again'
         : sessionState.phase === 'confirming'
         ? (sessionState.parsed.action === 'move'
           ? 'Failed to move item — try again'
           : 'Failed to add item — try again')
-        : 'Operation failed — try again';
+        : 'Operation failed — try again');
       setSessionState({ phase: 'error', message: errorMsg });
     }
   };

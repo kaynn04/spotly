@@ -174,6 +174,42 @@ export class ContainerRepository {
   }
 
   /**
+   * Get all containers across all spaces
+   *
+   * @returns Array of Container objects from all spaces
+   * @throws ServiceError if database operation fails
+   *
+   * SQL: SELECT * FROM containers
+   */
+  static async getAllContainers(): Promise<Container[]> {
+    try {
+      const db = getDatabase();
+
+      const result = await db.getAllAsync('SELECT * FROM containers');
+
+      // Map database rows (snake_case) to Container objects (camelCase)
+      return (result as any[]).map((row: ContainerRow) => ({
+        id: row.id,
+        name: row.name,
+        spaceId: row.space_id,
+        createdAt: row.created_at,
+        photoUri: row.photo_uri ?? null,
+      }));
+    } catch (error) {
+      // Convert database error to ServiceError
+      const serviceError: ServiceError = {
+        code: 'DB_ERROR',
+        message: 'Failed to retrieve containers. Try again.',
+      };
+
+      // Log error for debugging
+      console.error('[ContainerRepository.getAllContainers] Database error:', error);
+
+      throw serviceError;
+    }
+  }
+
+  /**
    * Delete a container by id
    * Items inside the container will have container_id set to NULL (ON DELETE SET NULL)
    */

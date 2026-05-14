@@ -110,7 +110,7 @@ export default function HomePage() {
   }, []);
 
   // Walkthrough
-  const { tabBarRef } = useWalkthroughContext();
+  const { tabBarRef, measureScreenRef } = useWalkthroughContext();
   const dashboardRef = useRef<View>(null);
   const settingsRef = useRef<View>(null);
   const [walkthroughVisible, setWalkthroughVisible] = useState(false);
@@ -166,6 +166,10 @@ export default function HomePage() {
           }) ?? reject(new Error('no ref'));
         });
       }
+      // Try to measure screen refs registered via context
+      const screenRect = await measureScreenRef(step.targetRef);
+      if (screenRect) return screenRect;
+      
       if (tabBarRef.current) {
         return await tabBarRef.current.measureTab(step.targetRef);
       }
