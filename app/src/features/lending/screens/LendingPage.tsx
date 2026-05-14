@@ -175,6 +175,15 @@ export default function LendingPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openCreate]);
 
+  // Listen for event from + button to open lending form
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('synop:open-add-lending', () => {
+      openItemPicker();
+    });
+    return () => sub.remove();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const openItemPicker = async () => {
     setItemPickerLoading(true);
     setItemPickerSearch('');

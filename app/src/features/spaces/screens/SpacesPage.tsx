@@ -114,6 +114,15 @@ export default function SpacesPage() {
       setFormVisible(true);
     }
   }, [openCreate]);
+
+  // Listen for event from + button to open add-space form
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('synop:open-add-space', () => {
+      setFormVisible(true);
+    });
+    return () => sub.remove();
+  }, []);
+
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<SectionedSearchItem[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
