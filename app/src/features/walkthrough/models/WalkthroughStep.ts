@@ -54,14 +54,14 @@ export const WALKTHROUGH_STEPS: WalkthroughStep[] = [
     id: 'voice-input',
     index: 6,
     description: 'Voice input — use speech to add items, find things, lend, and more.',
-    targetRef: 'tab-mic',
+    targetRef: 'voice-input-header',
     spotlightPadding: 10,
   },
   {
     id: 'appearance-toggle',
     index: 7,
     description: 'Appearance — switch between light and dark mode.',
-    targetRef: 'appearance-toggle',
+    targetRef: 'appearance-toggle-header',
     spotlightPadding: 8,
   },
   {
