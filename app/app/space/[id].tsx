@@ -73,7 +73,9 @@ type ListEntry =
 
 export default function SpaceDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, openAddContainer, openAddItem } = useLocalSearchParams<{ id: string; openAddContainer?: string; openAddItem?: string }>();
+  const openAddContainerOnce = useRef(openAddContainer === '1');
+  const openAddItemOnce = useRef(openAddItem === '1');
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
@@ -144,6 +146,19 @@ export default function SpaceDetailScreen() {
   }, []);
 
   useEffect(() => { loadAll(); }, [id]);
+
+  // Auto-open modal when navigated here via the + button
+  useEffect(() => {
+    if (!loading) {
+      if (openAddContainerOnce.current) {
+        openAddContainerOnce.current = false;
+        setShowAddContainerModal(true);
+      } else if (openAddItemOnce.current) {
+        openAddItemOnce.current = false;
+        setShowAddItemModal(true);
+      }
+    }
+  }, [loading]);
 
   useFocusEffect(
     useCallback(() => {
