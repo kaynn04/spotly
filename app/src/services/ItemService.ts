@@ -51,17 +51,8 @@ export class ItemService {
         throw error;
       }
 
-      // Check for duplicate name globally (across all items)
-      const allItems = await ItemRepository.getAll();
-      const isDuplicate = allItems.some(i => 
-        i.name.toLowerCase() === trimmedName.toLowerCase()
-      );
-
-      if (isDuplicate) {
-        throw { code: 'DUPLICATE_NAME', message: 'An item with this name already exists.' } as unknown as ServiceError;
-      }
-
       // Create item in database via repository
+      // Database enforces global UNIQUE constraint on item names
       const item = await ItemRepository.createItem(trimmedName, spaceId, containerId, description, quantity, photoUri);
 
       return item;
@@ -254,19 +245,7 @@ export class ItemService {
         throw error;
       }
 
-      // Check for duplicate name on update (globally)
-      const item = await ItemRepository.getItemById(itemId);
-      if (item) {
-        const allItems = await ItemRepository.getAll();
-        const isDuplicate = allItems.some(i => 
-          i.id !== itemId &&
-          i.name.toLowerCase() === trimmed.toLowerCase()
-        );
-        if (isDuplicate) {
-          throw { code: 'DUPLICATE_NAME', message: 'An item with this name already exists.' } as unknown as ServiceError;
-        }
-      }
-
+      // Database enforces global UNIQUE constraint on item names
       updates.name = trimmed;
     }
     return ItemRepository.updateItem(itemId, updates);
