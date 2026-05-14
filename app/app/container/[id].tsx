@@ -64,7 +64,8 @@ const GRID_COLUMNS = 2;
 
 export default function ContainerDetailScreen() {
   const router = useRouter();
-  const { id: containerId } = useLocalSearchParams<{ id: string }>();
+  const { id: containerId, openAddItem } = useLocalSearchParams<{ id: string; openAddItem?: string }>();
+  const openAddItemOnce = useRef(openAddItem === '1');
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
@@ -128,6 +129,14 @@ export default function ContainerDetailScreen() {
   const subtleText = isDark ? '#8e8e93' : '#a0aec0';
 
   useEffect(() => { loadContainer(); }, [containerId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-open add item modal when navigated here via the + button
+  useEffect(() => {
+    if (!loading && openAddItemOnce.current) {
+      openAddItemOnce.current = false;
+      setShowAddItemModal(true);
+    }
+  }, [loading]);
 
   useFocusEffect(
     useCallback(() => {

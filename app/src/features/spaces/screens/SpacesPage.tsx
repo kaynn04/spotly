@@ -742,17 +742,6 @@ export default function SpacesPage() {
         }
       />
 
-      {/* FAB -- hidden in select mode */}
-      {spaces.length > 0 && !selectMode && (
-        <TouchableOpacity
-          style={[styles.fab, { backgroundColor: PRIMARY, bottom: insets.bottom + 84 }]}
-          onPress={() => setFormVisible(true)}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.fabText}>+</Text>
-        </TouchableOpacity>
-      )}
-
       <SpaceFormModal
         visible={formVisible}
         onClose={() => setFormVisible(false)}
@@ -937,8 +926,8 @@ const styles = StyleSheet.create({
   clearBtn: { padding: 4 },
   clearBtnText: { fontSize: 16 },
   resultHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5, marginBottom: 6 },
-  sectionLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
+  sectionLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0 },
   longPressHint: { fontSize: 11, fontStyle: 'italic' },
   sectionHeader: { fontSize: 12, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', paddingTop: 12, paddingBottom: 6 },
 
