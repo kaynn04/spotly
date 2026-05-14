@@ -93,6 +93,16 @@ export default function SpacesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [editingSpace, setEditingSpace] = useState<SpaceWithCount | null>(null);
+  const formVisibleRef = useRef(false);
+
+  const openCreateSpaceForm = useCallback(() => {
+    setEditingSpace(null);
+    setFormVisible((current) => {
+      if (current || formVisibleRef.current) return current;
+      formVisibleRef.current = true;
+      return true;
+    });
+  }, []);
 
   // Load persisted preferences
   useEffect(() => {
@@ -110,10 +120,10 @@ export default function SpacesPage() {
   // Listen for event from + button to open add-space form
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('synop:open-add-space', () => {
-      setFormVisible(true);
+      openCreateSpaceForm();
     });
     return () => sub.remove();
-  }, []);
+  }, [openCreateSpaceForm]);
 
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<SectionedSearchItem[]>([]);
@@ -569,7 +579,7 @@ export default function SpacesPage() {
               <View style={styles.headerActions}>
                 <TouchableOpacity
                   style={[styles.addSpaceBtn, { backgroundColor: PRIMARY }]}
-                  onPress={() => setFormVisible(true)}
+                  onPress={openCreateSpaceForm}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   <Text style={styles.addSpaceBtnText}>+ Add Space</Text>
@@ -734,7 +744,7 @@ export default function SpacesPage() {
               </Text>
               <TouchableOpacity
                 style={[styles.primaryButton, { backgroundColor: PRIMARY }]}
-                onPress={() => setFormVisible(true)}
+                onPress={openCreateSpaceForm}
               >
                 <Text style={styles.primaryButtonText}>+ Create Space</Text>
               </TouchableOpacity>
@@ -746,6 +756,7 @@ export default function SpacesPage() {
       <SpaceFormModal
         visible={formVisible}
         onClose={() => {
+          formVisibleRef.current = false;
           setFormVisible(false);
         }}
         onSubmit={handleCreateSpace}
