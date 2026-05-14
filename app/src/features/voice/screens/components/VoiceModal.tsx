@@ -455,6 +455,9 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
       }
       if (parsed.container !== 'absent' && parsed.container.status === 'exact') {
         setConfirmedContainerId(parsed.container.record.id);
+      } else if (parsed.container !== 'absent' && parsed.container.status === 'fuzzy' && parsed.container.candidates.length === 1) {
+        // Auto-select if there's only one fuzzy match
+        setConfirmedContainerId(parsed.container.candidates[0].id);
       } else if (parsed.container === 'absent') {
         setConfirmedContainerId(null);
       }
