@@ -725,8 +725,10 @@ export default function ContainerDetailScreen() {
 
       {/* Move Bottom Sheet */}
       <Modal visible={showMoveModal} transparent animationType="slide" onRequestClose={() => setShowMoveModal(false)}>
-        <View style={styles.sheetOverlay}>
-          <View style={[styles.moveSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+        <TouchableWithoutFeedback onPress={() => setShowMoveModal(false)}>
+          <View style={styles.sheetOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.moveSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
             <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
             <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move {selectedMoveItemIds.size} Item{selectedMoveItemIds.size !== 1 ? 's' : ''}</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -781,40 +783,46 @@ export default function ContainerDetailScreen() {
                 </>
               )}
             </ScrollView>
-            <TouchableOpacity style={[styles.moveCancelBtn, { borderColor }]} onPress={() => setShowMoveModal(false)}>
-              <Text style={[styles.moveCancelText, { color: subtleText }]}>Cancel</Text>
-            </TouchableOpacity>
+                <TouchableOpacity style={[styles.moveCancelBtn, { borderColor }]} onPress={() => setShowMoveModal(false)}>
+                  <Text style={[styles.moveCancelText, { color: subtleText }]}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Move Container Modal */}
       <Modal visible={showMoveContainerModal} transparent animationType="slide" onRequestClose={() => setShowMoveContainerModal(false)}>
-        <View style={styles.sheetOverlay}>
-          <View style={[styles.moveSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
-            <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
-            <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move Container to</Text>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {allSpaces.filter((s) => s.id !== space?.id).length === 0 ? (
-                <Text style={[styles.moveOptionText, { color: subtleText, paddingVertical: 12 }]}>No other spaces available.</Text>
-              ) : (
-                allSpaces.filter((s) => s.id !== space?.id).map((s) => (
-                  <TouchableOpacity
-                    key={s.id}
-                    style={[styles.moveOption, { borderColor }]}
-                    onPress={() => handleMoveContainerToSpace(s.id)}
-                  >
-                    <FontAwesomeIcon icon={faMapPin} size={16} color={PRIMARY} />
-                    <Text style={[styles.moveOptionText, { color: colors.text }]}>{s.name}</Text>
-                  </TouchableOpacity>
-                ))
-              )}
-            </ScrollView>
-            <TouchableOpacity style={[styles.moveCancelBtn, { borderColor }]} onPress={() => setShowMoveContainerModal(false)}>
-              <Text style={[styles.moveCancelText, { color: subtleText }]}>Cancel</Text>
-            </TouchableOpacity>
+        <TouchableWithoutFeedback onPress={() => setShowMoveContainerModal(false)}>
+          <View style={styles.sheetOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.moveSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+                <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+                <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move Container to</Text>
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  {allSpaces.filter((s) => s.id !== space?.id).length === 0 ? (
+                    <Text style={[styles.moveOptionText, { color: subtleText, paddingVertical: 12 }]}>No other spaces available.</Text>
+                  ) : (
+                    allSpaces.filter((s) => s.id !== space?.id).map((s) => (
+                      <TouchableOpacity
+                        key={s.id}
+                        style={[styles.moveOption, { borderColor }]}
+                        onPress={() => handleMoveContainerToSpace(s.id)}
+                      >
+                        <FontAwesomeIcon icon={faMapPin} size={16} color={PRIMARY} />
+                        <Text style={[styles.moveOptionText, { color: colors.text }]}>{s.name}</Text>
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </ScrollView>
+                <TouchableOpacity style={[styles.moveCancelBtn, { borderColor }]} onPress={() => setShowMoveContainerModal(false)}>
+                  <Text style={[styles.moveCancelText, { color: subtleText }]}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       <ItemFormModal

@@ -634,8 +634,10 @@ export default function ItemDetailScreen() {
 
       {/* Move Modal */}
       <Modal visible={showMoveModal} transparent animationType="slide" onRequestClose={() => setShowMoveModal(false)}>
-        <View style={styles.sheetOverlay}>
-          <View style={[styles.moveSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+        <TouchableWithoutFeedback onPress={() => setShowMoveModal(false)}>
+          <View style={styles.sheetOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.moveSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
             <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
             <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move Item</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -695,11 +697,13 @@ export default function ItemDetailScreen() {
                 );
               })}
             </ScrollView>
-            <TouchableOpacity style={[styles.moveCancelBtn, { borderColor }]} onPress={() => setShowMoveModal(false)}>
-              <Text style={[styles.moveCancelText, { color: subtleText }]}>Cancel</Text>
-            </TouchableOpacity>
+                <TouchableOpacity style={[styles.moveCancelBtn, { borderColor }]} onPress={() => setShowMoveModal(false)}>
+                  <Text style={[styles.moveCancelText, { color: subtleText }]}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       <PhotoPickerSheet
