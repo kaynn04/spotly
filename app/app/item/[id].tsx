@@ -39,6 +39,7 @@ import { OutsideService } from '@/src/features/outside/services/OutsideService';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faBox, faHandshake, faCheck, faTrash, faMapPin, faFolder, faEllipsisVertical, faChevronLeft, faShield } from '@fortawesome/free-solid-svg-icons';
 import DatePickerSheet from '@/src/features/lending/screens/components/DatePickerSheet';
+import { parseDateOnly, startOfLocalDay } from '@/src/utils/dateOnly';
 
 const PRIMARY = '#6b7f99';
 const LENDING = '#9b72cb';
@@ -283,7 +284,7 @@ export default function ItemDetailScreen() {
 
   function openWarrantyPicker() {
     setWarrantyPickerDate(
-      item?.warrantyExpiry ? new Date(item.warrantyExpiry + 'T00:00:00') : new Date()
+      item?.warrantyExpiry ? parseDateOnly(item.warrantyExpiry) : new Date()
     );
     setShowWarrantyPicker(true);
   }
@@ -326,10 +327,8 @@ export default function ItemDetailScreen() {
   }
 
   function getWarrantyStatus(expiryStr: string): { label: string; color: string } {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const expiry = new Date(expiryStr);
-    expiry.setHours(0, 0, 0, 0);
+    const today = startOfLocalDay(new Date());
+    const expiry = parseDateOnly(expiryStr);
     const days = Math.ceil((expiry.getTime() - today.getTime()) / 86400000);
     if (days < 0) return { label: 'Expired', color: '#e53e3e' };
     if (days <= 30) return { label: 'Expiring Soon', color: WARRANTY };
@@ -552,7 +551,7 @@ export default function ItemDetailScreen() {
           ) : item.warrantyExpiry ? (
             <View style={styles.warrantyRow}>
               <Text style={[styles.fieldValue, { color: colors.text, flex: 1 }]}>
-                {new Date(item.warrantyExpiry + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                {parseDateOnly(item.warrantyExpiry).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
               </Text>
               <TouchableOpacity onPress={openWarrantyPicker} style={styles.warrantyEditBtn}>
                 <Text style={[styles.warrantyEditText, { color: WARRANTY }]}>Edit</Text>

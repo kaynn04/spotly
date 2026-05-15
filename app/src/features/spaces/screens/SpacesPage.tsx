@@ -117,13 +117,17 @@ export default function SpacesPage() {
     }).catch(() => {});
   }, []);
 
-  // Listen for event from + button to open add-space form
-  useEffect(() => {
-    const sub = DeviceEventEmitter.addListener('synop:open-add-space', () => {
-      openCreateSpaceForm();
-    });
-    return () => sub.remove();
-  }, [openCreateSpaceForm]);
+  // Listen only while this Spaces screen is focused. Restarting the walkthrough can
+  // leave an older tabs tree mounted underneath; this prevents background listeners
+  // from opening duplicate add-space sheets.
+  useFocusEffect(
+    useCallback(() => {
+      const sub = DeviceEventEmitter.addListener('synop:open-add-space', () => {
+        openCreateSpaceForm();
+      });
+      return () => sub.remove();
+    }, [openCreateSpaceForm])
+  );
 
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<SectionedSearchItem[]>([]);

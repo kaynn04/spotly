@@ -4,7 +4,7 @@
  * Bottom sheet -- create a new container inside a space
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -30,9 +30,19 @@ interface ContainerFormModalProps {
   visible: boolean;
   onClose: () => void;
   onSubmit: (name: string, photoUri?: string | null) => Promise<void>;
+  editMode?: boolean;
+  initialName?: string;
+  initialPhotoUri?: string | null;
 }
 
-export default function ContainerFormModal({ visible, onClose, onSubmit }: ContainerFormModalProps) {
+export default function ContainerFormModal({
+  visible,
+  onClose,
+  onSubmit,
+  editMode,
+  initialName,
+  initialPhotoUri,
+}: ContainerFormModalProps) {
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const isDark = colorScheme === 'dark';
@@ -42,6 +52,13 @@ export default function ContainerFormModal({ visible, onClose, onSubmit }: Conta
   const [error, setError] = useState<string | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [showPhotoPicker, setShowPhotoPicker] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    setName(editMode ? (initialName ?? '') : '');
+    setPhotoUri(editMode ? (initialPhotoUri ?? null) : null);
+    setError(null);
+  }, [visible, editMode, initialName, initialPhotoUri]);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const inputBg = isDark ? '#2c2c2e' : '#f8f9fa';
@@ -65,8 +82,10 @@ export default function ContainerFormModal({ visible, onClose, onSubmit }: Conta
     setError(null);
     try {
       await onSubmit(name.trim(), photoUri);
-      setName('');
-      setPhotoUri(null);
+      if (!editMode) {
+        setName('');
+        setPhotoUri(null);
+      }
       onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to create container');
@@ -90,7 +109,7 @@ export default function ContainerFormModal({ visible, onClose, onSubmit }: Conta
                 <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
                 {/* Title */}
-                <Text style={[styles.sheetTitle, { color: textColor }]}>New Container</Text>
+                <Text style={[styles.sheetTitle, { color: textColor }]}>{editMode ? 'Edit Container' : 'New Container'}</Text>
 
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
@@ -99,7 +118,7 @@ export default function ContainerFormModal({ visible, onClose, onSubmit }: Conta
                   style={styles.scrollContent}
                 >
                   <Text style={[styles.sheetSubtitle, { color: subtleText }]}>
-                    Group related items together
+                    {editMode ? 'Update container details' : 'Group related items together'}
                   </Text>
 
                   {/* Input */}
@@ -168,7 +187,7 @@ export default function ContainerFormModal({ visible, onClose, onSubmit }: Conta
                     {loading ? (
                       <ActivityIndicator color="#fff" size="small" />
                     ) : (
-                      <Text style={[styles.createBtnText, { color: isValid ? '#fff' : subtleText }]}>Create</Text>
+                      <Text style={[styles.createBtnText, { color: isValid ? '#fff' : subtleText }]}>{editMode ? 'Save' : 'Create'}</Text>
                     )}
                   </TouchableOpacity>
                 </View>
