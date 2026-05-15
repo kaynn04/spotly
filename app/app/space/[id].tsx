@@ -106,6 +106,7 @@ export default function SpaceDetailScreen() {
   const [actionSheetContainer, setActionSheetContainer] = useState<Container | null>(null);
   const [showMoveContainerModal, setShowMoveContainerModal] = useState(false);
   const [selectedMoveContainer, setSelectedMoveContainer] = useState<Container | null>(null);
+  const [selectedMoveContainerIds, setSelectedMoveContainerIds] = useState<Set<string>>(new Set());
   const [searchText, setSearchText] = useState('');
   const [showMenu, setShowMenu] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
@@ -122,6 +123,7 @@ export default function SpaceDetailScreen() {
   const selectModeRef = useRef(false);
   selectModeRef.current = selectMode;
   const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [editingContainer, setEditingContainer] = useState<Container | null>(null);
 
   const lendingService = useMemo(
     () => new LendingService(new LendingRepository(), new ItemRepository()),
@@ -263,16 +265,46 @@ export default function SpaceDetailScreen() {
     ]);
   }
 
+  function closeMoveContainerModal() {
+    setShowMoveContainerModal(false);
+    setSelectedMoveContainer(null);
+    setSelectedMoveContainerIds(new Set());
+  }
+
+  function getBlockedContainerItems(containerIds: string[]) {
+    return items.filter((item) =>
+      item.containerId &&
+      containerIds.includes(item.containerId) &&
+      (activeOutsideItemIds.has(item.id) || !!activeLendingMap[item.id])
+    );
+  }
+
   async function handleMoveContainerToSpace(targetSpaceId: string) {
-    if (!selectedMoveContainer) return;
+    const containerIds = selectedMoveContainer
+      ? [selectedMoveContainer.id]
+      : [...selectedMoveContainerIds];
+
+    if (containerIds.length === 0) return;
+
+    const blockedItems = getBlockedContainerItems(containerIds);
+    if (blockedItems.length > 0) {
+      const blockedNames = blockedItems.map((item) => item.name).join(', ');
+      Alert.alert(
+        'Items are Blocked',
+        `Cannot move container${containerIds.length !== 1 ? 's' : ''}: ${blockedNames} ${blockedItems.length === 1 ? 'is' : 'are'} lent or in an outside session. Complete these tasks first.`
+      );
+      return;
+    }
+
     try {
-      await ContainerService.moveContainer(selectedMoveContainer.id, targetSpaceId);
-      setShowMoveContainerModal(false);
-      setSelectedMoveContainer(null);
+      await Promise.all(containerIds.map((containerId) =>
+        ContainerService.moveContainer(containerId, targetSpaceId)
+      ));
+      closeMoveContainerModal();
       await loadContainers();
       await loadItems();
     } catch {
-      Alert.alert('Error', 'Failed to move container');
+      Alert.alert('Error', `Failed to move container${containerIds.length !== 1 ? 's' : ''}`);
     }
   }
 
@@ -441,25 +473,37 @@ export default function SpaceDetailScreen() {
     }
     const c = containers.find((cc) => cc.id === entryId);
     if (c) {
-      Alert.prompt('Rename Container', '', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Save', onPress: async (newName: string | undefined) => {
-          if (newName && newName.trim()) {
-            try {
-              await ContainerService.updateContainer(c.id, { name: newName.trim() });
-              exitSelectMode();
-              await loadContainers();
-            } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to rename container');
-            }
-          }
-        }},
-      ], 'plain-text', c.name);
+      setEditingContainer(c);
     }
   };
 
   const handleBulkMove = () => {
     const selItemIds = [...selectedIds].filter((sid) => items.some((i) => i.id === sid));
+    const selContainerIds = [...selectedIds].filter((sid) => containers.some((c) => c.id === sid));
+
+    if (selItemIds.length > 0 && selContainerIds.length > 0) {
+      Alert.alert('Mixed Selection', 'Move items and containers separately so each destination is clear.');
+      return;
+    }
+
+    if (selContainerIds.length > 0) {
+      const blockedItems = getBlockedContainerItems(selContainerIds);
+      if (blockedItems.length > 0) {
+        const blockedNames = blockedItems.map((item) => item.name).join(', ');
+        Alert.alert(
+          'Items are Blocked',
+          `Cannot move container${selContainerIds.length !== 1 ? 's' : ''}: ${blockedNames} ${blockedItems.length === 1 ? 'is' : 'are'} lent or in an outside session. Complete these tasks first.`
+        );
+        return;
+      }
+
+      exitSelectMode();
+      setSelectedMoveContainer(null);
+      setSelectedMoveContainerIds(new Set(selContainerIds));
+      setShowMoveContainerModal(true);
+      return;
+    }
+
     if (selItemIds.length === 0) return;
 
     // Check if any selected items are lent or outside
@@ -519,6 +563,24 @@ export default function SpaceDetailScreen() {
     setEditingItem(null);
     exitSelectMode();
     await loadItems();
+  };
+
+  const handleEditContainerSubmit = async (name: string, photoUri?: string | null) => {
+    if (!editingContainer) return;
+
+    await ContainerService.updateContainer(editingContainer.id, { name });
+
+    if (photoUri && photoUri !== editingContainer.photoUri) {
+      const savedUri = await PhotoService.savePhoto(photoUri, `container_${editingContainer.id}`);
+      await ContainerRepository.updatePhotoUri(editingContainer.id, savedUri);
+    } else if (!photoUri && editingContainer.photoUri) {
+      await PhotoService.deletePhoto(editingContainer.photoUri);
+      await ContainerRepository.updatePhotoUri(editingContainer.id, null);
+    }
+
+    setEditingContainer(null);
+    exitSelectMode();
+    await loadContainers();
   };
 
   async function handleAddItem(name: string, description?: string, quantity?: number, photoUri?: string | null, warrantyExpiry?: Date | null) {
@@ -1094,7 +1156,7 @@ export default function SpaceDetailScreen() {
               icon: faBox,
               label: 'Move',
               description: 'Move container to another space',
-              onPress: () => { setSelectedMoveContainer(c); setShowMoveContainerModal(true); },
+              onPress: () => { setSelectedMoveContainer(c); setSelectedMoveContainerIds(new Set()); setShowMoveContainerModal(true); },
             },
             {
               icon: faTrash,
@@ -1107,13 +1169,17 @@ export default function SpaceDetailScreen() {
         })()}
       />
       {/* Move Container Modal */}
-      <Modal visible={showMoveContainerModal} transparent animationType="slide" onRequestClose={() => setShowMoveContainerModal(false)}>
+      <Modal visible={showMoveContainerModal} transparent animationType="slide" onRequestClose={closeMoveContainerModal}>
         <View style={styles.sheetOverlay}>
           <View style={[styles.moveSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
             <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
-            <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move Container</Text>
+            <Text style={[styles.moveSheetTitle, { color: colors.text }]}>
+              Move {selectedMoveContainerIds.size > 1 ? `${selectedMoveContainerIds.size} Containers` : 'Container'}
+            </Text>
             <Text style={[styles.moveSheetSubtitle, { color: subtleText }]}>
-              Move &quot;{selectedMoveContainer?.name}&quot; to another space
+              {selectedMoveContainer
+                ? `Move "${selectedMoveContainer.name}" to another space`
+                : 'Move selected containers to another space'}
             </Text>
             <ScrollView showsVerticalScrollIndicator={false}>
               {allSpaces.filter((s) => s.id !== id).map((s) => (
@@ -1126,7 +1192,7 @@ export default function SpaceDetailScreen() {
                 <Text style={[styles.moveEmptyText, { color: subtleText }]}>No other spaces available</Text>
               )}
             </ScrollView>
-            <TouchableOpacity style={[styles.moveCancelBtn, { borderColor }]} onPress={() => setShowMoveContainerModal(false)}>
+            <TouchableOpacity style={[styles.moveCancelBtn, { borderColor }]} onPress={closeMoveContainerModal}>
               <Text style={[styles.moveCancelText, { color: subtleText }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -1204,14 +1270,18 @@ export default function SpaceDetailScreen() {
         const onlyOneItem = selItemIds.length === 1 && selContainerIds.length === 0;
     const canEdit = selectedIds.size === 1; // Can edit either one item or one container
         // Can move multiple items if none are lent or outside
-        let canMove = selItemIds.length > 0 && selContainerIds.length === 0;
-        if (canMove) {
+        const hasOnlyItems = selItemIds.length > 0 && selContainerIds.length === 0;
+        const hasOnlyContainers = selContainerIds.length > 0 && selItemIds.length === 0;
+        let canMove = hasOnlyItems || hasOnlyContainers;
+        if (hasOnlyItems) {
           for (const itemId of selItemIds) {
             if (activeOutsideItemIds.has(itemId) || activeLendingMap[itemId]) {
               canMove = false;
               break;
             }
           }
+        } else if (hasOnlyContainers) {
+          canMove = getBlockedContainerItems(selContainerIds).length === 0;
         }
         const canDelete = selectedIds.size > 0;
 
@@ -1293,6 +1363,14 @@ export default function SpaceDetailScreen() {
         initialDescription={editingItem?.description ?? undefined}
         initialQuantity={editingItem?.quantity}
         initialPhotoUri={editingItem?.photoUri}
+      />
+      <ContainerFormModal
+        visible={editingContainer !== null}
+        onClose={() => setEditingContainer(null)}
+        onSubmit={handleEditContainerSubmit}
+        editMode
+        initialName={editingContainer?.name}
+        initialPhotoUri={editingContainer?.photoUri}
       />
     </View>
   );

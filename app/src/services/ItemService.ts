@@ -11,6 +11,7 @@ import type { Item, ServiceError } from '../models/Item';
 import { ItemRepository } from '../repositories/ItemRepository';
 import { PhotoService } from './PhotoService';
 import { WarrantyReminderService } from './WarrantyReminderService';
+import { formatDateOnly } from '../utils/dateOnly';
 
 /**
  * ItemService handles all item-related business logic
@@ -284,8 +285,8 @@ export class ItemService {
       throw error;
     }
 
-    // Persist the expiry date (ISO date string "YYYY-MM-DD")
-    const isoDate = expiryDate.toISOString().split('T')[0];
+    // Persist as a local date-only string so timezones cannot shift the selected day.
+    const isoDate = formatDateOnly(expiryDate);
     await ItemRepository.updateWarranty(itemId, isoDate);
 
     // Schedule notifications (cancel existing first if rescheduling)

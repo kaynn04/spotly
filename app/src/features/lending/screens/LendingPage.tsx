@@ -175,25 +175,28 @@ export default function LendingPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openCreate]);
 
-  // Listen for event from + button to open lending form
-  useEffect(() => {
-    const sub = DeviceEventEmitter.addListener('synop:open-add-lending', () => {
-      openItemPicker();
-    });
-    return () => sub.remove();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Listen for event from the floating + button only while Lending is focused.
+  useFocusEffect(
+    useCallback(() => {
+      const sub = DeviceEventEmitter.addListener('synop:open-add-lending', () => {
+        openItemPicker();
+      });
+      return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+  );
 
   const openItemPicker = async () => {
     setItemPickerLoading(true);
     setItemPickerSearch('');
     setShowItemPicker(true);
     try {
-      const [items, activeSessionItemIds] = await Promise.all([
+      const [items, activeSessionItemIds, activeLendings] = await Promise.all([
         repositories.itemRepository.getAll(),
         repositories.outsideSessionItemRepository.getActiveSessionItemIds(),
+        lendingService.getActiveLendings(),
       ]);
-      const activeLentIds = new Set(lendings.map((l) => l.item_id));
+      const activeLentIds = new Set(activeLendings.map((l) => l.item_id));
       const activeOutsideIds = new Set(activeSessionItemIds);
       setAllItems(items.filter((i) => !activeLentIds.has(i.id) && !activeOutsideIds.has(i.id)));
     } catch {

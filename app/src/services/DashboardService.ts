@@ -11,6 +11,7 @@
 import { ItemRepository } from '../repositories/ItemRepository';
 import { SpaceRepository } from '../repositories/SpaceRepository';
 import { ContainerRepository } from '../repositories/ContainerRepository';
+import { parseDateOnly, startOfLocalDay } from '../utils/dateOnly';
 
 /**
  * Dashboard Item - Display model for recent items
@@ -160,16 +161,14 @@ export class DashboardService {
   static async getExpiringWarranties(limit: number = 5): Promise<DashboardWarrantyItem[]> {
     try {
       const items = await ItemRepository.getItemsWithWarrantyExpiry();
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const today = startOfLocalDay(new Date());
 
       const expiringItems: DashboardWarrantyItem[] = [];
 
       for (const item of items) {
         if (!item.warrantyExpiry) continue;
 
-        const expiry = new Date(item.warrantyExpiry);
-        expiry.setHours(0, 0, 0, 0);
+        const expiry = parseDateOnly(item.warrantyExpiry);
 
         const diffMs = expiry.getTime() - today.getTime();
         const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));

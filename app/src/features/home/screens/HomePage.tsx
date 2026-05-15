@@ -453,7 +453,7 @@ export default function HomePage() {
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <Text style={[styles.sectionTitle, { color: colors.text }]}>Warranties Expiring Soon</Text>
-                  <TouchableOpacity onPress={() => router.push('/(tabs)/spaces' as any)}>
+                  <TouchableOpacity onPress={() => router.push('/tools/warranty-tracker' as any)}>
                     <Text style={[styles.seeAll, { color: PRIMARY }]}>See all</Text>
                   </TouchableOpacity>
                 </View>
@@ -500,7 +500,7 @@ export default function HomePage() {
                   {data!.expiringWarranties.length > 3 && (
                     <TouchableOpacity
                       style={styles.viewAllRow}
-                      onPress={() => router.push('/(tabs)/spaces' as any)}
+                      onPress={() => router.push('/tools/warranty-tracker' as any)}
                     >
                       <Text style={[styles.viewAllText, { color: PRIMARY }]}>
                         +{data!.expiringWarranties.length - 3} more

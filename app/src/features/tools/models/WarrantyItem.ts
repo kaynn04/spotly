@@ -6,6 +6,7 @@
  */
 
 import type { Item } from '@/src/models/Item';
+import { parseDateOnly, startOfLocalDay } from '@/src/utils/dateOnly';
 
 export type WarrantyStatus = 'expiring-soon' | 'active' | 'expired';
 
@@ -19,10 +20,8 @@ export interface WarrantyItem extends Item {
  * Classify a warranty expiry date string into a status.
  */
 export function classifyWarranty(expiryDateStr: string): WarrantyStatus {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const expiry = new Date(expiryDateStr + 'T00:00:00');
-  expiry.setHours(0, 0, 0, 0);
+  const today = startOfLocalDay(new Date());
+  const expiry = parseDateOnly(expiryDateStr);
   const days = Math.ceil((expiry.getTime() - today.getTime()) / 86400000);
   if (days < 0) return 'expired';
   if (days <= 30) return 'expiring-soon';
@@ -34,10 +33,8 @@ export function classifyWarranty(expiryDateStr: string): WarrantyStatus {
  * Negative = already expired.
  */
 export function daysUntilExpiry(expiryDateStr: string): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const expiry = new Date(expiryDateStr + 'T00:00:00');
-  expiry.setHours(0, 0, 0, 0);
+  const today = startOfLocalDay(new Date());
+  const expiry = parseDateOnly(expiryDateStr);
   return Math.ceil((expiry.getTime() - today.getTime()) / 86400000);
 }
 
