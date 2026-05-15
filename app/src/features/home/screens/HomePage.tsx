@@ -82,6 +82,8 @@ interface DashboardData {
   isEmpty: boolean;
 }
 
+type DashboardSegment = 'today' | 'activity' | 'alerts';
+
 export default function HomePage() {
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -118,6 +120,7 @@ export default function HomePage() {
   const [walkthroughVisible, setWalkthroughVisible] = useState(false);
   const [walkthroughIndex, setWalkthroughIndex] = useState(0);
   const [spotlightRect, setSpotlightRect] = useState<SpotlightRect | null>(null);
+  const [dashboardSegment, setDashboardSegment] = useState<DashboardSegment>('today');
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
@@ -255,6 +258,14 @@ export default function HomePage() {
       ? Math.round((data.activeSession.checkedCount / data.activeSession.itemCount) * 100)
       : 0;
 
+  const firstWarranty = data?.expiringWarranties?.[0];
+  const firstLending = data?.activeLendings?.[0];
+  const showLendGuidance = !!data && !data.isEmpty && data.stats.totalItems > 0 && (data.activeLendings?.length ?? 0) === 0 && !dismissedGuidanceCards.has('lend');
+  const showOutsideGuidance = !!data && !data.isEmpty && data.stats.totalItems > 0 && !data.activeSession && !dismissedGuidanceCards.has('outside');
+  const hasTodayContent = !!data?.activeSession || (data?.activeLendings?.length ?? 0) > 0 || showLendGuidance || showOutsideGuidance;
+  const hasActivityContent = (data?.recentItems?.length ?? 0) > 0 || (data?.recentlyMoved?.length ?? 0) > 0 || (!!data && !data.isEmpty && data.stats.totalItems === 0);
+  const hasAlertContent = (data?.expiringWarranties?.length ?? 0) > 0;
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top']}>
       <ScrollView
@@ -345,8 +356,77 @@ export default function HomePage() {
               </TouchableOpacity>
             </View>
 
+            {!data?.isEmpty && (
+              <>
+                <TouchableOpacity
+                  style={[styles.priorityCard, { backgroundColor: cardBg, borderColor }]}
+                  onPress={() => {
+                    if (data?.activeSession) router.push(`/outside/${data.activeSession.id}` as any);
+                    else if (firstWarranty) router.push('/tools/warranty-tracker' as any);
+                    else if (firstLending) router.push('/(tabs)/lending' as any);
+                    else router.push('/(tabs)/spaces' as any);
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <View style={[styles.priorityIcon, { backgroundColor: `${PRIMARY}18` }]}>
+                    <FontAwesomeIcon
+                      icon={data?.activeSession ? faSuitcase : firstWarranty ? faShieldAlt : firstLending ? faHandshake : faBox}
+                      size={20}
+                      color={PRIMARY}
+                    />
+                  </View>
+                  <View style={styles.priorityContent}>
+                    <Text style={[styles.priorityEyebrow, { color: subtleText }]}>
+                      {data?.activeSession ? 'Current Focus' : firstWarranty ? 'Upcoming Alert' : firstLending ? 'Active Lending' : 'Next Step'}
+                    </Text>
+                    <Text style={[styles.priorityTitle, { color: colors.text }]} numberOfLines={1}>
+                      {data?.activeSession
+                        ? data.activeSession.title
+                        : firstWarranty
+                        ? `${firstWarranty.name} warranty`
+                        : firstLending
+                        ? firstLending.item_name
+                        : data?.stats.totalItems === 0
+                        ? 'Add your first item'
+                        : 'Inventory is up to date'}
+                    </Text>
+                    <Text style={[styles.prioritySubtitle, { color: subtleText }]} numberOfLines={2}>
+                      {data?.activeSession
+                        ? `${data.activeSession.checkedCount}/${data.activeSession.itemCount} items checked`
+                        : firstWarranty
+                        ? firstWarranty.daysRemaining === 0 ? 'Expires today' : `Expires in ${firstWarranty.daysRemaining} day${firstWarranty.daysRemaining !== 1 ? 's' : ''}`
+                        : firstLending
+                        ? `Lent to ${firstLending.borrower_name}`
+                        : data?.stats.totalItems === 0
+                        ? 'Start tracking belongings inside your spaces'
+                        : 'No urgent actions right now'}
+                    </Text>
+                  </View>
+                  <FontAwesomeIcon icon={faChevronRight} size={13} color={subtleText} />
+                </TouchableOpacity>
+
+                <View style={[styles.segmentTrack, { backgroundColor: isDark ? '#1c1c1e' : '#eef0f3' }]}>
+                  {(['today', 'activity', 'alerts'] as DashboardSegment[]).map((segment) => {
+                    const isActive = dashboardSegment === segment;
+                    return (
+                      <TouchableOpacity
+                        key={segment}
+                        style={[styles.segmentBtn, isActive && [styles.segmentBtnActive, { backgroundColor: cardBg }]]}
+                        onPress={() => setDashboardSegment(segment)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.segmentText, { color: isActive ? colors.text : subtleText }]}>
+                          {segment === 'today' ? 'Today' : segment === 'activity' ? 'Activity' : 'Alerts'}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+
             {/* ── Lend guidance (if has items but no lendings) ─ */}
-            {data && !data.isEmpty && data.stats.totalItems > 0 && (data?.activeLendings?.length ?? 0) === 0 && !dismissedGuidanceCards.has('lend') && (
+            {dashboardSegment === 'today' && data && !data.isEmpty && data.stats.totalItems > 0 && (data?.activeLendings?.length ?? 0) === 0 && !dismissedGuidanceCards.has('lend') && (
               <View style={[styles.guidanceCard, { backgroundColor: cardBg, borderColor }]}>
                 <TouchableOpacity
                   style={styles.guidanceCardContentWithClose}
@@ -377,7 +457,7 @@ export default function HomePage() {
             )}
 
             {/* ── Outside guidance (if has items but no session) */}
-            {data && !data.isEmpty && data.stats.totalItems > 0 && !data?.activeSession && !dismissedGuidanceCards.has('outside') && (
+            {dashboardSegment === 'today' && data && !data.isEmpty && data.stats.totalItems > 0 && !data?.activeSession && !dismissedGuidanceCards.has('outside') && (
               <View style={[styles.guidanceCard, { backgroundColor: cardBg, borderColor }]}>
                 <TouchableOpacity
                   style={styles.guidanceCardContentWithClose}
@@ -408,7 +488,7 @@ export default function HomePage() {
             )}
 
             {/* ── Active outside session ─────────────────────── */}
-            {data?.activeSession && (
+            {dashboardSegment === 'today' && data?.activeSession && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <Text style={[styles.sectionTitle, { color: colors.text }]}>Outside</Text>
@@ -449,7 +529,7 @@ export default function HomePage() {
             )}
 
             {/* ── Expiring warranties ────────────────────────── */}
-            {(data?.expiringWarranties?.length ?? 0) > 0 && (
+            {dashboardSegment === 'alerts' && (data?.expiringWarranties?.length ?? 0) > 0 && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <Text style={[styles.sectionTitle, { color: colors.text }]}>Warranties Expiring Soon</Text>
@@ -512,7 +592,7 @@ export default function HomePage() {
             )}
 
             {/* ── Active lendings ────────────────────────────── */}
-            {(data?.activeLendings?.length ?? 0) > 0 && (
+            {dashboardSegment === 'today' && (data?.activeLendings?.length ?? 0) > 0 && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <Text style={[styles.sectionTitle, { color: colors.text }]}>Lending</Text>
@@ -561,7 +641,7 @@ export default function HomePage() {
             )}
 
             {/* ── Recently added items ───────────────────────── */}
-            {(data?.recentItems?.length ?? 0) > 0 && (
+            {dashboardSegment === 'activity' && (data?.recentItems?.length ?? 0) > 0 && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <Text style={[styles.sectionTitle, { color: colors.text }]}>Recently Added</Text>
@@ -570,7 +650,7 @@ export default function HomePage() {
                   </TouchableOpacity>
                 </View>
                 <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
-                  {data!.recentItems.map((item, index) => {
+                  {data!.recentItems.slice(0, 2).map((item, index) => {
                     const route = item.containerId ? `/container/${item.containerId}` : `/space/${item.spaceId}`;
                     const location = item.containerName
                       ? `${item.spaceName} › ${item.containerName}`
@@ -580,7 +660,7 @@ export default function HomePage() {
                         key={item.id}
                         style={[
                           styles.recentRow,
-                          index < data!.recentItems.length - 1 && {
+                          index < Math.min(data!.recentItems.length, 2) - 1 && {
                             borderBottomWidth: 1,
                             borderBottomColor: borderColor,
                           },
@@ -621,7 +701,7 @@ export default function HomePage() {
             )}
 
             {/* ── Recently moved items ───────────────────────── */}
-            {(data?.recentlyMoved?.length ?? 0) > 0 && (
+            {dashboardSegment === 'activity' && (data?.recentlyMoved?.length ?? 0) > 0 && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <Text style={[styles.sectionTitle, { color: colors.text }]}>Recently Moved</Text>
@@ -630,7 +710,7 @@ export default function HomePage() {
                   </TouchableOpacity>
                 </View>
                 <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
-                  {data!.recentlyMoved.map((item, index) => {
+                  {data!.recentlyMoved.slice(0, 2).map((item, index) => {
                     const location = item.containerName
                       ? `${item.spaceName} › ${item.containerName}`
                       : item.spaceName;
@@ -642,7 +722,7 @@ export default function HomePage() {
                         key={`${item.kind}-${item.id}`}
                         style={[
                           styles.recentRow,
-                          index < data!.recentlyMoved.length - 1 && {
+                          index < Math.min(data!.recentlyMoved.length, 2) - 1 && {
                             borderBottomWidth: 1,
                             borderBottomColor: borderColor,
                           },
@@ -690,7 +770,7 @@ export default function HomePage() {
             )}
 
             {/* ── No items guidance state ─────────────────────── */}
-            {data && !data.isEmpty && data.stats.totalItems === 0 && (
+            {dashboardSegment === 'activity' && data && !data.isEmpty && data.stats.totalItems === 0 && (
               <View style={styles.section}>
                 <TouchableOpacity
                   style={[styles.guidanceCard, { backgroundColor: cardBg, borderColor }]}
@@ -710,6 +790,24 @@ export default function HomePage() {
                     <FontAwesomeIcon icon={faChevronRight} size={13} color={subtleText} />
                   </View>
                 </TouchableOpacity>
+              </View>
+            )}
+
+            {dashboardSegment === 'today' && !data?.isEmpty && !hasTodayContent && (
+              <View style={[styles.emptyPanel, { backgroundColor: cardBg, borderColor }]}>
+                <Text style={[styles.emptyPanelText, { color: subtleText }]}>Nothing needs attention today.</Text>
+              </View>
+            )}
+
+            {dashboardSegment === 'activity' && !data?.isEmpty && !hasActivityContent && (
+              <View style={[styles.emptyPanel, { backgroundColor: cardBg, borderColor }]}>
+                <Text style={[styles.emptyPanelText, { color: subtleText }]}>Recent inventory activity will appear here.</Text>
+              </View>
+            )}
+
+            {dashboardSegment === 'alerts' && !data?.isEmpty && !hasAlertContent && (
+              <View style={[styles.emptyPanel, { backgroundColor: cardBg, borderColor }]}>
+                <Text style={[styles.emptyPanelText, { color: subtleText }]}>No warranty alerts right now.</Text>
               </View>
             )}
 
@@ -784,10 +882,20 @@ const styles = StyleSheet.create({
   nameText: { fontSize: 30, fontWeight: '700', letterSpacing: -0.5, marginTop: 2 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 80 },
   // Stats row
-  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
+  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
   statCard: { flex: 1, borderRadius: 14, borderWidth: 1, padding: 16, alignItems: 'center' },
   statValue: { fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
   statLabel: { fontSize: 12, fontWeight: '500', marginTop: 4 },
+  priorityCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  priorityIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  priorityContent: { flex: 1 },
+  priorityEyebrow: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 2 },
+  priorityTitle: { fontSize: 16, fontWeight: '700' },
+  prioritySubtitle: { fontSize: 12, lineHeight: 17, marginTop: 2 },
+  segmentTrack: { flexDirection: 'row', borderRadius: 10, padding: 3, gap: 2, marginBottom: 16 },
+  segmentBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8, borderRadius: 8 },
+  segmentBtnActive: { shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
+  segmentText: { fontSize: 13, fontWeight: '700' },
   // Sections
   section: { marginBottom: 20 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
@@ -841,39 +949,9 @@ const styles = StyleSheet.create({
   guidanceTitle: { fontSize: 15, fontWeight: '600', marginBottom: 3 },
   guidanceSubtitle: { fontSize: 13, fontWeight: '400', lineHeight: 18 },
   guidanceCloseButton: { position: 'absolute', top: 12, right: 12, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
-  // FAB
-  fab: {
-    position: 'absolute',
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: PRIMARY,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
   // Empty state
-  // FAB
-  fab: {
-    position: 'absolute',
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: PRIMARY,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
+  emptyPanel: { borderRadius: 14, borderWidth: 1, padding: 18, alignItems: 'center' },
+  emptyPanelText: { fontSize: 14, fontWeight: '500', textAlign: 'center' },
   emptyCard: { borderRadius: 16, borderWidth: 1, padding: 32, alignItems: 'center', marginTop: 8 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
