@@ -18,11 +18,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   ScrollView,
   TextInput,
   Linking,
-  Platform,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import {
@@ -30,7 +28,6 @@ import {
   faTimes,
   faCheck,
   faChevronDown,
-  faSearch,
   faMapMarkerAlt,
 } from '@fortawesome/free-solid-svg-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -668,8 +665,11 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Voice Input</Text>
-          <TouchableOpacity onPress={handleCancel} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <View>
+            <Text style={styles.headerTitle}>Voice</Text>
+            <Text style={styles.headerSubtitle}>Add, move, find, lend, or return items</Text>
+          </View>
+          <TouchableOpacity style={styles.closeButton} onPress={handleCancel} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <FontAwesomeIcon icon={faTimes} size={18} color="#8e8e93" />
           </TouchableOpacity>
         </View>
@@ -678,10 +678,13 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
           {/* ── IDLE ─────────────────────────────────────────── */}
           {sessionState.phase === 'idle' && (
             <View style={styles.idleContent}>
-              <TouchableOpacity style={styles.micButton} onPress={startListening} activeOpacity={0.8}>
-                <FontAwesomeIcon icon={faMicrophone} size={32} color="#fff" />
-              </TouchableOpacity>
-              <Text style={styles.hintText}>Tap to start listening</Text>
+              <View style={styles.heroPanel}>
+                <TouchableOpacity style={styles.micButton} onPress={startListening} activeOpacity={0.85}>
+                  <FontAwesomeIcon icon={faMicrophone} size={34} color="#fff" />
+                </TouchableOpacity>
+                <Text style={styles.heroTitle}>What should we do?</Text>
+                <Text style={styles.heroCopy}>Tap the mic and speak naturally.</Text>
+              </View>
 
               <View style={styles.commandList}>
                 {[
@@ -708,13 +711,20 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
           {/* ── LISTENING ────────────────────────────────────── */}
           {sessionState.phase === 'listening' && (
             <View style={styles.centeredContent}>
-              <View style={styles.listeningRing}>
-                <View style={styles.micButtonActive}>
-                  <FontAwesomeIcon icon={faMicrophone} size={32} color="#fff" />
+              <View style={styles.listenPanel}>
+                <View style={styles.listeningRing}>
+                  <View style={styles.micButtonActive}>
+                    <FontAwesomeIcon icon={faMicrophone} size={32} color="#fff" />
+                  </View>
                 </View>
-              </View>
               <Text style={styles.listeningText}>Listening…</Text>
+                <View style={styles.waveRow}>
+                  {[18, 34, 24, 44, 28, 38, 20].map((height, index) => (
+                    <View key={index} style={[styles.waveBar, { height }]} />
+                  ))}
+                </View>
               <Text style={styles.hintText}>Speak clearly, up to 10 seconds</Text>
+              </View>
               <TouchableOpacity style={styles.cancelLink} onPress={handleCancel}>
                 <Text style={styles.cancelLinkText}>Cancel</Text>
               </TouchableOpacity>
@@ -724,8 +734,11 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
           {/* ── PROCESSING ───────────────────────────────────── */}
           {sessionState.phase === 'processing' && (
             <View style={styles.centeredContent}>
-              <ActivityIndicator size="large" color={PRIMARY} />
+              <View style={styles.listenPanel}>
+                <ActivityIndicator size="large" color={PRIMARY} />
+                <Text style={styles.listeningText}>Working on it</Text>
               <Text style={styles.hintText}>Processing…</Text>
+              </View>
             </View>
           )}
 
@@ -823,8 +836,8 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
               </View>
               <Text style={styles.errorText}>{sessionState.message}</Text>
               {sessionState.transcript ? (
-                <Text style={{ color: isDark ? '#8e8e93' : '#666', fontSize: 13, marginTop: 4, marginBottom: 16, textAlign: 'center', fontStyle: 'italic' }}>
-                  Heard: "{sessionState.transcript}"
+                <Text style={styles.transcriptText}>
+                  {`Heard: "${sessionState.transcript}"`}
                 </Text>
               ) : null}
               <TouchableOpacity style={styles.primaryButton} onPress={handleRetry}>
@@ -904,7 +917,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
                 {isMultiAdd ? (
                   // Multi-add: show list of items
                   <View>
-                    <Text style={styles.fieldLabel} style={{marginBottom: 8}}>Items</Text>
+                    <Text style={[styles.fieldLabel, { marginBottom: 8 }]}>Items</Text>
                     {itemNamesOverride.map((name, idx) => (
                       <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: isDark ? '#2c2c2e' : '#f5f5f5', borderRadius: 8 }}>
                         <Text style={{marginRight: 8, fontWeight: 'bold', color: '#999'}}>{idx + 1}.</Text>
@@ -1435,185 +1448,262 @@ function ContainerField({
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 function buildStyles(isDark: boolean) {
-  const bg = isDark ? '#000000' : '#f8f9fa';
-  const cardBg = isDark ? '#1c1c1e' : '#ffffff';
-  const border = isDark ? '#2c2c2e' : '#e2e6ea';
-  const textPrimary = isDark ? '#ffffff' : '#1a1a1a';
+  const bg = isDark ? '#101112' : '#f4f6f8';
+  const cardBg = isDark ? '#1b1d20' : '#ffffff';
+  const softBg = isDark ? '#24272b' : '#eef2f5';
+  const border = isDark ? '#30343a' : '#dfe5ea';
+  const textPrimary = isDark ? '#f7f8fa' : '#17202a';
+  const textSecondary = isDark ? '#a9b0ba' : '#647181';
   return StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: bg },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: border,
-  },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: textPrimary },
-  body: { flexGrow: 1, paddingHorizontal: 20, paddingVertical: 24 },
-  centeredContent: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingTop: 40 },
-  micButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: PRIMARY,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  micButtonActive: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: PRIMARY,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  listeningRing: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 3,
-    borderColor: `${PRIMARY}60`,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  listeningText: { fontSize: 20, fontWeight: '700', color: textPrimary },
-  hintText: { fontSize: 14, color: '#8e8e93', textAlign: 'center' },
-  exampleText: { fontSize: 13, color: '#a0aec0', textAlign: 'center', fontStyle: 'italic' },
-  idleContent: { alignItems: 'center', paddingTop: 8, paddingBottom: 16, width: '100%' },
-  commandList: { width: '100%', marginTop: 20, gap: 10 },
-  commandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  commandBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, minWidth: 110 },
-  commandLabel: { fontSize: 12, fontWeight: '600', textAlign: 'center' },
-  commandExample: { flex: 1, fontSize: 13, color: '#8e8e93', fontStyle: 'italic' },
-  errorText: { fontSize: 16, color: DESTRUCTIVE, textAlign: 'center', fontWeight: '600' },
-  successTitle: { fontSize: 22, fontWeight: '700', color: SUCCESS },
-  successLocation: { fontSize: 13, color: '#8e8e93' },
-  primaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: PRIMARY,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    marginTop: 8,
-    alignSelf: 'stretch',
-  },
-  primaryButtonDisabled: { opacity: 0.4 },
-  primaryButtonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  secondaryButton: {
-    alignItems: 'center',
-    paddingVertical: 12,
-    marginTop: 4,
-  },
-  secondaryButtonText: { fontSize: 15, color: PRIMARY, fontWeight: '500' },
-  cancelLink: { paddingVertical: 8 },
-  cancelLinkText: { fontSize: 14, color: '#8e8e93' },
-  // Confirm card
-  confirmCard: { gap: 4 },
-  confirmTitle: { fontSize: 20, fontWeight: '700', color: textPrimary, marginBottom: 12 },
-  fieldRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
-  fieldSection: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: border },
-  fieldLabel: { fontSize: 12, fontWeight: '600', color: '#8e8e93', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  fieldValue: { fontSize: 17, fontWeight: '600', color: textPrimary },
-  didYouMeanLabel: { fontSize: 13, color: '#8e8e93', marginBottom: 6 },
-  suggestionRow: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    backgroundColor: `${PRIMARY}12`,
-    marginBottom: 6,
-  },
-  suggestionText: { fontSize: 15, fontWeight: '600', color: PRIMARY },
-  pickerToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-  },
-  pickerToggleText: { fontSize: 14, color: PRIMARY, fontWeight: '500' },
-  pickerList: {
-    marginTop: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: border,
-    overflow: 'hidden',
-  },
-  pickerItem: {
-    paddingVertical: 13,
-    paddingHorizontal: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: border,
-    backgroundColor: cardBg,
-  },
-  pickerItemText: { fontSize: 15, color: textPrimary },
-  // Name input for create-space confirmation
-  nameInput: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: textPrimary,
-    borderBottomWidth: 2,
-    borderBottomColor: PRIMARY,
-    paddingVertical: 6,
-    marginTop: 4,
-  },
-  // Found items (search results)
-  guideCard: {
-    alignItems: 'center',
-    paddingTop: 32,
-    gap: 12,
-  },
-  guideIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  guideTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  guideBody: {
-    fontSize: 15,
-    color: '#8e8e93',
-    textAlign: 'center',
-    lineHeight: 22,
-    paddingHorizontal: 8,
-  },
-  guideSteps: {
-    alignSelf: 'stretch',
-    backgroundColor: isDark ? '#1c1c1e' : '#f0f1f3',
-    borderRadius: 12,
-    padding: 16,
-    gap: 8,
-  },
-  guideStep: {
-    fontSize: 14,
-    color: isDark ? '#ebebf5cc' : '#374151',
-    lineHeight: 20,
-  },
-  foundItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: cardBg,
-    borderWidth: 1,
-    borderColor: border,
-    marginBottom: 8,
-  },
-  foundLocationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 3,
-  },
-  foundLocationText: { fontSize: 13, color: '#8e8e93' },
+    safeArea: { flex: 1, backgroundColor: bg },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      paddingBottom: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: border,
+      backgroundColor: cardBg,
+    },
+    headerTitle: { fontSize: 24, fontWeight: '800', color: textPrimary },
+    headerSubtitle: { marginTop: 2, fontSize: 13, color: textSecondary },
+    closeButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: softBg,
+    },
+    body: { flexGrow: 1, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 24 },
+    centeredContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingVertical: 28 },
+    heroPanel: {
+      width: '100%',
+      alignItems: 'center',
+      padding: 20,
+      borderRadius: 8,
+      backgroundColor: cardBg,
+      borderWidth: 1,
+      borderColor: border,
+    },
+    heroTitle: { marginTop: 14, fontSize: 22, fontWeight: '800', color: textPrimary, textAlign: 'center' },
+    heroCopy: { marginTop: 4, fontSize: 14, color: textSecondary, textAlign: 'center' },
+    micButton: {
+      width: 86,
+      height: 86,
+      borderRadius: 43,
+      backgroundColor: PRIMARY,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    micButtonActive: {
+      width: 78,
+      height: 78,
+      borderRadius: 39,
+      backgroundColor: PRIMARY,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    listenPanel: {
+      width: '100%',
+      alignItems: 'center',
+      paddingVertical: 32,
+      paddingHorizontal: 20,
+      borderRadius: 8,
+      backgroundColor: cardBg,
+      borderWidth: 1,
+      borderColor: border,
+      gap: 14,
+    },
+    listeningRing: {
+      width: 112,
+      height: 112,
+      borderRadius: 56,
+      borderWidth: 8,
+      borderColor: `${PRIMARY}24`,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: `${PRIMARY}10`,
+    },
+    waveRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, height: 48 },
+    waveBar: { width: 5, borderRadius: 3, backgroundColor: `${PRIMARY}80` },
+    listeningText: { fontSize: 21, fontWeight: '800', color: textPrimary, textAlign: 'center' },
+    hintText: { fontSize: 14, color: textSecondary, textAlign: 'center', lineHeight: 20 },
+    exampleText: { fontSize: 13, color: textSecondary, textAlign: 'center', fontStyle: 'italic' },
+    idleContent: { alignItems: 'center', paddingBottom: 16, width: '100%' },
+    commandList: { width: '100%', marginTop: 14, gap: 8 },
+    commandRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      padding: 12,
+      borderRadius: 8,
+      backgroundColor: cardBg,
+      borderWidth: 1,
+      borderColor: border,
+    },
+    commandBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 5, minWidth: 106 },
+    commandLabel: { fontSize: 12, fontWeight: '800', textAlign: 'center' },
+    commandExample: { flex: 1, fontSize: 13, color: textSecondary, fontStyle: 'italic', lineHeight: 18 },
+    errorText: { fontSize: 17, color: DESTRUCTIVE, textAlign: 'center', fontWeight: '800', lineHeight: 24 },
+    transcriptText: {
+      color: textSecondary,
+      fontSize: 13,
+      marginTop: 4,
+      marginBottom: 16,
+      textAlign: 'center',
+      fontStyle: 'italic',
+      lineHeight: 19,
+    },
+    successTitle: { fontSize: 24, fontWeight: '800', color: SUCCESS, textAlign: 'center' },
+    successLocation: { fontSize: 14, color: textSecondary, textAlign: 'center' },
+    primaryButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: PRIMARY,
+      borderRadius: 8,
+      paddingVertical: 14,
+      paddingHorizontal: 22,
+      marginTop: 12,
+      minHeight: 50,
+      alignSelf: 'stretch',
+    },
+    primaryButtonDisabled: { opacity: 0.45 },
+    primaryButtonText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+    secondaryButton: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 13,
+      marginTop: 6,
+      borderRadius: 8,
+      backgroundColor: softBg,
+      alignSelf: 'stretch',
+    },
+    secondaryButtonText: { fontSize: 15, color: PRIMARY, fontWeight: '800' },
+    cancelLink: { paddingVertical: 10, paddingHorizontal: 12 },
+    cancelLinkText: { fontSize: 14, color: textSecondary, fontWeight: '700' },
+    confirmCard: {
+      gap: 6,
+      padding: 16,
+      borderRadius: 8,
+      backgroundColor: cardBg,
+      borderWidth: 1,
+      borderColor: border,
+    },
+    confirmTitle: { fontSize: 22, fontWeight: '800', color: textPrimary, marginBottom: 8 },
+    fieldRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
+    fieldSection: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: border },
+    fieldLabel: { fontSize: 12, fontWeight: '800', color: textSecondary, textTransform: 'uppercase', letterSpacing: 0, marginBottom: 6 },
+    fieldValue: { fontSize: 17, fontWeight: '800', color: textPrimary, lineHeight: 23 },
+    didYouMeanLabel: { fontSize: 13, color: textSecondary, marginBottom: 8 },
+    suggestionRow: {
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      backgroundColor: `${PRIMARY}14`,
+      borderWidth: 1,
+      borderColor: `${PRIMARY}28`,
+      marginBottom: 8,
+    },
+    suggestionText: { fontSize: 15, fontWeight: '800', color: PRIMARY },
+    pickerToggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      backgroundColor: softBg,
+    },
+    pickerToggleText: { flex: 1, fontSize: 14, color: PRIMARY, fontWeight: '800' },
+    pickerList: {
+      marginTop: 8,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: border,
+      overflow: 'hidden',
+    },
+    pickerItem: {
+      paddingVertical: 14,
+      paddingHorizontal: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: border,
+      backgroundColor: cardBg,
+    },
+    pickerItemText: { fontSize: 15, color: textPrimary, fontWeight: '700' },
+    nameInput: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: textPrimary,
+      borderWidth: 1,
+      borderColor: border,
+      backgroundColor: softBg,
+      borderRadius: 8,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      marginTop: 4,
+    },
+    guideCard: {
+      alignItems: 'center',
+      padding: 20,
+      borderRadius: 8,
+      backgroundColor: cardBg,
+      borderWidth: 1,
+      borderColor: border,
+      gap: 12,
+    },
+    guideIconCircle: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 2,
+    },
+    guideTitle: {
+      fontSize: 22,
+      fontWeight: '800',
+      textAlign: 'center',
+    },
+    guideBody: {
+      fontSize: 15,
+      color: textSecondary,
+      textAlign: 'center',
+      lineHeight: 22,
+    },
+    guideSteps: {
+      alignSelf: 'stretch',
+      backgroundColor: softBg,
+      borderRadius: 8,
+      padding: 14,
+      gap: 8,
+    },
+    guideStep: {
+      fontSize: 14,
+      color: isDark ? '#d6dbe1' : '#374151',
+      lineHeight: 20,
+    },
+    foundItemRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: 14,
+      borderRadius: 8,
+      backgroundColor: softBg,
+      borderWidth: 1,
+      borderColor: border,
+      marginBottom: 8,
+    },
+    foundLocationRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: 4,
+    },
+    foundLocationText: { fontSize: 13, color: textSecondary },
   });
 }
