@@ -27,7 +27,6 @@ import { ItemRepository } from '../../../repositories/ItemRepository';
 import { Lending } from '../models/Lending';
 import { LendingPhoto, LendingPhotoPhase } from '../models/LendingPhoto';
 import LendingPhotoSection from './components/LendingPhotoSection';
-import { ReminderService } from '../../../services/ReminderService';
 
 const PRIMARY = '#6b7f99';
 const SUCCESS = '#6b9e7a';
@@ -93,11 +92,6 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
     setShowConfirm(false);
     setSubmitting(true);
     try {
-      // Cancel scheduled reminders before marking returned
-      if (lending.reminder_id) {
-        try { await ReminderService.cancelReminders(lending.reminder_id); } catch { /* non-fatal */ }
-      }
-
       const updated = await lendingService.markAsReturned(lending.id);
       setLending(updated);
       // Show location hint before navigating back

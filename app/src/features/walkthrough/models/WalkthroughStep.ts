@@ -47,7 +47,7 @@ export const WALKTHROUGH_STEPS: WalkthroughStep[] = [
     id: 'tools-tab',
     index: 5,
     description: 'Tools — utilities to help you manage your inventory.',
-    targetRef: 'tab-outside',
+    targetRef: 'tab-tools',
     spotlightPadding: 10,
   },
   {

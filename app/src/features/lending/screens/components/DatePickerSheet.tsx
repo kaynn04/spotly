@@ -1,13 +1,11 @@
 /**
  * DatePickerSheet
  *
- * Pure React Native drum-roll date picker — no native modules required.
- * Works in Expo Go and any managed/bare workflow without a prebuild.
- *
- * Shows a bottom-sheet modal with three scrollable columns (Month · Day · Year).
+ * Calendar-style bottom sheet used by lending due dates and item warranties.
+ * Pure React Native, so it works in Expo Go without native date picker modules.
  */
 
-import React, { useRef, useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -15,136 +13,35 @@ import {
   Modal,
   TouchableOpacity,
   ScrollView,
+  useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faChevronLeft, faChevronRight, faCheck } from '@fortawesome/free-solid-svg-icons';
 
-const ITEM_HEIGHT = 44;
-const VISIBLE_ITEMS = 5; // must be odd
-const HALF = Math.floor(VISIBLE_ITEMS / 2);
-const DRUM_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
+const PRIMARY = '#6b7f99';
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const MONTH_FORMATTER = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
+const FULL_DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  weekday: 'long',
+  month: 'long',
+  day: 'numeric',
+  year: 'numeric',
+});
 
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
+type PickerPurpose = 'date' | 'due' | 'warranty';
 
-function daysInMonth(month: number, year: number): number {
-  return new Date(year, month + 1, 0).getDate();
+interface QuickOption {
+  label: string;
+  date: Date;
 }
-
-function buildYears(minimumDate?: Date): number[] {
-  const start = minimumDate ? minimumDate.getFullYear() : new Date().getFullYear();
-  const years: number[] = [];
-  for (let y = start; y <= start + 10; y++) years.push(y);
-  return years;
-}
-
-// ─── Drum column ─────────────────────────────────────────────────────────────
-
-interface DrumColumnProps {
-  items: string[];
-  selectedIndex: number;
-  onSelect: (index: number) => void;
-  textColor: string;
-  subtleText: string;
-  disabledBefore?: number; // indexes < this value are shown faded
-}
-
-function DrumColumn({ items, selectedIndex, onSelect, textColor, subtleText, disabledBefore = 0 }: DrumColumnProps) {
-  const ref = useRef<ScrollView>(null);
-  const [activeIndex, setActiveIndex] = useState(selectedIndex);
-  const pendingSnapRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hasMomentumRef = useRef(false);
-
-  // Sync position when parent changes (e.g. minimumDate clamp snaps back)
-  useEffect(() => {
-    setActiveIndex(selectedIndex);
-    ref.current?.scrollTo({ y: selectedIndex * ITEM_HEIGHT, animated: false });
-  }, [selectedIndex]);
-
-  const snapTo = useCallback((rawY: number) => {
-    const idx = Math.max(0, Math.min(items.length - 1, Math.round(rawY / ITEM_HEIGHT)));
-    setActiveIndex(idx);
-    ref.current?.scrollTo({ y: idx * ITEM_HEIGHT, animated: true });
-    onSelect(idx);
-  }, [items.length, onSelect]);
-
-  const handleScroll = useCallback((e: any) => {
-    const raw = e.nativeEvent.contentOffset.y / ITEM_HEIGHT;
-    const idx = Math.max(0, Math.min(items.length - 1, Math.round(raw)));
-    setActiveIndex(idx);
-  }, [items.length]);
-
-  const handleScrollEndDrag = useCallback((e: any) => {
-    hasMomentumRef.current = false;
-    const y = e.nativeEvent.contentOffset.y;
-    // Wait briefly — if momentum starts, cancel this snap
-    pendingSnapRef.current = setTimeout(() => {
-      if (!hasMomentumRef.current) {
-        snapTo(y);
-      }
-    }, 80);
-  }, [snapTo]);
-
-  const handleMomentumScrollBegin = useCallback(() => {
-    hasMomentumRef.current = true;
-    if (pendingSnapRef.current) {
-      clearTimeout(pendingSnapRef.current);
-      pendingSnapRef.current = null;
-    }
-  }, []);
-
-  const handleMomentumScrollEnd = useCallback((e: any) => {
-    hasMomentumRef.current = false;
-    snapTo(e.nativeEvent.contentOffset.y);
-  }, [snapTo]);
-
-  return (
-    <View style={styles.column}>
-      <ScrollView
-        ref={ref}
-        style={{ height: DRUM_HEIGHT }}
-        showsVerticalScrollIndicator={false}
-        snapToInterval={ITEM_HEIGHT}
-        decelerationRate="fast"
-        onScroll={handleScroll}
-        onScrollEndDrag={handleScrollEndDrag}
-        onMomentumScrollBegin={handleMomentumScrollBegin}
-        onMomentumScrollEnd={handleMomentumScrollEnd}
-        contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * HALF }}
-        scrollEventThrottle={16}
-      >
-        {items.map((label, i) => {
-          const isSelected = i === activeIndex;
-          const isPast = i < disabledBefore;
-          const distFromCenter = Math.abs(i - activeIndex);
-          return (
-            <View key={i} style={styles.drumItem}>
-              <Text
-                style={[
-                  styles.drumLabel,
-                  {
-                    color: isPast ? subtleText : isSelected ? textColor : subtleText,
-                    fontWeight: isSelected ? '600' : '400',
-                    opacity: isPast ? 0.3 : distFromCenter > HALF ? 0.25 : 1,
-                  },
-                ]}
-              >
-                {label}
-              </Text>
-            </View>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-}
-
-// ─── DatePickerSheet ──────────────────────────────────────────────────────────
 
 interface DatePickerSheetProps {
   visible: boolean;
   value: Date;
   minimumDate?: Date;
+  purpose?: PickerPurpose;
   onChange: (date: Date) => void;
   onConfirm: () => void;
   onClose: () => void;
@@ -155,10 +52,107 @@ interface DatePickerSheetProps {
   isDark: boolean;
 }
 
+function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function startOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return startOfDay(next);
+}
+
+function addMonths(date: Date, months: number): Date {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + months);
+  return startOfDay(next);
+}
+
+function addYears(date: Date, years: number): Date {
+  const next = new Date(date);
+  next.setFullYear(next.getFullYear() + years);
+  return startOfDay(next);
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+}
+
+function isBeforeMonth(a: Date, b: Date): boolean {
+  return a.getFullYear() < b.getFullYear()
+    || (a.getFullYear() === b.getFullYear() && a.getMonth() < b.getMonth());
+}
+
+function buildCalendarDays(displayMonth: Date): Date[] {
+  const firstDay = startOfMonth(displayMonth);
+  const gridStart = addDays(firstDay, -firstDay.getDay());
+  return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
+}
+
+function clampToMinimum(date: Date, minDay?: Date): Date {
+  const cleanDate = startOfDay(date);
+  return minDay && cleanDate < minDay ? new Date(minDay) : cleanDate;
+}
+
+function getTitle(purpose: PickerPurpose): string {
+  if (purpose === 'due') return 'Due Date';
+  if (purpose === 'warranty') return 'Warranty Expiry';
+  return 'Select Date';
+}
+
+function getConfirmLabel(purpose: PickerPurpose): string {
+  if (purpose === 'due') return 'Set Due Date';
+  if (purpose === 'warranty') return 'Set Warranty';
+  return 'Set Date';
+}
+
+function getQuickOptions(purpose: PickerPurpose, today: Date): QuickOption[] {
+  if (purpose === 'due') {
+    return [
+      { label: 'Today', date: today },
+      { label: 'Tomorrow', date: addDays(today, 1) },
+      { label: '1 week', date: addDays(today, 7) },
+      { label: '2 weeks', date: addDays(today, 14) },
+    ];
+  }
+
+  if (purpose === 'warranty') {
+    return [
+      { label: '30 days', date: addDays(today, 30) },
+      { label: '90 days', date: addDays(today, 90) },
+      { label: '1 year', date: addYears(today, 1) },
+      { label: '2 years', date: addYears(today, 2) },
+    ];
+  }
+
+  return [
+    { label: 'Today', date: today },
+    { label: 'Tomorrow', date: addDays(today, 1) },
+    { label: '1 week', date: addDays(today, 7) },
+    { label: '1 month', date: addMonths(today, 1) },
+  ];
+}
+
+function getRelativeLabel(selectedDay: Date, today: Date): string {
+  const dayDiff = Math.round((selectedDay.getTime() - today.getTime()) / DAY_MS);
+  if (dayDiff === 0) return 'Today';
+  if (dayDiff === 1) return 'Tomorrow';
+  if (dayDiff > 1) return `In ${dayDiff} days`;
+  if (dayDiff === -1) return 'Yesterday';
+  return `${Math.abs(dayDiff)} days ago`;
+}
+
 export default function DatePickerSheet({
   visible,
   value,
   minimumDate,
+  purpose = 'date',
   onChange,
   onConfirm,
   onClose,
@@ -168,104 +162,190 @@ export default function DatePickerSheet({
   subtleText,
   isDark,
 }: DatePickerSheetProps) {
-  const YEARS = buildYears(minimumDate);
+  const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const today = useMemo(() => startOfDay(new Date()), []);
+  const minDay = useMemo(
+    () => minimumDate ? startOfDay(minimumDate) : undefined,
+    [minimumDate]
+  );
+  const selectedDay = useMemo(() => clampToMinimum(value, minDay), [value, minDay]);
+  const [displayMonth, setDisplayMonth] = useState(startOfMonth(selectedDay));
 
-  // Normalize minimumDate to start of day for clean comparisons
-  const minDay = minimumDate
-    ? new Date(minimumDate.getFullYear(), minimumDate.getMonth(), minimumDate.getDate())
-    : undefined;
+  useEffect(() => {
+    if (visible) {
+      setDisplayMonth(startOfMonth(selectedDay));
+    }
+  }, [selectedDay, visible]);
 
-  const monthIndex = value.getMonth();
-  const day = value.getDate();
-  const year = value.getFullYear();
-
-  const yearIndex = Math.max(0, YEARS.indexOf(year));
-  const maxDay = daysInMonth(monthIndex, year);
-  const days = Array.from({ length: maxDay }, (_, i) => String(i + 1));
-  const clampedDayIndex = Math.min(day - 1, maxDay - 1);
-
-  // Which indexes in each column are before the minimum date
-  const minYear = minDay?.getFullYear() ?? 0;
-  const minMonth = minDay?.getMonth() ?? 0;
-  const minDate = minDay?.getDate() ?? 1;
-
-  const disabledYearBefore = 0; // years start from minYear so none are disabled
-  const disabledMonthBefore = year === minYear ? minMonth : 0;
-  const disabledDayBefore =
-    year === minYear && monthIndex === minMonth ? minDate - 1 : 0;
-
-  const buildDate = useCallback(
-    (mIdx: number, dIdx: number, yIdx: number): Date => {
-      const y = YEARS[yIdx] ?? YEARS[0];
-      const m = mIdx;
-      const maxD = daysInMonth(m, y);
-      const d = Math.min(dIdx + 1, maxD);
-      const date = new Date(y, m, d);
-      if (minDay && date < minDay) return new Date(minDay);
-      return date;
-    },
-    [YEARS, minDay]
+  const days = useMemo(() => buildCalendarDays(displayMonth), [displayMonth]);
+  const quickOptions = useMemo(
+    () => getQuickOptions(purpose, today).map((option) => ({
+      ...option,
+      date: clampToMinimum(option.date, minDay),
+    })),
+    [minDay, purpose, today]
   );
 
-  const handleMonth = useCallback(
-    (idx: number) => onChange(buildDate(idx, clampedDayIndex, yearIndex)),
-    [buildDate, clampedDayIndex, yearIndex, onChange]
-  );
-  const handleDay = useCallback(
-    (idx: number) => onChange(buildDate(monthIndex, idx, yearIndex)),
-    [buildDate, monthIndex, yearIndex, onChange]
-  );
-  const handleYear = useCallback(
-    (idx: number) => onChange(buildDate(monthIndex, clampedDayIndex, idx)),
-    [buildDate, monthIndex, clampedDayIndex, onChange]
-  );
+  const canGoPrevious = useMemo(() => {
+    if (!minDay) return true;
+    return !isBeforeMonth(addMonths(displayMonth, -1), startOfMonth(minDay));
+  }, [displayMonth, minDay]);
 
-  const selectorBg = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)';
+  const selectDate = useCallback((date: Date) => {
+    const nextDate = clampToMinimum(date, minDay);
+    onChange(nextDate);
+    setDisplayMonth(startOfMonth(nextDate));
+  }, [minDay, onChange]);
+
+  const moveMonth = useCallback((amount: number) => {
+    setDisplayMonth((current) => {
+      const nextMonth = addMonths(current, amount);
+      if (amount < 0 && minDay && isBeforeMonth(nextMonth, startOfMonth(minDay))) {
+        return current;
+      }
+      return nextMonth;
+    });
+  }, [minDay]);
+
+  const selectedLabel = FULL_DATE_FORMATTER.format(selectedDay);
+  const relativeLabel = getRelativeLabel(selectedDay, today);
+  const title = getTitle(purpose);
+  const confirmLabel = getConfirmLabel(purpose);
+  const selectedBg = isDark ? 'rgba(107,127,153,0.28)' : 'rgba(107,127,153,0.14)';
+  const softBg = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.04)';
+  const isCompact = height < 720 || width < 360;
+  const horizontalPadding = isCompact ? 14 : 18;
+  const daySize = isCompact ? 30 : 34;
+  const dayRadius = daySize / 2;
+  const dayCellHeight = isCompact ? 36 : 42;
+  const sheetMaxHeight = Math.min(height * 0.92, 660);
+  const contentMaxHeight = Math.max(320, sheetMaxHeight - 150 - insets.bottom);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={[styles.sheet, { backgroundColor: cardBg, borderTopColor: borderColor }]}>
-          {/* Header */}
-          <View style={[styles.header, { borderBottomColor: borderColor }]}>
-            <TouchableOpacity onPress={onClose} style={styles.cancelBtn}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
+        <View style={[styles.sheet, { backgroundColor: cardBg, borderTopColor: borderColor, maxHeight: sheetMaxHeight, paddingBottom: Math.max(insets.bottom, 12) }]}>
+          <View style={styles.handle} />
+
+          <View style={[styles.header, { borderBottomColor: borderColor, paddingHorizontal: horizontalPadding }]}>
+            <TouchableOpacity onPress={onClose} style={styles.headerTextButton}>
+              <Text style={[styles.headerText, { color: subtleText }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={[styles.title, { color: textColor }]}>Select Date</Text>
-            <TouchableOpacity onPress={onConfirm} style={styles.doneBtn}>
-              <Text style={styles.doneBtnText}>Done</Text>
+            <View style={styles.headerTitleWrap}>
+              <Text style={[styles.title, { color: textColor }]} numberOfLines={1}>{title}</Text>
+            </View>
+            <TouchableOpacity onPress={onConfirm} style={styles.headerTextButton}>
+              <Text style={styles.doneText}>Done</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Drum roll */}
-          <View style={styles.drumWrapper}>
-            {/* Selection highlight */}
-            <View style={[styles.selectionBar, { backgroundColor: selectorBg, borderColor }]} pointerEvents="none" />
+          <ScrollView
+            style={{ maxHeight: contentMaxHeight }}
+            contentContainerStyle={[styles.content, { paddingHorizontal: horizontalPadding }]}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
+            <View style={[styles.selectedCard, { backgroundColor: selectedBg, borderColor }]}>
+              <View style={styles.selectedTextWrap}>
+                <Text style={[styles.selectedDate, { color: textColor }]} numberOfLines={1}>
+                  {selectedLabel}
+                </Text>
+                <Text style={[styles.relativeDate, { color: subtleText }]}>{relativeLabel}</Text>
+              </View>
+              <View style={styles.selectedIcon}>
+                <FontAwesomeIcon icon={faCheck} size={12} color="#ffffff" />
+              </View>
+            </View>
 
-            <DrumColumn
-              items={MONTHS}
-              selectedIndex={monthIndex}
-              onSelect={handleMonth}
-              textColor={textColor}
-              subtleText={subtleText}
-              disabledBefore={disabledMonthBefore}
-            />
-            <DrumColumn
-              items={days}
-              selectedIndex={clampedDayIndex}
-              onSelect={handleDay}
-              textColor={textColor}
-              subtleText={subtleText}
-              disabledBefore={disabledDayBefore}
-            />
-            <DrumColumn
-              items={YEARS.map(String)}
-              selectedIndex={yearIndex}
-              onSelect={handleYear}
-              textColor={textColor}
-              subtleText={subtleText}
-              disabledBefore={disabledYearBefore}
-            />
+            <View style={styles.quickRow}>
+              {quickOptions.map((option) => {
+                const isSelected = isSameDay(option.date, selectedDay);
+                return (
+                  <TouchableOpacity
+                    key={option.label}
+                    style={[
+                      styles.quickChip,
+                      {
+                        backgroundColor: isSelected ? PRIMARY : softBg,
+                        borderColor: isSelected ? PRIMARY : borderColor,
+                      },
+                    ]}
+                    onPress={() => selectDate(option.date)}
+                  >
+                    <Text style={[styles.quickChipText, { color: isSelected ? '#ffffff' : textColor }]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={styles.monthNav}>
+              <TouchableOpacity
+                onPress={() => moveMonth(-1)}
+                disabled={!canGoPrevious}
+                style={[styles.navButton, { backgroundColor: softBg, opacity: canGoPrevious ? 1 : 0.35 }]}
+              >
+                <FontAwesomeIcon icon={faChevronLeft} size={14} color={canGoPrevious ? textColor : subtleText} />
+              </TouchableOpacity>
+              <Text style={[styles.monthTitle, { color: textColor }]}>{MONTH_FORMATTER.format(displayMonth)}</Text>
+              <TouchableOpacity onPress={() => moveMonth(1)} style={[styles.navButton, { backgroundColor: softBg }]}>
+                <FontAwesomeIcon icon={faChevronRight} size={14} color={textColor} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.weekRow}>
+              {WEEKDAYS.map((day, index) => (
+                <Text key={`${day}-${index}`} style={[styles.weekLabel, { color: subtleText }]}>{day}</Text>
+              ))}
+            </View>
+
+            <View style={styles.calendarGrid}>
+              {days.map((date) => {
+                const isCurrentMonth = date.getMonth() === displayMonth.getMonth();
+                const isSelected = isSameDay(date, selectedDay);
+                const isToday = isSameDay(date, today);
+                const isDisabled = !!minDay && date < minDay;
+
+                return (
+                  <TouchableOpacity
+                    key={date.toISOString()}
+                    style={[styles.dayCell, { height: dayCellHeight }]}
+                    disabled={isDisabled}
+                    onPress={() => selectDate(date)}
+                    activeOpacity={0.75}
+                  >
+                    <View
+                      style={[
+                        styles.dayCircle,
+                        { width: daySize, height: daySize, borderRadius: dayRadius },
+                        isSelected && { backgroundColor: PRIMARY },
+                        !isSelected && isToday && { borderColor: PRIMARY, borderWidth: 1.5 },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.dayText,
+                          { color: isCurrentMonth ? textColor : subtleText },
+                          isSelected && styles.selectedDayText,
+                          isDisabled && { color: subtleText, opacity: 0.35 },
+                          !isSelected && !isDisabled && isToday && { color: PRIMARY, fontWeight: '700' },
+                        ]}
+                      >
+                        {date.getDate()}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </ScrollView>
+
+          <View style={[styles.footer, { borderTopColor: borderColor, paddingHorizontal: horizontalPadding }]}>
+            <TouchableOpacity style={styles.primaryButton} onPress={onConfirm}>
+              <Text style={styles.primaryButtonText}>{confirmLabel}</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -283,51 +363,172 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderTopWidth: 1,
-    paddingBottom: 32,
+    paddingBottom: 24,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(128,128,128,0.45)',
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 4,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
     borderBottomWidth: 1,
   },
-  title: { fontSize: 16, fontWeight: '700' },
-  cancelBtn: { paddingVertical: 4, paddingHorizontal: 8 },
-  cancelBtnText: { fontSize: 16, fontWeight: '600', color: '#999' },
-  doneBtn: { paddingVertical: 4, paddingHorizontal: 8 },
-  doneBtnText: { fontSize: 16, fontWeight: '600', color: '#6b7f99' },
-
-  drumWrapper: {
-    flexDirection: 'row',
+  headerTextButton: {
+    minWidth: 64,
+    minHeight: 36,
     justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-    paddingHorizontal: 16,
-    overflow: 'hidden',
   },
-  selectionBar: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    top: '50%',
-    height: ITEM_HEIGHT,
-    marginTop: -(ITEM_HEIGHT / 2),
+  headerText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  doneText: {
+    color: PRIMARY,
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  headerTitleWrap: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  content: {
+    paddingHorizontal: 18,
+    paddingTop: 14,
+  },
+  selectedCard: {
+    minHeight: 68,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  selectedTextWrap: {
+    flex: 1,
+  },
+  selectedDate: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  relativeDate: {
+    fontSize: 13,
+    marginTop: 3,
+    fontWeight: '500',
+  },
+  selectedIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  quickChip: {
+    flexGrow: 1,
+    minWidth: '22%',
+    minHeight: 38,
     borderRadius: 10,
     borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
   },
-
-  column: {
-    flex: 1,
-    overflow: 'hidden',
+  quickChipText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
-  drumItem: {
-    height: ITEM_HEIGHT,
+  monthNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 18,
+    marginBottom: 10,
+  },
+  navButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  drumLabel: {
+  monthTitle: {
     fontSize: 16,
+    fontWeight: '700',
+  },
+  weekRow: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  weekLabel: {
+    width: `${100 / 7}%`,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  dayCell: {
+    width: `${100 / 7}%`,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  selectedDayText: {
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  footer: {
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    marginTop: 8,
+    borderTopWidth: 1,
+  },
+  primaryButton: {
+    minHeight: 48,
+    borderRadius: 12,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

@@ -200,6 +200,7 @@ export default function LendingFormModal({
                       visible={showPicker}
                       value={tempDate}
                       minimumDate={new Date()}
+                      purpose="due"
                       onChange={setTempDate}
                       onConfirm={() => {
                         onDueDateChange(tempDate);

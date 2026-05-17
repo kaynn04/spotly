@@ -461,7 +461,7 @@ export default function HomePage() {
               <View style={[styles.guidanceCard, { backgroundColor: cardBg, borderColor }]}>
                 <TouchableOpacity
                   style={styles.guidanceCardContentWithClose}
-                  onPress={() => router.push('/(tabs)/outside' as any)}
+                  onPress={() => router.push('/(tabs)/tools' as any)}
                   activeOpacity={0.7}
                 >
                   <View style={styles.guidanceCardContent}>

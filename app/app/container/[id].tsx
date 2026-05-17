@@ -29,7 +29,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faChevronLeft, faMapPin, faEllipsisVertical, faBox, faHandshake, faCheck, faTrash, faFolder, faRightLeft, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faList, faGrip, faPen, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faChevronLeft, faMapPin, faBox, faHandshake, faCheck, faTrash, faFolder, faRightLeft, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faFilter, faList, faGrip, faPen, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -218,10 +218,12 @@ export default function ContainerDetailScreen() {
         item_id: selectedLendItem.id,
         borrower_name: borrowerName.trim(),
         note: lendNote.trim() || undefined,
+        due_date: dueDate ?? undefined,
       });
       setShowLendModal(false);
       setBorrowerName('');
       setLendNote('');
+      setDueDate(null);
       setSelectedLendItem(null);
       await loadActiveLendings();
     } catch (err: any) {
@@ -553,9 +555,25 @@ export default function ContainerDetailScreen() {
           )}
         </View>
         {!selectMode ? (
-          <TouchableOpacity style={styles.headerMenuBtn} onPress={handleContainerMenuPress}>
-            <FontAwesomeIcon icon={faEllipsisVertical} size={18} color={PRIMARY} />
-          </TouchableOpacity>
+          <View style={styles.headerControls}>
+            <TouchableOpacity
+              style={[styles.iconToggle, viewMode === 'list' && styles.iconToggleActive]}
+              onPress={() => switchViewMode('list')}
+              accessibilityLabel="List view"
+            >
+              <FontAwesomeIcon icon={faList} size={15} color={viewMode === 'list' ? PRIMARY : subtleText} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.iconToggle, viewMode === 'grid' && styles.iconToggleActive]}
+              onPress={() => switchViewMode('grid')}
+              accessibilityLabel="Grid view"
+            >
+              <FontAwesomeIcon icon={faGrip} size={15} color={viewMode === 'grid' ? PRIMARY : subtleText} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconToggle} onPress={handleContainerMenuPress} accessibilityLabel="Sort and container actions">
+              <FontAwesomeIcon icon={faFilter} size={15} color={PRIMARY} />
+            </TouchableOpacity>
+          </View>
         ) : (
           <TouchableOpacity onPress={handleSelectAll} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Text style={{ color: PRIMARY, fontSize: 14, fontWeight: '500' }}>All</Text>
@@ -839,21 +857,6 @@ export default function ContainerDetailScreen() {
             <TouchableWithoutFeedback>
               <View style={[styles.menuCard, { backgroundColor: cardBg, borderColor }]}>
               <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
-                {/* View section */}
-                <Text style={[styles.menuTitle, { color: subtleText }]}>View</Text>
-                <TouchableOpacity style={[styles.menuOption, viewMode === 'list' && styles.menuOptionActive]} onPress={() => switchViewMode('list')} activeOpacity={0.7}>
-                  <FontAwesomeIcon icon={faList} size={14} color={viewMode === 'list' ? PRIMARY : subtleText} />
-                  <Text style={[styles.menuOptionText, { color: viewMode === 'list' ? PRIMARY : colors.text }]}>List</Text>
-                  {viewMode === 'list' && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.menuOption, viewMode === 'grid' && styles.menuOptionActive]} onPress={() => switchViewMode('grid')} activeOpacity={0.7}>
-                  <FontAwesomeIcon icon={faGrip} size={14} color={viewMode === 'grid' ? PRIMARY : subtleText} />
-                  <Text style={[styles.menuOptionText, { color: viewMode === 'grid' ? PRIMARY : colors.text }]}>Grid</Text>
-                  {viewMode === 'grid' && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
-                </TouchableOpacity>
-
-                <View style={[styles.menuDivider, { backgroundColor: borderColor }]} />
-
                 {/* Sort section */}
                 <Text style={[styles.menuTitle, { color: subtleText }]}>Sort</Text>
                 {([
@@ -1070,6 +1073,15 @@ const styles = StyleSheet.create({
   breadcrumb: { fontSize: 11, fontWeight: '500', letterSpacing: 0.2, marginBottom: 1 },
   headerTitle: { fontSize: 17, fontWeight: '600' },
   headerMenuBtn: { paddingLeft: 12, paddingVertical: 8 },
+  headerControls: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  iconToggle: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconToggleActive: { backgroundColor: 'rgba(107,127,153,0.12)' },
   containerPhotoWrap: { marginHorizontal: 16, marginTop: 8, borderRadius: 12, overflow: 'hidden', borderWidth: 1 },
   containerPhoto: { width: '100%', height: 160 },
   containerPhotoPlaceholder: { marginHorizontal: 16, marginTop: 8, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', paddingVertical: 14, alignItems: 'center' },

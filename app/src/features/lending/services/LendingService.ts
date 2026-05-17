@@ -17,6 +17,7 @@ import { Lending, LendingCreateInput, LendingStatus } from '../models/Lending';
 import { LendingPhoto, LendingPhotoPhase } from '../models/LendingPhoto';
 import { ItemRepository } from '../../../repositories/ItemRepository';
 import { PhotoService } from '../../../services/PhotoService';
+import { ReminderService } from '../../../services/ReminderService';
 
 /**
  * Service Error
@@ -192,6 +193,23 @@ export class LendingService {
       );
     }
 
+    if (input.due_date) {
+      try {
+        const reminderId = await ReminderService.scheduleDueDateReminders(
+          lending.id,
+          lending.borrower_name,
+          item.name,
+          input.due_date
+        );
+        if (reminderId) {
+          await this.lendingRepository.setReminderId(lending.id, reminderId);
+          lending.reminder_id = reminderId;
+        }
+      } catch (error) {
+        console.warn('[LendingService.createLending] Failed to schedule due-date reminder:', error);
+      }
+    }
+
     return lending;
   }
 
@@ -237,6 +255,14 @@ export class LendingService {
         'INVALID_STATUS_TRANSITION',
         'Item already returned'
       );
+    }
+
+    if (lending.reminder_id) {
+      try {
+        await ReminderService.cancelReminders(lending.reminder_id);
+      } catch (error) {
+        console.warn('[LendingService.markAsReturned] Failed to cancel due-date reminder:', error);
+      }
     }
 
     // All validations passed, mark as returned

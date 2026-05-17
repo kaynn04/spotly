@@ -35,7 +35,14 @@ export function WalkthroughProvider({
       if (!ref?.current) return null;
       
       return new Promise<SpotlightRect>((resolve, reject) => {
-        ref.current?.measure((_, __, width, height, pageX, pageY) => {
+        ref.current?.measure((
+          _x: number,
+          _y: number,
+          width: number,
+          height: number,
+          pageX: number,
+          pageY: number
+        ) => {
           resolve({ x: pageX, y: pageY, width, height });
         }) ?? reject(new Error(`ref ${id} not found`));
       }).catch(() => null);

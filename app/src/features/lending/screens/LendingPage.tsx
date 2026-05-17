@@ -26,7 +26,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faMagnifyingGlass, faTimes, faChevronRight, faHandshake, faPlus, faMapPin, faFolder, faEllipsisVertical, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faCheck, faList, faGrip, faClockRotateLeft } from '@fortawesome/free-solid-svg-icons';
+import { faMagnifyingGlass, faTimes, faChevronRight, faHandshake, faPlus, faMapPin, faFolder, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faFilter, faCheck, faList, faGrip, faClockRotateLeft } from '@fortawesome/free-solid-svg-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -42,7 +42,6 @@ import { Lending } from '../models/Lending';
 import type { Item } from '../../../models/Item';
 import LendingFormModal from './components/LendingFormModal';
 import { OutsideSessionItemRepository } from '../../outside/repositories/OutsideSessionItemRepository';
-import { ReminderService } from '../../../services/ReminderService';
 
 const PRIMARY = '#6b7f99';
 const SORT_KEY = 'synop:lending-sort';
@@ -220,29 +219,12 @@ export default function LendingPage() {
     if (!selectedLendItem || !borrowerName.trim()) return;
     setLendLoading(true);
     try {
-      const created = await lendingService.createLending({
+      await lendingService.createLending({
         item_id: selectedLendItem.id,
         borrower_name: borrowerName.trim(),
         note: lendNote.trim() || undefined,
         due_date: lendDueDate ?? undefined,
       });
-
-      // Schedule reminders if due date was set
-      if (lendDueDate) {
-        try {
-          const reminderId = await ReminderService.scheduleDueDateReminders(
-            created.id,
-            borrowerName.trim(),
-            selectedLendItem.name,
-            lendDueDate
-          );
-          if (reminderId) {
-            await repositories.lendingRepository.setReminderId(created.id, reminderId);
-          }
-        } catch {
-          // Non-fatal — lending still created
-        }
-      }
 
       setShowLendForm(false);
       setSelectedLendItem(null);
@@ -435,12 +417,31 @@ export default function LendingPage() {
                   <Text style={[styles.sectionLabel, { color: subtleText }]}>
                     ACTIVE{' '}
                     <Text style={styles.sectionLabelHint}>{'\u00B7'} {filteredLendings.length} item{filteredLendings.length !== 1 ? 's' : ''}</Text>
-                  </Text>                  <TouchableOpacity
-                    onPress={() => setShowMenu(true)}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <FontAwesomeIcon icon={faEllipsisVertical} size={16} color={subtleText} />
-                  </TouchableOpacity>                </View>
+                  </Text>
+                  <View style={styles.contentControls}>
+                    <TouchableOpacity
+                      style={[styles.iconToggle, viewMode === 'list' && styles.iconToggleActive]}
+                      onPress={() => switchViewMode('list')}
+                      accessibilityLabel="List view"
+                    >
+                      <FontAwesomeIcon icon={faList} size={15} color={viewMode === 'list' ? PRIMARY : subtleText} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.iconToggle, viewMode === 'grid' && styles.iconToggleActive]}
+                      onPress={() => switchViewMode('grid')}
+                      accessibilityLabel="Grid view"
+                    >
+                      <FontAwesomeIcon icon={faGrip} size={15} color={viewMode === 'grid' ? PRIMARY : subtleText} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.iconToggle}
+                      onPress={() => setShowMenu(true)}
+                      accessibilityLabel="Sort"
+                    >
+                      <FontAwesomeIcon icon={faFilter} size={15} color={subtleText} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
                 {viewMode === 'grid' ? (
                   <FlatList
                     data={filteredLendings}
@@ -583,25 +584,6 @@ export default function LendingPage() {
             <TouchableWithoutFeedback>
               <View style={[styles.menuCard, { backgroundColor: cardBg, borderColor }]}>
                 <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
-                  <Text style={[styles.menuTitle, { color: subtleText }]}>View</Text>
-                  {([
-                    { key: 'list' as ViewMode, icon: faList, label: 'List' },
-                    { key: 'grid' as ViewMode, icon: faGrip, label: 'Grid' },
-                  ] as { key: ViewMode; icon: any; label: string }[]).map((opt) => (
-                    <TouchableOpacity
-                      key={opt.key}
-                      style={[styles.menuOption, viewMode === opt.key && styles.menuOptionActive]}
-                      onPress={() => switchViewMode(opt.key)}
-                      activeOpacity={0.7}
-                    >
-                      <FontAwesomeIcon icon={opt.icon} size={14} color={viewMode === opt.key ? PRIMARY : subtleText} />
-                      <Text style={[styles.menuOptionText, { color: viewMode === opt.key ? PRIMARY : colors.text }]}>{opt.label}</Text>
-                      {viewMode === opt.key && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
-                    </TouchableOpacity>
-                  ))}
-
-                  <View style={[styles.menuDivider, { backgroundColor: borderColor }]} />
-
                   <Text style={[styles.menuTitle, { color: subtleText }]}>Sort</Text>
                   {([
                     { key: 'name-asc' as SortMode, icon: faArrowDownAZ, label: 'Name A→Z' },
@@ -658,25 +640,28 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 20,
   },
   title: { fontSize: 30, fontWeight: '700', letterSpacing: -0.5 },
   subtitle: { fontSize: 13, marginTop: 2 },
   historyPill: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   lendItemBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
+    height: 38,
+    minWidth: 108,
+    paddingHorizontal: 14,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  lendItemBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  lendItemBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
   centerContainer: { justifyContent: 'center', alignItems: 'center', minHeight: 200 },
 
@@ -697,6 +682,15 @@ const styles = StyleSheet.create({
   sectionLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
   sectionLabelHint: { fontSize: 11, fontStyle: 'italic', fontWeight: '400' },
+  contentControls: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  iconToggle: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconToggleActive: { backgroundColor: 'rgba(107,127,153,0.12)' },
 
   lendingRow: {
     flexDirection: 'row',
@@ -726,7 +720,7 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 20, fontWeight: '700' },
   emptySubtitle: { fontSize: 14, textAlign: 'center', lineHeight: 20, paddingHorizontal: 16 },
 
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, minHeight: 40 },
 
   menuOverlay: {
     flex: 1,

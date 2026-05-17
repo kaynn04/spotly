@@ -31,7 +31,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faChevronLeft, faEllipsisVertical, faBox, faHandshake, faCheck, faTrash, faMapPin, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faFilter, faList, faGrip, faPen, faRightLeft } from '@fortawesome/free-solid-svg-icons';
+import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faChevronLeft, faBox, faHandshake, faCheck, faTrash, faMapPin, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faFilter, faList, faGrip, faPen, faRightLeft } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -378,10 +378,12 @@ export default function SpaceDetailScreen() {
         item_id: selectedLendItem.id,
         borrower_name: borrowerName.trim(),
         note: lendNote.trim() || undefined,
+        due_date: dueDate ?? undefined,
       });
       setShowLendModal(false);
       setBorrowerName('');
       setLendNote('');
+      setDueDate(null);
       setSelectedLendItem(null);
       // Refresh active lendings map to show "Lent" badge immediately
       await loadActiveLendings();
@@ -708,9 +710,25 @@ export default function SpaceDetailScreen() {
           {selectMode ? `${selectedIds.size} selected` : (space?.name ?? 'Space')}
         </Text>
         {!selectMode && (
-          <TouchableOpacity onPress={() => setShowMenu(true)} style={styles.menuBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <FontAwesomeIcon icon={faEllipsisVertical} size={18} color={subtleText} />
-          </TouchableOpacity>
+          <View style={styles.headerControls}>
+            <TouchableOpacity
+              onPress={() => switchViewMode('list')}
+              style={[styles.iconToggle, viewMode === 'list' && styles.iconToggleActive]}
+              accessibilityLabel="List view"
+            >
+              <FontAwesomeIcon icon={faList} size={15} color={viewMode === 'list' ? PRIMARY : subtleText} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => switchViewMode('grid')}
+              style={[styles.iconToggle, viewMode === 'grid' && styles.iconToggleActive]}
+              accessibilityLabel="Grid view"
+            >
+              <FontAwesomeIcon icon={faGrip} size={15} color={viewMode === 'grid' ? PRIMARY : subtleText} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowMenu(true)} style={styles.iconToggle} accessibilityLabel="Sort">
+              <FontAwesomeIcon icon={faFilter} size={15} color={subtleText} />
+            </TouchableOpacity>
+          </View>
         )}
         {selectMode && (
           <TouchableOpacity onPress={handleSelectAll} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -1223,29 +1241,6 @@ export default function SpaceDetailScreen() {
             <TouchableWithoutFeedback>
               <View style={[styles.menuCard, { backgroundColor: cardBg, borderColor }]}>
               <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
-                {/* View section */}
-                <Text style={[styles.menuTitle, { color: subtleText }]}>View</Text>
-                <TouchableOpacity
-                  style={[styles.menuOption, viewMode === 'list' && styles.menuOptionActive]}
-                  onPress={() => switchViewMode('list')}
-                  activeOpacity={0.7}
-                >
-                  <FontAwesomeIcon icon={faList} size={14} color={viewMode === 'list' ? PRIMARY : subtleText} />
-                  <Text style={[styles.menuOptionText, { color: viewMode === 'list' ? PRIMARY : colors.text }]}>List</Text>
-                  {viewMode === 'list' && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.menuOption, viewMode === 'grid' && styles.menuOptionActive]}
-                  onPress={() => switchViewMode('grid')}
-                  activeOpacity={0.7}
-                >
-                  <FontAwesomeIcon icon={faGrip} size={14} color={viewMode === 'grid' ? PRIMARY : subtleText} />
-                  <Text style={[styles.menuOptionText, { color: viewMode === 'grid' ? PRIMARY : colors.text }]}>Grid</Text>
-                  {viewMode === 'grid' && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
-                </TouchableOpacity>
-
-                <View style={[styles.menuDivider, { backgroundColor: borderColor }]} />
-
                 {/* Sort section */}
                 <Text style={[styles.menuTitle, { color: subtleText }]}>Sort</Text>
                 {([
@@ -1461,6 +1456,15 @@ const styles = StyleSheet.create({
 
   // 3-dot menu
   menuBtn: { paddingLeft: 12, paddingVertical: 8 },
+  headerControls: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  iconToggle: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconToggleActive: { backgroundColor: 'rgba(107,127,153,0.12)' },
   menuOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',

@@ -25,7 +25,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ItemActionSheet from './components/ItemActionSheet';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faFileAlt, faFileArchive, faTrash, faPen, faEllipsisVertical, faList, faGrip, faArrowDownAZ, faArrowDownZA, faCubes, faCalendarPlus, faCalendar, faFilter, faCheck } from '@fortawesome/free-solid-svg-icons';
+import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faFileAlt, faFileArchive, faTrash, faPen, faList, faGrip, faArrowDownAZ, faArrowDownZA, faCubes, faCalendarPlus, faCalendar, faFilter, faCheck } from '@fortawesome/free-solid-svg-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -434,6 +434,20 @@ export default function SpacesPage() {
     return result;
   }, [spaces, sortMode, filterMode]);
 
+  const navigateToSearchResult = (result: SearchResult) => {
+    if (result.type === 'container') {
+      router.push({ pathname: '/container/[id]' as any, params: { id: result.id } });
+      return;
+    }
+
+    if (result.containerId) {
+      router.push({ pathname: '/container/[id]' as any, params: { id: result.containerId } });
+      return;
+    }
+
+    router.push({ pathname: '/space/[id]' as any, params: { id: result.spaceId } });
+  };
+
   type GridSearchRow =
     | { kind: 'fullwidth'; item: SectionedSearchItem }
     | { kind: 'pair'; left: SectionedSearchItem; right: SectionedSearchItem | null };
@@ -462,10 +476,7 @@ export default function SpacesPage() {
     return (
       <TouchableOpacity
         style={[styles.gridCard, { backgroundColor: cardBg, borderColor, width: GRID_ITEM_WIDTH }]}
-        onPress={() => {
-          if (isContainer) router.push({ pathname: '/container/[id]' as any, params: { id: result.id } });
-          else router.push({ pathname: '/item/[id]' as any, params: { id: result.id } });
-        }}
+        onPress={() => navigateToSearchResult(result)}
         activeOpacity={0.7}
       >
         <View style={[styles.gridPhotoPlaceholder, { backgroundColor: `${PRIMARY}12`, height: GRID_ITEM_WIDTH * 0.7 }]}>
@@ -630,13 +641,29 @@ export default function SpacesPage() {
         ) : spaces.length > 0 ? (
           <View style={styles.sectionLabelRow}>
             <Text style={[styles.sectionLabel, { color: subtleText }]}>YOUR SPACES <Text style={styles.longPressHint}>{'\u00B7'} Long press to select</Text></Text>
-            <TouchableOpacity
-              style={styles.menuBtn}
-              onPress={() => setShowMenu(true)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <FontAwesomeIcon icon={faEllipsisVertical} size={16} color={subtleText} />
-            </TouchableOpacity>
+            <View style={styles.contentControls}>
+              <TouchableOpacity
+                style={[styles.iconToggle, viewMode === 'list' && styles.iconToggleActive]}
+                onPress={() => switchViewMode('list')}
+                accessibilityLabel="List view"
+              >
+                <FontAwesomeIcon icon={faList} size={15} color={viewMode === 'list' ? PRIMARY : subtleText} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.iconToggle, viewMode === 'grid' && styles.iconToggleActive]}
+                onPress={() => switchViewMode('grid')}
+                accessibilityLabel="Grid view"
+              >
+                <FontAwesomeIcon icon={faGrip} size={15} color={viewMode === 'grid' ? PRIMARY : subtleText} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.iconToggle}
+                onPress={() => setShowMenu(true)}
+                accessibilityLabel="Sort and filter"
+              >
+                <FontAwesomeIcon icon={faFilter} size={15} color={subtleText} />
+              </TouchableOpacity>
+            </View>
           </View>
         ) : null}
       </View>
@@ -691,13 +718,7 @@ export default function SpacesPage() {
           return (
             <TouchableOpacity
               style={[styles.resultCard, { backgroundColor: cardBg, borderColor }]}
-              onPress={() => {
-                if (isContainer) {
-                  router.push({ pathname: '/container/[id]' as any, params: { id: result.id } });
-                } else {
-                  router.push({ pathname: '/space/[id]' as any, params: { id: result.spaceId } });
-                }
-              }}
+              onPress={() => navigateToSearchResult(result)}
               activeOpacity={0.7}
             >
               <View style={[styles.resultIcon, { backgroundColor: isContainer ? `${PRIMARY}15` : `${isDark ? '#48484a' : '#e2e6ea'}` }]}>
@@ -832,29 +853,6 @@ export default function SpacesPage() {
             <TouchableWithoutFeedback>
               <View style={[styles.menuCard, { backgroundColor: cardBg, borderColor }]}>
               <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
-                {/* View section */}
-                <Text style={[styles.menuTitle, { color: subtleText }]}>View</Text>
-                <TouchableOpacity
-                  style={[styles.menuOption, viewMode === 'list' && styles.menuOptionActive]}
-                  onPress={() => switchViewMode('list')}
-                  activeOpacity={0.7}
-                >
-                  <FontAwesomeIcon icon={faList} size={14} color={viewMode === 'list' ? PRIMARY : subtleText} />
-                  <Text style={[styles.menuOptionText, { color: viewMode === 'list' ? PRIMARY : colors.text }]}>List</Text>
-                  {viewMode === 'list' && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.menuOption, viewMode === 'grid' && styles.menuOptionActive]}
-                  onPress={() => switchViewMode('grid')}
-                  activeOpacity={0.7}
-                >
-                  <FontAwesomeIcon icon={faGrip} size={14} color={viewMode === 'grid' ? PRIMARY : subtleText} />
-                  <Text style={[styles.menuOptionText, { color: viewMode === 'grid' ? PRIMARY : colors.text }]}>Grid</Text>
-                  {viewMode === 'grid' && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
-                </TouchableOpacity>
-
-                <View style={[styles.menuDivider, { backgroundColor: borderColor }]} />
-
                 {/* Sort section */}
                 <Text style={[styles.menuTitle, { color: subtleText }]}>Sort</Text>
                 {[
@@ -912,7 +910,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 10,
     paddingTop: 4,
   },
@@ -927,6 +925,15 @@ const styles = StyleSheet.create({
   },
   countBadgeText: { fontSize: 14, fontWeight: '600' },
   menuBtn: { padding: 8, marginTop: 4 },
+  contentControls: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  iconToggle: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconToggleActive: { backgroundColor: 'rgba(107,127,153,0.12)' },
 
   // Search
   searchWrapper: {
@@ -1026,13 +1033,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryButtonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, minHeight: 40 },
   addSpaceBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
+    height: 38,
+    minWidth: 108,
+    paddingHorizontal: 14,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  addSpaceBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  addSpaceBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
   // Grid view
   gridRow: { gap: GRID_GAP },

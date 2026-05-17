@@ -11,6 +11,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   ScrollView,
   ActivityIndicator,
   Alert,
@@ -235,10 +236,12 @@ export default function ItemDetailScreen() {
         item_id: item.id,
         borrower_name: borrowerName.trim(),
         note: lendNote.trim() || undefined,
+        due_date: dueDate ?? undefined,
       });
       setShowLendModal(false);
       setBorrowerName('');
       setLendNote('');
+      setDueDate(null);
       await loadItem();
     } catch (err: any) {
       Alert.alert('Error', err.code === 'DUPLICATE_ACTIVE_LENDING'
@@ -575,6 +578,7 @@ export default function ItemDetailScreen() {
           onChange={setWarrantyPickerDate}
           value={warrantyPickerDate}
           minimumDate={new Date()}
+          purpose="warranty"
           textColor={colors.text}
           subtleText={subtleText}
           cardBg={cardBg}
