@@ -45,8 +45,8 @@ function withAndroidCompatibility(config) {
   return withAndroidManifest(config, (config) => {
     const manifest = config.modResults.manifest;
 
-    config.modResults.$ = {
-      ...config.modResults.$,
+    manifest.$ = {
+      ...manifest.$,
       'xmlns:tools': 'http://schemas.android.com/tools',
     };
 
