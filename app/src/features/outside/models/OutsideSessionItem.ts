@@ -10,6 +10,10 @@ export interface OutsideSessionItem {
   item_id: string;
   is_checked: number | boolean;  // SQLite returns 0/1, convert to boolean as needed
   checked_at: string | null; // ISO timestamp when checked
+  return_checked: number | boolean;
+  return_checked_at: string | null;
+  issue_status: 'LOST' | 'NOT_BROUGHT' | null;
+  issue_reported_at: string | null;
 }
 
 export interface OutsideSessionItemCreateDTO {
@@ -19,6 +23,10 @@ export interface OutsideSessionItemCreateDTO {
 export interface OutsideSessionItemUpdateDTO {
   is_checked?: boolean;
   checked_at?: string | null;
+  return_checked?: boolean;
+  return_checked_at?: string | null;
+  issue_status?: 'LOST' | 'NOT_BROUGHT' | null;
+  issue_reported_at?: string | null;
 }
 
 export interface OutsideSessionItemWithContext extends OutsideSessionItem {

@@ -513,9 +513,9 @@ export default function SpaceDetailScreen() {
 
     if (selItemIds.length === 0) return;
 
-    // Check if any selected items are lent or outside
+    // Check if any selected items are lent, outside, or lost
     const blockedItems = selItemIds.filter((itemId) =>
-      activeOutsideItemIds.has(itemId) || !!activeLendingMap[itemId]
+      activeOutsideItemIds.has(itemId) || !!activeLendingMap[itemId] || !!items.find((i) => i.id === itemId)?.lostAt
     );
 
     if (blockedItems.length > 0) {
@@ -524,7 +524,7 @@ export default function SpaceDetailScreen() {
         .join(', ');
       Alert.alert(
         'Items are Blocked',
-        `Cannot move: ${blockedNames}. Complete outside sessions and mark lent items as returned first.`
+        `Cannot move: ${blockedNames}. Complete outside sessions, mark lent items as returned, or mark lost items as found first.`
       );
       return;
     }
@@ -541,6 +541,11 @@ export default function SpaceDetailScreen() {
     if (!item) return;
     const isOutside = activeOutsideItemIds.has(item.id);
     const isLent = !!activeLendingMap[item.id];
+    const isLost = !!item.lostAt;
+    if (isLost) {
+      Alert.alert('Item is Lost', 'Mark this item as found before lending.');
+      return;
+    }
     if (isOutside) {
       Alert.alert('Item is Outside', 'Complete the outside session before lending.');
       return;
@@ -879,13 +884,14 @@ export default function SpaceDetailScreen() {
                 const item = !isContainer ? entry.data as Item : null;
                 const photoUri = isContainer ? c?.photoUri : item?.photoUri;
                 const name = entry.data.name;
-                const activeLending = item ? activeLendingMap[item.id] : null;
-                const isLent = !!activeLending;
-                const isOutside = item ? activeOutsideItemIds.has(item.id) : false;
-                const count = isContainer ? items.filter((i) => i.containerId === c!.id).length : null;
-                const meta = isContainer
-                  ? `${count} ${count === 1 ? 'item' : 'items'}`
-                  : isLent ? `Lent to ${activeLending!.borrower_name}` : isOutside ? 'Outside' : '';
+  const activeLending = item ? activeLendingMap[item.id] : null;
+  const isLent = !!activeLending;
+  const isOutside = item ? activeOutsideItemIds.has(item.id) : false;
+  const isLost = !!item?.lostAt;
+  const count = isContainer ? items.filter((i) => i.containerId === c!.id).length : null;
+  const meta = isContainer
+    ? `${count} ${count === 1 ? 'item' : 'items'}`
+    : isLost ? 'Reported lost' : isLent ? `Lent to ${activeLending!.borrower_name}` : isOutside ? 'Outside' : '';
                 return (
                   <TouchableOpacity
                     style={[styles.gridCard, { backgroundColor: cardBg, borderColor: isSelected ? PRIMARY : borderColor, width: GRID_ITEM_WIDTH }, isSelected && styles.selectedCard]}
@@ -916,10 +922,13 @@ export default function SpaceDetailScreen() {
                       {isContainer && (
                         <Text style={[styles.gridBadge, { color: PRIMARY }]}>Container</Text>
                       )}
-                      {isLent && (
+                      {isLost && (
+                        <Text style={[styles.gridBadge, { color: '#d32f2f' }]}>Lost</Text>
+                      )}
+                      {!isLost && isLent && (
                         <Text style={[styles.gridBadge, { color: LENDING }]}>Lent</Text>
                       )}
-                      {isOutside && !isLent && (
+                      {!isLost && isOutside && !isLent && (
                         <Text style={[styles.gridBadge, { color: '#e67e22' }]}>Outside</Text>
                       )}
                       <Text style={[styles.gridName, { color: colors.text }]} numberOfLines={1}>{name}</Text>
@@ -971,9 +980,10 @@ export default function SpaceDetailScreen() {
             const activeLending = activeLendingMap[item.id];
             const isLent = !!activeLending;
             const isOutside = activeOutsideItemIds.has(item.id);
+            const isLost = !!item.lostAt;
             return (
               <TouchableOpacity
-                style={[styles.itemCard, { backgroundColor: cardBg, borderColor: isSelected ? PRIMARY : (isOutside ? '#e67e2240' : isLent ? `${LENDING}40` : borderColor) }, isSelected && styles.selectedCard]}
+                style={[styles.itemCard, { backgroundColor: cardBg, borderColor: isSelected ? PRIMARY : (isLost ? '#d32f2f55' : isOutside ? '#e67e2240' : isLent ? `${LENDING}40` : borderColor) }, isSelected && styles.selectedCard]}
                 onPress={() => {
                   if (selectMode) { toggleSelect(entry); return; }
                   router.push({ pathname: '../item/[id]' as any, params: { id: item.id } });
@@ -989,7 +999,7 @@ export default function SpaceDetailScreen() {
                     {isSelected && <FontAwesomeIcon icon={faCheck} size={10} color="#fff" />}
                   </View>
                 ) : (
-                  <View style={[styles.itemDot, { backgroundColor: isOutside ? '#e67e22' : isLent ? LENDING : isDark ? '#48484a' : '#c7c7cc' }]} />
+                  <View style={[styles.itemDot, { backgroundColor: isLost ? '#d32f2f' : isOutside ? '#e67e22' : isLent ? LENDING : isDark ? '#48484a' : '#c7c7cc' }]} />
                 )}
                 {item.photoUri ? (
                   <Image source={{ uri: item.photoUri }} style={styles.itemThumb} />
@@ -1001,13 +1011,23 @@ export default function SpaceDetailScreen() {
                       Lent to {activeLending.borrower_name}
                     </Text>
                   )}
-                  {isOutside && !isLent && (
+                  {isLost && (
+                    <Text style={[styles.itemLentMeta, { color: '#d32f2f' }]} numberOfLines={1}>
+                      Reported lost
+                    </Text>
+                  )}
+                  {isOutside && !isLent && !isLost && (
                     <Text style={[styles.itemLentMeta, { color: '#e67e22' }]} numberOfLines={1}>
                       In outside session
                     </Text>
                   )}
                 </View>
-                {isOutside && (
+                {isLost && (
+                  <View style={[styles.lentBadge, { backgroundColor: '#d32f2f18' }]}>
+                    <Text style={[styles.lentBadgeText, { color: '#d32f2f' }]}>Lost</Text>
+                  </View>
+                )}
+                {!isLost && isOutside && (
                   <View style={[styles.lentBadge, { backgroundColor: '#e67e2215' }]}>
                     <Text style={[styles.lentBadgeText, { color: '#e67e22' }]}>Outside</Text>
                   </View>
@@ -1159,10 +1179,16 @@ export default function SpaceDetailScreen() {
           const lending = activeLendingMap[item.id];
           const isLent = !!lending;
           const isOutside = activeOutsideItemIds.has(item.id);
+          const isLost = !!item.lostAt;
           const outsideGuard = () =>
             Alert.alert(
               'Item is Outside',
               'This item is in an active outside session. Complete or remove it from the session before moving or lending it.'
+            );
+          const lostGuard = () =>
+            Alert.alert(
+              'Item is Lost',
+              'Mark this item as found before moving or lending it.'
             );
           const lendingGuard = () =>
             Alert.alert(
@@ -1173,8 +1199,8 @@ export default function SpaceDetailScreen() {
             {
               icon: faBox,
               label: 'Move',
-              description: isOutside ? 'In active outside session' : isLent ? 'Item is currently lent out' : 'Move to another space or container',
-              onPress: isOutside ? outsideGuard : isLent ? lendingGuard : () => openMoveModal(new Set([item.id])),
+              description: isLost ? 'Item is marked lost' : isOutside ? 'In active outside session' : isLent ? 'Item is currently lent out' : 'Move to another space or container',
+              onPress: isLost ? lostGuard : isOutside ? outsideGuard : isLent ? lendingGuard : () => openMoveModal(new Set([item.id])),
             },
             isLent
               ? {
@@ -1186,8 +1212,8 @@ export default function SpaceDetailScreen() {
               : {
                   icon: faHandshake,
                   label: 'Lend',
-                  description: isOutside ? 'In active outside session' : 'Track who you lent this item to',
-                  onPress: isOutside ? outsideGuard : () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setDueDate(null); setShowLendModal(true); },
+                  description: isLost ? 'Item is marked lost' : isOutside ? 'In active outside session' : 'Track who you lent this item to',
+                  onPress: isLost ? lostGuard : isOutside ? outsideGuard : () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setDueDate(null); setShowLendModal(true); },
                 },
             {
               icon: faTrash,
@@ -1363,7 +1389,7 @@ export default function SpaceDetailScreen() {
         let canMove = hasOnlyItems || hasOnlyContainers;
         if (hasOnlyItems) {
           for (const itemId of selItemIds) {
-            if (activeOutsideItemIds.has(itemId) || activeLendingMap[itemId]) {
+            if (activeOutsideItemIds.has(itemId) || activeLendingMap[itemId] || items.find((i) => i.id === itemId)?.lostAt) {
               canMove = false;
               break;
             }
@@ -1385,6 +1411,7 @@ export default function SpaceDetailScreen() {
           if (selectedItem) {
             const activeLendingForItem = activeLendingMap[selectedItem.id];
             const isOutside = activeOutsideItemIds.has(selectedItem.id);
+            const isLost = !!selectedItem.lostAt;
 
             if (activeLendingForItem) {
               lendActionLabel = 'Return';
@@ -1395,8 +1422,8 @@ export default function SpaceDetailScreen() {
                 exitSelectMode();
               };
               lendActionDisabled = false;
-            } else if (isOutside) {
-              lendActionDisabled = true; // Cannot lend if outside
+            } else if (isOutside || isLost) {
+              lendActionDisabled = true; // Cannot lend if outside or lost
             } else {
               lendActionOnPress = handleBulkLend;
               lendActionDisabled = false;

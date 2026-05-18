@@ -12,6 +12,7 @@ import { OutsideSessionRepository } from '../repositories/OutsideSessionReposito
 import { OutsideSessionItemRepository } from '../repositories/OutsideSessionItemRepository';
 import { OutsideSession, OutsideSessionError, OutsideSessionErrorCode, OutsideSessionStatus } from '../models/OutsideSession';
 import { OutsideSessionItemWithContext, OutsideSessionItemError, OutsideSessionItemErrorCode } from '../models/OutsideSessionItem';
+import { ItemRepository } from '@/src/repositories/ItemRepository';
 
 export enum OutsideServiceErrorCode {
   ACTIVE_SESSION_EXISTS = 'ACTIVE_SESSION_EXISTS',
@@ -91,7 +92,7 @@ export class OutsideService {
   /**
    * Get the active session with item counts
    */
-  async getActiveSession(): Promise<(OutsideSession & { itemCount: number; checkedCount: number }) | null> {
+  async getActiveSession(): Promise<(OutsideSession & { itemCount: number; checkedCount: number; returnCheckedCount: number }) | null> {
     try {
       const session = await this.sessionRepository.getActive();
       if (!session) return null;
@@ -101,6 +102,7 @@ export class OutsideService {
         ...session,
         itemCount: stats.total,
         checkedCount: stats.checked,
+        returnCheckedCount: stats.returnChecked,
       };
     } catch (error) {
       console.error('✗ Service: Error getting active session:', error);
@@ -115,7 +117,7 @@ export class OutsideService {
   /**
    * Get session by ID with item counts
    */
-  async getSession(id: string): Promise<(OutsideSession & { itemCount: number; checkedCount: number }) | null> {
+  async getSession(id: string): Promise<(OutsideSession & { itemCount: number; checkedCount: number; returnCheckedCount: number }) | null> {
     try {
       const session = await this.sessionRepository.getById(id);
       if (!session) return null;
@@ -125,6 +127,7 @@ export class OutsideService {
         ...session,
         itemCount: stats.total,
         checkedCount: stats.checked,
+        returnCheckedCount: stats.returnChecked,
       };
     } catch (error) {
       console.error('✗ Service: Error getting session:', error);
@@ -226,6 +229,30 @@ export class OutsideService {
   }
 
   /**
+   * Toggle return check status of an item
+   */
+  async checkReturnItem(sessionId: string, itemId: string): Promise<void> {
+    try {
+      await this.itemRepository.toggleReturnCheck(sessionId, itemId);
+      console.log(`✓ Service: Toggled return check for item ${itemId}`);
+    } catch (error) {
+      if (error instanceof OutsideSessionItemError) {
+        throw new OutsideServiceError(
+          OutsideServiceErrorCode.ITEM_NOT_FOUND,
+          error.message,
+          { originalError: error }
+        );
+      }
+      console.error('✗ Service: Error checking return item:', error);
+      throw new OutsideServiceError(
+        OutsideServiceErrorCode.DATABASE_ERROR,
+        'Failed to toggle item return check status',
+        { originalError: error }
+      );
+    }
+  }
+
+  /**
    * Record that an item was moved to a different location during put-away
    */
   async recordItemMove(sessionId: string, itemId: string, spaceName: string, containerName: string | null): Promise<void> {
@@ -234,6 +261,22 @@ export class OutsideService {
     } catch (error) {
       console.error('✗ Service: Error recording item move:', error);
       // Non-critical — don't throw, just log
+    }
+  }
+
+  async reportItemIssues(sessionId: string, itemIds: string[], issueStatus: 'LOST' | 'NOT_BROUGHT', note?: string): Promise<void> {
+    try {
+      await this.itemRepository.reportIssue(sessionId, itemIds, issueStatus);
+      if (issueStatus === 'LOST') {
+        await ItemRepository.markLost(itemIds, sessionId, note);
+      }
+    } catch (error) {
+      console.error('✗ Service: Error reporting outside item issues:', error);
+      throw new OutsideServiceError(
+        OutsideServiceErrorCode.DATABASE_ERROR,
+        'Failed to report item issue',
+        { originalError: error }
+      );
     }
   }
 

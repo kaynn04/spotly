@@ -4,7 +4,7 @@
  * Main Outside tab — modern minimalist redesign
  */
 
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -35,6 +35,7 @@ interface SessionCardState {
   error: string | null;
   itemCount: number;
   checkedCount: number;
+  returnCheckedCount: number;
 }
 
 const PRIMARY = '#6b7f99';
@@ -58,12 +59,14 @@ export default function OutsidePage() {
   const isDark = colorScheme === 'dark';
   const { handleScroll } = useScrollHide();
   const tabBarPadding = useTabBarPadding();
+  const openingSessionRef = useRef(false);
 
   const [sessionCard, setSessionCard] = useState<SessionCardState>({
     loading: false,
     error: null,
     itemCount: 0,
     checkedCount: 0,
+    returnCheckedCount: 0,
   });
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [activeSessionTitle, setActiveSessionTitle] = useState<string>('');
@@ -88,7 +91,7 @@ export default function OutsidePage() {
   }, []);
 
   const loadActiveSession = async () => {
-    setSessionCard({ loading: true, error: null, itemCount: 0, checkedCount: 0 });
+    setSessionCard({ loading: true, error: null, itemCount: 0, checkedCount: 0, returnCheckedCount: 0 });
     try {
       const session = await outsideService.getActiveSession();
       if (session) {
@@ -101,16 +104,17 @@ export default function OutsidePage() {
           error: null,
           itemCount: session.itemCount,
           checkedCount: session.checkedCount,
+          returnCheckedCount: session.returnCheckedCount,
         });
       } else {
         setActiveSessionId(null);
         setActiveSessionTitle('');
         setSessionItems([]);
-        setSessionCard({ loading: false, error: null, itemCount: 0, checkedCount: 0 });
+        setSessionCard({ loading: false, error: null, itemCount: 0, checkedCount: 0, returnCheckedCount: 0 });
       }
     } catch (err) {
       console.error('Error loading active session:', err);
-      setSessionCard({ loading: false, error: 'Failed to load session', itemCount: 0, checkedCount: 0 });
+      setSessionCard({ loading: false, error: 'Failed to load session', itemCount: 0, checkedCount: 0, returnCheckedCount: 0 });
     }
   };
 
@@ -124,8 +128,16 @@ export default function OutsidePage() {
   };
 
   const handleViewHistory = () => router.push('/outside/history');
-  const handleOpenSession = () => activeSessionId && router.push(`/outside/${activeSessionId}`);
-  const handleCompleteSession = () => activeSessionId && router.push(`/outside/${activeSessionId}`);
+  const openSession = (sessionId: string | null) => {
+    if (!sessionId || openingSessionRef.current) return;
+    openingSessionRef.current = true;
+    router.push(`/outside/${sessionId}`);
+    setTimeout(() => {
+      openingSessionRef.current = false;
+    }, 700);
+  };
+  const handleOpenSession = () => openSession(activeSessionId);
+  const handleContinueSession = () => openSession(activeSessionId);
   const handleCreateSession = async () => {
     try {
       const items = await new ItemRepository().getAll();
@@ -144,9 +156,13 @@ export default function OutsidePage() {
   };
 
   const previewItems = sessionItems.slice(0, 5);
-  const progressPercent =
+  const leavingPercent =
     sessionCard.itemCount > 0
       ? Math.round((sessionCard.checkedCount / sessionCard.itemCount) * 100)
+      : 0;
+  const returningPercent =
+    sessionCard.itemCount > 0
+      ? Math.round((sessionCard.returnCheckedCount / sessionCard.itemCount) * 100)
       : 0;
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
@@ -172,9 +188,11 @@ export default function OutsidePage() {
             >
               <FontAwesomeIcon icon={faChevronLeft} size={16} color={PRIMARY} />
             </TouchableOpacity>
-            <View>
+            <View style={styles.titleBlock}>
               <Text style={[styles.title, { color: colors.text }]}>Outside</Text>
-              <Text style={[styles.subtitle, { color: subtleText }]}>Track items you&apos;ve taken out</Text>
+              <Text style={[styles.subtitle, { color: subtleText }]} numberOfLines={1}>
+                Check items before leaving and going home
+              </Text>
             </View>
           </View>
           <TouchableOpacity style={[styles.historyPill, { borderColor: borderColor, backgroundColor: cardBg }]} onPress={handleViewHistory}>
@@ -205,13 +223,13 @@ export default function OutsidePage() {
             >
               {/* Session name row */}
               <View style={styles.sessionHeaderRow}>
-                <View style={[styles.sessionDot, { backgroundColor: progressPercent === 100 ? '#6b9e7a' : PRIMARY }]} />
+                <View style={[styles.sessionDot, { backgroundColor: returningPercent === 100 ? '#6b9e7a' : PRIMARY }]} />
                 <Text style={[styles.sessionCardTitle, { color: colors.text }]} numberOfLines={1}>
                   {activeSessionTitle}
                 </Text>
-                <View style={[styles.activeBadge, { backgroundColor: progressPercent === 100 ? '#6b9e7a18' : `${PRIMARY}18` }]}>
-                  <Text style={[styles.activeBadgeText, { color: progressPercent === 100 ? '#6b9e7a' : PRIMARY }]}>
-                    {progressPercent === 100 ? 'Ready' : 'Active'}
+                <View style={[styles.activeBadge, { backgroundColor: returningPercent === 100 ? '#6b9e7a18' : `${PRIMARY}18` }]}>
+                  <Text style={[styles.activeBadgeText, { color: returningPercent === 100 ? '#6b9e7a' : PRIMARY }]}>
+                    {returningPercent === 100 ? 'Ready' : 'Active'}
                   </Text>
                 </View>
                 <FontAwesomeIcon icon={faChevronRight} size={14} color={subtleText} />
@@ -221,10 +239,10 @@ export default function OutsidePage() {
               <View style={styles.progressSection}>
                 <View style={styles.progressLabelRow}>
                   <Text style={[styles.progressLabel, { color: subtleText }]}>
-                    {sessionCard.checkedCount}/{sessionCard.itemCount} checked
+                    Leaving
                   </Text>
-                  <Text style={[styles.progressPercent, { color: progressPercent === 100 ? '#6b9e7a' : PRIMARY }]}>
-                    {progressPercent}%
+                  <Text style={[styles.progressPercent, { color: leavingPercent === 100 ? '#6b9e7a' : PRIMARY }]}>
+                    {sessionCard.checkedCount}/{sessionCard.itemCount}
                   </Text>
                 </View>
                 <View style={[styles.progressTrack, { backgroundColor: isDark ? '#2c2c2e' : '#e8e8ed' }]}>
@@ -232,8 +250,27 @@ export default function OutsidePage() {
                     style={[
                       styles.progressFill,
                       {
-                        width: `${progressPercent}%`,
-                        backgroundColor: progressPercent === 100 ? '#6b9e7a' : PRIMARY,
+                        width: `${leavingPercent}%`,
+                        backgroundColor: leavingPercent === 100 ? '#6b9e7a' : PRIMARY,
+                      },
+                    ]}
+                  />
+                </View>
+                <View style={styles.progressLabelRow}>
+                  <Text style={[styles.progressLabel, { color: subtleText }]}>
+                    Going home
+                  </Text>
+                  <Text style={[styles.progressPercent, { color: returningPercent === 100 ? '#6b9e7a' : PRIMARY }]}>
+                    {sessionCard.returnCheckedCount}/{sessionCard.itemCount}
+                  </Text>
+                </View>
+                <View style={[styles.progressTrack, { backgroundColor: isDark ? '#2c2c2e' : '#e8e8ed' }]}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {
+                        width: `${returningPercent}%`,
+                        backgroundColor: returningPercent === 100 ? '#6b9e7a' : PRIMARY,
                       },
                     ]}
                   />
@@ -268,19 +305,21 @@ export default function OutsidePage() {
               {/* Tap hint */}
               <View style={styles.tapHintRow}>
                 <Text style={[styles.tapHintText, { color: PRIMARY }]}>
-                  Tap to manage session
+                  Tap to open checklist
                 </Text>
               </View>
             </TouchableOpacity>
 
-            {/* Quick Action: Complete (only shown when 100%) */}
-            {progressPercent === 100 && (
+            {/* Quick Action: Continue */}
+            {sessionCard.itemCount > 0 && (
               <TouchableOpacity
-                style={[styles.completeButton, { backgroundColor: '#6b9e7a' }]}
-                onPress={handleCompleteSession}
+                style={[styles.completeButton, { backgroundColor: returningPercent === 100 ? '#6b9e7a' : PRIMARY }]}
+                onPress={handleContinueSession}
               >
                 <FontAwesomeIcon icon={faCheckCircle} size={18} color="#fff" />
-                <Text style={styles.completeButtonText}>Complete Session</Text>
+                <Text style={styles.completeButtonText}>
+                  {returningPercent === 100 ? 'Review and End' : 'Continue Checklist'}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -292,30 +331,35 @@ export default function OutsidePage() {
             </View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No Active Session</Text>
             <Text style={[styles.emptySubtitle, { color: subtleText }]}>
-              Start a checklist to track items you take outside
+              Start a temporary checklist for the next time you leave
             </Text>
             <TouchableOpacity
               style={[styles.primaryButton, { backgroundColor: PRIMARY, alignSelf: 'stretch' }]}
               onPress={handleCreateSession}
             >
-              <Text style={styles.primaryButtonText}>+ Start New Session</Text>
+              <Text style={styles.primaryButtonText}>+ Start Checklist</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {/* Recent Sessions — shown regardless of active session state */}
-        {recentSessions.length > 0 && (
-          <View style={styles.recentSection}>
+        <View style={styles.recentSection}>
             <View style={styles.recentHeader}>
               <FontAwesomeIcon icon={faClockRotateLeft} size={13} color={subtleText} />
               <Text style={[styles.recentTitle, { color: subtleText }]}>Recent Sessions</Text>
-              <TouchableOpacity onPress={handleViewHistory}>
-                <Text style={[styles.recentSeeAll, { color: PRIMARY }]}>See all</Text>
-              </TouchableOpacity>
+              {recentSessions.length > 0 && (
+                <TouchableOpacity onPress={handleViewHistory}>
+                  <Text style={[styles.recentSeeAll, { color: PRIMARY }]}>See all</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             <View style={[styles.card, { backgroundColor: cardBg, borderColor, padding: 0, overflow: 'hidden' }]}>
-              {recentSessions.map((session, index) => {
+              {recentSessions.length === 0 ? (
+                <View style={styles.emptyRecentRow}>
+                  <Text style={[styles.emptyRecentText, { color: subtleText }]}>No history yet</Text>
+                </View>
+              ) : recentSessions.map((session, index) => {
                 const date = new Date(session.completed_at ?? session.created_at);
                 const label = formatRelativeDate(date);
                 return (
@@ -325,7 +369,7 @@ export default function OutsidePage() {
                       styles.recentRow,
                       index < recentSessions.length - 1 && { borderBottomWidth: 1, borderBottomColor: borderColor },
                     ]}
-                    onPress={() => router.push(`/outside/${session.id}`)}
+                    onPress={() => openSession(session.id)}
                     activeOpacity={0.6}
                   >
                     <View style={[styles.recentDot, { backgroundColor: '#6b9e7a' }]} />
@@ -338,8 +382,7 @@ export default function OutsidePage() {
                 );
               })}
             </View>
-          </View>
-        )}
+        </View>
       </ScrollView>
 
       <SessionFormModal
@@ -362,23 +405,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
     marginBottom: 20,
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 },
   backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
-  title: { fontSize: 30, fontWeight: '700', letterSpacing: -0.5 },
-  subtitle: { fontSize: 13, marginTop: 2 },
+  titleBlock: { flex: 1, minWidth: 0 },
+  title: { fontSize: 29, fontWeight: '700', letterSpacing: 0 },
+  subtitle: { fontSize: 13, marginTop: 1 },
   historyPill: {
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 20,
     borderWidth: 1,
+    flexShrink: 0,
   },
   historyPillText: { fontSize: 14, fontWeight: '600' },
 
@@ -462,4 +509,10 @@ const styles = StyleSheet.create({
   recentDot: { width: 7, height: 7, borderRadius: 4 },
   recentSessionName: { fontSize: 15, fontWeight: '500', flex: 1 },
   recentDate: { fontSize: 13 },
+  emptyRecentRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+    alignItems: 'center',
+  },
+  emptyRecentText: { fontSize: 14, fontWeight: '500' },
 });

@@ -21,6 +21,7 @@ import {
   ActivityIndicator,
   DeviceEventEmitter,
   Image,
+  Alert,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { 
@@ -97,11 +98,22 @@ type DashboardDueLending = Lending & {
   urgency: 'overdue' | 'critical' | 'warning';
 };
 
+type DashboardLostItem = {
+  id: string;
+  name: string;
+  spaceName: string;
+  containerName: string | null;
+  spaceId: string;
+  containerId: string | null;
+  lostAt: string;
+};
+
 interface DashboardData {
   stats: { totalItems: number; totalSpaces: number; totalContainers: number };
   recentItems: { id: string; name: string; spaceName: string; containerName: string | null; spaceId: string; containerId: string | null; createdAt: string; photoUri: string | null }[];
   recentlyMoved: DashboardMovedItem[];
   expiringWarranties: { id: string; name: string; spaceName: string; containerName: string | null; spaceId: string; containerId: string | null; warrantyExpiry: string; daysRemaining: number; urgency: 'critical' | 'warning' }[];
+  lostItems: DashboardLostItem[];
   activeLendings: (Lending & { item_name: string })[];
   dueLendings: DashboardDueLending[];
   activeSession: { id: string; title: string; itemCount: number; checkedCount: number } | null;
@@ -251,11 +263,12 @@ export default function HomePage() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [name, dashboard, activeLendings, session] = await Promise.all([
+      const [name, dashboard, activeLendings, session, lostItems] = await Promise.all([
         UserService.getName(),
         DashboardService.getFullDashboard(),
         lendingService.getActiveLendingsWithItemNames().catch(() => []),
         outsideService.getActiveSession().catch(() => null),
+        ItemRepository.getLostItems(),
       ]);
 
       if (!name) setShowNamePrompt(true);
@@ -281,6 +294,7 @@ export default function HomePage() {
         recentItems: dashboard.recentItems,
         recentlyMoved: dashboard.recentlyMoved,
         expiringWarranties: dashboard.expiringWarranties,
+        lostItems,
         activeLendings,
         dueLendings,
         activeSession: session
@@ -307,7 +321,24 @@ export default function HomePage() {
   const showOutsideGuidance = !!data && !data.isEmpty && data.stats.totalItems > 0 && !data.activeSession && !dismissedGuidanceCards.has('outside');
   const hasTodayContent = !!data?.activeSession || (data?.activeLendings?.length ?? 0) > 0 || showLendGuidance || showOutsideGuidance;
   const hasActivityContent = (data?.recentItems?.length ?? 0) > 0 || (data?.recentlyMoved?.length ?? 0) > 0 || (!!data && !data.isEmpty && data.stats.totalItems === 0);
-  const hasAlertContent = (data?.dueLendings?.length ?? 0) > 0 || (data?.expiringWarranties?.length ?? 0) > 0;
+  const hasAlertContent = (data?.lostItems?.length ?? 0) > 0 || (data?.dueLendings?.length ?? 0) > 0 || (data?.expiringWarranties?.length ?? 0) > 0;
+
+  const handleMarkFound = (item: DashboardLostItem) => {
+    Alert.alert('Mark as Found', `Clear the lost status for "${item.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Mark Found',
+        onPress: async () => {
+          try {
+            await ItemRepository.markFound(item.id);
+            await loadAll();
+          } catch {
+            Alert.alert('Error', 'Failed to mark item as found');
+          }
+        },
+      },
+    ]);
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top']}>
@@ -577,6 +608,64 @@ export default function HomePage() {
             )}
 
             {/* ── Expiring warranties ────────────────────────── */}
+            {dashboardSegment === 'alerts' && (data?.lostItems?.length ?? 0) > 0 && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Lost Items</Text>
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/spaces' as any)}>
+                    <Text style={[styles.seeAll, { color: PRIMARY }]}>Spaces</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+                  {data!.lostItems.slice(0, 3).map((item, index) => {
+                    const route = item.containerId ? `/container/${item.containerId}` : `/space/${item.spaceId}`;
+                    const location = item.containerName
+                      ? `${item.spaceName} â€º ${item.containerName}`
+                      : item.spaceName;
+                    const isLastItem = index === Math.min(data!.lostItems.length, 3) - 1;
+
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={[
+                          styles.warrantyRow,
+                          !isLastItem && {
+                            borderBottomWidth: 1,
+                            borderBottomColor: borderColor,
+                          },
+                        ]}
+                        onPress={() => router.push(route as any)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.warrantyDot, { backgroundColor: '#d32f2f' }]} />
+                        <View style={styles.warrantyContent}>
+                          <Text style={[styles.warrantyName, { color: colors.text }]} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                          <Text style={[styles.warrantyMeta, { color: subtleText }]} numberOfLines={1}>
+                            {location} · Reported {formatDate(item.lostAt)}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          style={[styles.statusPill, { backgroundColor: '#d32f2f18' }]}
+                          onPress={() => handleMarkFound(item)}
+                        >
+                          <Text style={[styles.statusPillText, { color: '#d32f2f' }]}>Found</Text>
+                        </TouchableOpacity>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  {data!.lostItems.length > 3 && (
+                    <View style={styles.viewAllRow}>
+                      <Text style={[styles.viewAllText, { color: PRIMARY }]}>
+                        +{data!.lostItems.length - 3} more
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
+
             {dashboardSegment === 'alerts' && (data?.dueLendings?.length ?? 0) > 0 && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>

@@ -38,6 +38,7 @@ import {
   faWrench,
   faUser,
   faMicrophone,
+  faChevronLeft,
 } from '@fortawesome/free-solid-svg-icons';
 import { UserService } from '@/src/services/UserService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -267,7 +268,7 @@ export default function OnboardingScreen() {
         <View style={styles.btnsRow}>
           {currentIndex > 0 && (
             <TouchableOpacity style={[styles.backBtn, { borderColor }]} onPress={goBack}>
-              <Text style={[styles.backBtnText, { color: subtleText }]}>Back</Text>
+              <FontAwesomeIcon icon={faChevronLeft} size={16} color={subtleText} />
             </TouchableOpacity>
           )}
 

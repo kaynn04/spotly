@@ -215,6 +215,27 @@ export async function initializeDatabase() {
       console.error('⚠ Item warranty migration failed:', err);
     }
 
+    // Add lost item tracking columns
+    try {
+      const itemCols = await db.getAllAsync<any>("PRAGMA table_info(items);");
+      if (!itemCols.some((col: any) => col.name === 'lost_at')) {
+        await db.execAsync(`ALTER TABLE items ADD COLUMN lost_at TEXT;`);
+        console.log('✓ Added lost_at column to items');
+      }
+      const refreshedItemCols = await db.getAllAsync<any>("PRAGMA table_info(items);");
+      if (!refreshedItemCols.some((col: any) => col.name === 'lost_outside_session_id')) {
+        await db.execAsync(`ALTER TABLE items ADD COLUMN lost_outside_session_id TEXT;`);
+        console.log('✓ Added lost_outside_session_id column to items');
+      }
+      const finalItemCols = await db.getAllAsync<any>("PRAGMA table_info(items);");
+      if (!finalItemCols.some((col: any) => col.name === 'lost_note')) {
+        await db.execAsync(`ALTER TABLE items ADD COLUMN lost_note TEXT;`);
+        console.log('✓ Added lost_note column to items');
+      }
+    } catch (err) {
+      console.error('Lost item columns migration failed:', err);
+    }
+
     // Add global unique constraints for items and containers (Migration 013)
     try {
       await addGlobalUniqueConstraints(db);

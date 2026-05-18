@@ -22,6 +22,8 @@ import { Colors } from '@/constants/theme';
 import { useOutsideService } from '../services/OutsideService';
 import { OutsideSession } from '../models/OutsideSession';
 import { OutsideSessionItemWithContext } from '../models/OutsideSessionItem';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faChevronLeft } from '@fortawesome/free-solid-svg-icons';
 
 const PRIMARY = '#6b7f99';
 
@@ -117,7 +119,7 @@ export default function SessionHistoryScreen() {
   const headerBar = (
     <View style={[styles.headerBar, { borderBottomColor: borderColor, backgroundColor: isDark ? '#1c1c1e' : '#ffffff' }]}>
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Text style={[styles.backBtnText, { color: PRIMARY }]}>{'\u2039 Back'}</Text>
+        <FontAwesomeIcon icon={faChevronLeft} size={18} color={PRIMARY} />
       </TouchableOpacity>
       <Text style={[styles.headerTitle, { color: colors.text }]}>History</Text>
       <View style={styles.headerSpacer} />
@@ -216,6 +218,11 @@ export default function SessionHistoryScreen() {
                         const movedTo = si.moved_to_container_name
                           ? `${si.moved_to_space_name} › ${si.moved_to_container_name}`
                           : si.moved_to_space_name;
+                        const issueLabel = si.issue_status === 'LOST'
+                          ? 'Reported lost'
+                          : si.issue_status === 'NOT_BROUGHT'
+                          ? 'Forgot to bring'
+                          : null;
                         return (
                           <View key={si.id} style={styles.expandedItem}>
                             <View style={[styles.expandedCheck, { backgroundColor: checked ? (isDark ? '#4ade80' : '#6b9e7a') : isDark ? '#48484a' : '#d1d5db' }]}>
@@ -234,6 +241,11 @@ export default function SessionHistoryScreen() {
                                   {location}
                                 </Text>
                               ) : null}
+                              {issueLabel && (
+                                <Text style={[styles.expandedItemIssue, { color: si.issue_status === 'LOST' ? '#d32f2f' : '#f57c00' }]}>
+                                  {issueLabel}
+                                </Text>
+                              )}
                             </View>
                           </View>
                         );
@@ -294,6 +306,7 @@ const styles = StyleSheet.create({
   expandedItemText: { flex: 1 },
   expandedItemName: { fontSize: 14, fontWeight: '500' },
   expandedItemLocation: { fontSize: 11, marginTop: 1 },
+  expandedItemIssue: { fontSize: 11, marginTop: 1, fontWeight: '700' },
 
   /* Empty state */
   emptyIconWrap: { width: 72, height: 72, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },

@@ -27,6 +27,8 @@ import { ItemRepository } from '../../../repositories/ItemRepository';
 import { Lending } from '../models/Lending';
 import { LendingPhoto, LendingPhotoPhase } from '../models/LendingPhoto';
 import LendingPhotoSection from './components/LendingPhotoSection';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faChevronLeft } from '@fortawesome/free-solid-svg-icons';
 
 const PRIMARY = '#6b7f99';
 const SUCCESS = '#6b9e7a';
@@ -146,7 +148,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
   const headerBar = (
     <View style={[styles.headerBar, { borderBottomColor: borderColor }]}>
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Text style={[styles.backBtnText, { color: PRIMARY }]}>{'< Back'}</Text>
+        <FontAwesomeIcon icon={faChevronLeft} size={18} color={PRIMARY} />
       </TouchableOpacity>
       <Text style={[styles.headerTitle, { color: colors.text }]}>Lending Details</Text>
       <View style={styles.headerSpacer} />

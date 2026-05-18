@@ -142,6 +142,13 @@ export class LendingService {
       throw createServiceError('ITEM_NOT_FOUND', 'Item not found');
     }
 
+    if (item.lostAt) {
+      throw createServiceError(
+        'ITEM_LOST',
+        'This item is marked as lost. Mark it as found before lending it.'
+      );
+    }
+
     // Validate no ACTIVE lending already exists (BR-001)
     let hasActive: boolean;
     try {
