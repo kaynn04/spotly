@@ -78,6 +78,8 @@ export default function OutsidePage() {
     useCallback(() => {
       loadActiveSession();
       loadRecentSessions();
+      // Refresh both outside summaries whenever this tab gains focus.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   );
 
@@ -88,6 +90,8 @@ export default function OutsidePage() {
     };
     const subscription = DeviceEventEmitter.addListener('synop:refresh-home', handleRefresh);
     return () => subscription.remove();
+    // Register one refresh listener for this screen instance.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadActiveSession = async () => {

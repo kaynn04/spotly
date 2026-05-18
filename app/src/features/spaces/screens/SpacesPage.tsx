@@ -268,6 +268,8 @@ export default function SpacesPage() {
     // Debounce: cancel previous pending search
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     searchTimerRef.current = setTimeout(() => performSearch(trimmed), 300);
+    // performSearch is intentionally captured for the debounce callback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

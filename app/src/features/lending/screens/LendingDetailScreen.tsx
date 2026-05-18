@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Lending Detail Screen
  *
  * Minimalist redesign â€” uniform with Outside feature

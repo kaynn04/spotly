@@ -8,8 +8,8 @@
  */
 
 import { getDatabase } from './client';
-import { createLendingsTable, dropLendingsTable } from './migrations/003-create-lendings-table';
-import { createOutsideSessionsTables, dropOutsideSessionsTables } from './migrations/004-create-outside-tables';
+import { createLendingsTable } from './migrations/003-create-lendings-table';
+import { createOutsideSessionsTables } from './migrations/004-create-outside-tables';
 import { addItemsUpdatedAt } from './migrations/005-add-items-updated-at';
 import { addItemsForeignKeys } from './migrations/006-add-items-foreign-keys';
 import { addItemPhotoUri } from './migrations/007-add-item-photo-uri';

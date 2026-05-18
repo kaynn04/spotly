@@ -14,10 +14,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  ActivityIndicator,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faCamera, faPlus, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faCamera, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { LendingPhoto, LendingPhotoPhase, MAX_PHOTOS_PER_PHASE } from '../../models/LendingPhoto';
 import { PhotoService } from '../../../../services/PhotoService';
 import PhotoViewModal from '@/components/PhotoViewModal';

@@ -72,6 +72,8 @@ export default function ItemSelectionModal({
     } finally {
       setLoading(false);
     }
+  // Recreate the item list when this picker mounts.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load items when modal opens

@@ -473,6 +473,8 @@ function TabItem({ icon, focused, onPress, tabRef }: { icon: any; focused: boole
       tension: 80,
       friction: 10,
     }).start();
+    // anim is a stable Animated.Value ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focused]);
 
   const scale = anim.interpolate({

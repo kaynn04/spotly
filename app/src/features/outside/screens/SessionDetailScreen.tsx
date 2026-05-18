@@ -96,6 +96,8 @@ export default function SessionDetailScreen() {
   useFocusEffect(
     useCallback(() => {
       if (id) loadSession();
+      // loadSession intentionally refreshes the current route id on focus.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id])
   );
 
@@ -316,7 +318,7 @@ export default function SessionDetailScreen() {
       if (isWrapUpMode) {
         await advanceWrapUp();
       }
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'Failed to update item');
     }
     if (!isWrapUpMode) setPutAwayItem(null);
@@ -346,7 +348,7 @@ export default function SessionDetailScreen() {
       );
       setSpaceContainers(containersMap);
       setShowMoveSheet(true);
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'Failed to load spaces');
       if (!isWrapUpMode) setPutAwayItem(null);
       if (isWrapUpMode) setShowPutAwaySheet(true);
@@ -372,7 +374,7 @@ export default function SessionDetailScreen() {
       if (isWrapUpMode) {
         await advanceWrapUp();
       }
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'Failed to move item');
     }
     if (!isWrapUpMode) setPutAwayItem(null);
@@ -393,7 +395,7 @@ export default function SessionDetailScreen() {
       if (isWrapUpMode) {
         await advanceWrapUp();
       }
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'Failed to move item');
     }
     if (!isWrapUpMode) setPutAwayItem(null);

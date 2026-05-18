@@ -244,10 +244,6 @@ export default function ContainerDetailScreen() {
     }
   }
 
-  function handleItemPress(item: Item) {
-    setActionSheetItem(item);
-  }
-
   function handleContainerMenuPress() {
     setShowContainerMenu(true);
   }
@@ -1125,7 +1121,6 @@ export default function ContainerDetailScreen() {
           }
         }
         
-        const canLend = selectedIds.size === 1;
         const canDelete = selectedIds.size > 0;
 
         // Logic for Lend/Return button

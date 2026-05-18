@@ -28,7 +28,6 @@ import { faShield, faCalendarAlt, faTimes } from '@fortawesome/free-solid-svg-ic
 import PhotoPickerSheet from '@/components/PhotoPickerSheet';
 import DatePickerSheet from '@/src/features/lending/screens/components/DatePickerSheet';
 import { PhotoService } from '@/src/services/PhotoService';
-import { Colors } from '@/constants/theme';
 import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 
 const PRIMARY = '#6b7f99';
@@ -75,6 +74,8 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
       setPhotoUri(null);
       setWarrantyDate(null);
     }
+  // The form resets from initial values only when the sheet opens/closes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';

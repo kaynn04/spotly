@@ -60,6 +60,8 @@ export default function SpaceFormModal({ visible, onClose, onSubmit, initialName
     } else {
       submittingRef.current = false;
     }
+  // The form should refresh from initial values only when opened/closed.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';

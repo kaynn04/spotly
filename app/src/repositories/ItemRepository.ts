@@ -74,7 +74,7 @@ export class ItemRepository {
     );
   }
 
-  static async getLostItems(): Promise<Array<{ id: string; name: string; spaceName: string; containerName: string | null; spaceId: string; containerId: string | null; lostAt: string }>> {
+  static async getLostItems(): Promise<{ id: string; name: string; spaceName: string; containerName: string | null; spaceId: string; containerId: string | null; lostAt: string }[]> {
     try {
       const db = getDatabase();
       await ItemRepository.ensureLostColumns();
@@ -437,7 +437,7 @@ export class ItemRepository {
    */
   static async getRecentItems(
     limit: number = 5
-  ): Promise<Array<{ id: string; name: string; spaceName: string; containerName: string | null; spaceId: string; containerId: string | null; createdAt: string; photoUri: string | null }>> {
+  ): Promise<{ id: string; name: string; spaceName: string; containerName: string | null; spaceId: string; containerId: string | null; createdAt: string; photoUri: string | null }[]> {
     try {
       const db = getDatabase();
 
@@ -472,7 +472,7 @@ export class ItemRepository {
 
   static async getRecentlyMovedItems(
     limit: number = 5
-  ): Promise<Array<{ id: string; name: string; spaceName: string; containerName: string | null; updatedAt: string; photoUri: string | null }>> {
+  ): Promise<{ id: string; name: string; spaceName: string; containerName: string | null; updatedAt: string; photoUri: string | null }[]> {
     try {
       const db = getDatabase();
       const sanitizedLimit = Math.max(1, Math.min(1000, Math.floor(limit)));
@@ -730,7 +730,7 @@ export class ItemRepository {
    * 
    * @returns Array of items with warranty expiry info
    */
-  static async getItemsWithWarrantyExpiry(): Promise<Array<{
+  static async getItemsWithWarrantyExpiry(): Promise<{
     id: string;
     name: string;
     spaceName: string;
@@ -738,7 +738,7 @@ export class ItemRepository {
     spaceId: string;
     containerId: string | null;
     warrantyExpiry: string;
-  }>> {
+  }[]> {
     try {
       const db = getDatabase();
 
