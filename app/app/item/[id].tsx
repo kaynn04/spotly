@@ -33,7 +33,9 @@ import { LendingService } from '@/src/features/lending/services/LendingService';
 import { LendingRepository } from '@/src/features/lending/repositories/LendingRepository';
 import { ItemRepository } from '@/src/repositories/ItemRepository';
 import { PhotoService } from '@/src/services/PhotoService';
+import PhotoActionSheet from '@/components/PhotoActionSheet';
 import PhotoPickerSheet from '@/components/PhotoPickerSheet';
+import PhotoViewModal from '@/components/PhotoViewModal';
 import { Lending } from '@/src/features/lending/models/Lending';
 import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
 import { OutsideService } from '@/src/features/outside/services/OutsideService';
@@ -73,7 +75,9 @@ export default function ItemDetailScreen() {
 
   // Menu state
   const [showMenu, setShowMenu] = useState(false);
+  const [showPhotoActions, setShowPhotoActions] = useState(false);
   const [showPhotoPicker, setShowPhotoPicker] = useState(false);
+  const [showPhotoViewer, setShowPhotoViewer] = useState(false);
 
   // Move state
   const [showMoveModal, setShowMoveModal] = useState(false);
@@ -458,13 +462,7 @@ export default function ItemDetailScreen() {
         {item.photoUri ? (
           <TouchableOpacity
             style={[styles.photoCard, { backgroundColor: cardBg, borderColor }]}
-            onPress={() => {
-              Alert.alert('Item Photo', '', [
-                { text: 'Replace Photo', onPress: () => setShowPhotoPicker(true) },
-                { text: 'Remove Photo', style: 'destructive', onPress: () => handleRemovePhoto() },
-                { text: 'Cancel', style: 'cancel' },
-              ]);
-            }}
+            onPress={() => setShowPhotoActions(true)}
             activeOpacity={0.8}
           >
             <Image source={{ uri: item.photoUri }} style={styles.photoFull} resizeMode="cover" />
@@ -755,6 +753,20 @@ export default function ItemDetailScreen() {
         onClose={() => setShowPhotoPicker(false)}
         onCamera={() => handleAddPhoto('camera')}
         onGallery={() => handleAddPhoto('gallery')}
+      />
+      <PhotoActionSheet
+        visible={showPhotoActions}
+        title={item.name}
+        onView={() => setShowPhotoViewer(true)}
+        onReplace={() => setShowPhotoPicker(true)}
+        onRemove={handleRemovePhoto}
+        onClose={() => setShowPhotoActions(false)}
+      />
+      <PhotoViewModal
+        visible={showPhotoViewer}
+        uri={item.photoUri ?? null}
+        title={item.name}
+        onClose={() => setShowPhotoViewer(false)}
       />
     </View>
   );

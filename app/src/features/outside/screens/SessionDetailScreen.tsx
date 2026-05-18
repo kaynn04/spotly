@@ -17,6 +17,8 @@ import {
   Alert,
   Modal,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faCheck, faTimes, faHome, faBox, faFolder, faChevronLeft, faMapPin, faHandshake, faTrash } from '@fortawesome/free-solid-svg-icons';
@@ -37,6 +39,7 @@ import { LendingRepository } from '@/src/features/lending/repositories/LendingRe
 import { ItemRepository } from '@/src/repositories/ItemRepository';
 import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
 import ItemPickerModal from './components/ItemPickerModal';
+import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 
 const PRIMARY = '#6b7f99';
 const LENDING = '#9b72cb';
@@ -49,6 +52,7 @@ export default function SessionDetailScreen() {
   const outsideService = useOutsideService();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
   const isDark = colorScheme === 'dark';
 
   const [session, setSession] = useState<any>(null);
@@ -95,8 +99,8 @@ export default function SessionDetailScreen() {
     }, [id])
   );
 
-  const loadSession = async () => {
-    setLoading(true);
+  const loadSession = async (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
     setError(null);
     try {
       const sessionData = await outsideService.getSession(id!);
@@ -107,27 +111,55 @@ export default function SessionDetailScreen() {
       console.error('[SessionDetailScreen] Error loading session:', err);
       setError('Failed to load session');
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
   const handleToggleItem = async (item: OutsideSessionItemWithContext) => {
     // Completed sessions are read-only
     if (session?.status !== 'ACTIVE') return;
+    const nextChecked = !item.is_checked;
+    const nextCheckedAt = nextChecked ? new Date().toISOString() : null;
+    setItems((prev) =>
+      prev.map((sessionItem) =>
+        sessionItem.item_id === item.item_id
+          ? { ...sessionItem, is_checked: nextChecked ? 1 : 0, checked_at: nextCheckedAt }
+          : sessionItem
+      )
+    );
+    setSession((prev: any) => prev
+      ? { ...prev, checkedCount: Math.max(0, (prev.checkedCount ?? 0) + (nextChecked ? 1 : -1)) }
+      : prev
+    );
     try {
       await outsideService.checkItem(id!, item.item_id);
-      await loadSession();
+      await loadSession(false);
     } catch {
+      await loadSession(false);
       Alert.alert('Error', 'Failed to update item');
     }
   };
 
   const handleToggleReturnItem = async (item: OutsideSessionItemWithContext) => {
     if (session?.status !== 'ACTIVE') return;
+    const nextChecked = !item.return_checked;
+    const nextCheckedAt = nextChecked ? new Date().toISOString() : null;
+    setItems((prev) =>
+      prev.map((sessionItem) =>
+        sessionItem.item_id === item.item_id
+          ? { ...sessionItem, return_checked: nextChecked ? 1 : 0, return_checked_at: nextCheckedAt }
+          : sessionItem
+      )
+    );
+    setSession((prev: any) => prev
+      ? { ...prev, returnCheckedCount: Math.max(0, (prev.returnCheckedCount ?? 0) + (nextChecked ? 1 : -1)) }
+      : prev
+    );
     try {
       await outsideService.checkReturnItem(id!, item.item_id);
-      await loadSession();
+      await loadSession(false);
     } catch {
+      await loadSession(false);
       Alert.alert('Error', 'Failed to update return check');
     }
   };
@@ -761,8 +793,11 @@ export default function SessionDetailScreen() {
       )}
 
       <Modal visible={showLostReportModal} transparent animationType="slide" onRequestClose={() => setShowLostReportModal(false)}>
-        <View style={styles.sheetOverlay}>
-          <View style={[styles.uncheckSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+        <KeyboardAvoidingView
+          style={styles.sheetOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={[styles.uncheckSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 + keyboardHeight }]}>
             <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
             <Text style={[styles.sheetTitle, { color: colors.text }]}>Report lost item</Text>
             <Text style={[styles.sheetSubtitle, { color: subtleText }]}>
@@ -796,7 +831,7 @@ export default function SessionDetailScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Uncheck Confirmation Sheet */}

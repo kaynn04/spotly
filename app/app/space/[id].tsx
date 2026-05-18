@@ -48,7 +48,9 @@ import { LendingRepository } from '@/src/features/lending/repositories/LendingRe
 import { ItemRepository } from '@/src/repositories/ItemRepository';
 import { PhotoService } from '@/src/services/PhotoService';
 import { SpaceRepository } from '@/src/repositories/SpaceRepository';
+import PhotoActionSheet from '@/components/PhotoActionSheet';
 import PhotoPickerSheet from '@/components/PhotoPickerSheet';
+import PhotoViewModal from '@/components/PhotoViewModal';
 import { Lending } from '@/src/features/lending/models/Lending';
 import { OutsideService } from '@/src/features/outside/services/OutsideService';
 import ItemFormModal from '@/src/features/spaces/screens/components/ItemFormModal';
@@ -92,7 +94,9 @@ export default function SpaceDetailScreen() {
 
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [showAddContainerModal, setShowAddContainerModal] = useState(false);
+  const [showSpacePhotoActions, setShowSpacePhotoActions] = useState(false);
   const [showSpacePhotoPicker, setShowSpacePhotoPicker] = useState(false);
+  const [showSpacePhotoViewer, setShowSpacePhotoViewer] = useState(false);
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [selectedMoveItemIds, setSelectedMoveItemIds] = useState<Set<string>>(new Set());
   const [spaceContainers, setSpaceContainers] = useState<Record<string, Container[]>>({});
@@ -759,11 +763,7 @@ export default function SpaceDetailScreen() {
         space.photoUri ? (
           <TouchableOpacity
             style={[styles.spacePhotoWrap, { borderColor }]}
-            onPress={() => Alert.alert('Space Photo', '', [
-              { text: 'Replace Photo', onPress: () => setShowSpacePhotoPicker(true) },
-              { text: 'Remove Photo', style: 'destructive', onPress: handleRemoveSpacePhoto },
-              { text: 'Cancel', style: 'cancel' },
-            ])}
+            onPress={() => setShowSpacePhotoActions(true)}
             activeOpacity={0.8}
           >
             <Image source={{ uri: space.photoUri }} style={styles.spacePhoto} resizeMode="cover" />
@@ -1290,6 +1290,20 @@ export default function SpaceDetailScreen() {
         onClose={() => setShowSpacePhotoPicker(false)}
         onCamera={() => handleSpacePhoto('camera')}
         onGallery={() => handleSpacePhoto('gallery')}
+      />
+      <PhotoActionSheet
+        visible={showSpacePhotoActions}
+        title={space?.name ?? 'Space photo'}
+        onView={() => setShowSpacePhotoViewer(true)}
+        onReplace={() => setShowSpacePhotoPicker(true)}
+        onRemove={handleRemoveSpacePhoto}
+        onClose={() => setShowSpacePhotoActions(false)}
+      />
+      <PhotoViewModal
+        visible={showSpacePhotoViewer}
+        uri={space?.photoUri ?? null}
+        title={space?.name ?? 'Space photo'}
+        onClose={() => setShowSpacePhotoViewer(false)}
       />
 
       {/* Sort Sheet */}

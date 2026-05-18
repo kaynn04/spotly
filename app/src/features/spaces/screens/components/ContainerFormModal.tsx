@@ -14,6 +14,8 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   ActivityIndicator,
   Image,
@@ -23,6 +25,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import PhotoPickerSheet from '@/components/PhotoPickerSheet';
 import { PhotoService } from '@/src/services/PhotoService';
+import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 
 const PRIMARY = '#6b7f99';
 
@@ -45,6 +48,7 @@ export default function ContainerFormModal({
 }: ContainerFormModalProps) {
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
   const isDark = colorScheme === 'dark';
 
   const [name, setName] = useState('');
@@ -101,10 +105,14 @@ export default function ContainerFormModal({
       animationType="slide"
       onRequestClose={handleCancel}
     >
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoider}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <TouchableWithoutFeedback onPress={handleCancel}>
           <View style={styles.overlay}>
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 + keyboardHeight }]}>
                 {/* Handle */}
                 <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
@@ -113,6 +121,8 @@ export default function ContainerFormModal({
 
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="on-drag"
+                  nestedScrollEnabled
                   showsVerticalScrollIndicator={false}
                   bounces={false}
                   style={styles.scrollContent}
@@ -195,6 +205,7 @@ export default function ContainerFormModal({
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
       <PhotoPickerSheet
         visible={showPhotoPicker}
         onClose={() => setShowPhotoPicker(false)}
@@ -214,6 +225,7 @@ export default function ContainerFormModal({
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoider: { flex: 1 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '85%' },
   scrollContent: { flexGrow: 0 },

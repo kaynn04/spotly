@@ -21,6 +21,8 @@ import {
   ScrollView,
   TextInput,
   Linking,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import {
@@ -753,6 +755,10 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleCancel}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoider}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         {/* Header */}
         <View style={styles.header}>
@@ -1382,6 +1388,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
           )}
         </ScrollView>
       </SafeAreaView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -1574,6 +1581,7 @@ function buildStyles(isDark: boolean) {
   const textPrimary = isDark ? '#f7f8fa' : '#17202a';
   const textSecondary = isDark ? '#a9b0ba' : '#647181';
   return StyleSheet.create({
+    keyboardAvoider: { flex: 1 },
     safeArea: { flex: 1, backgroundColor: bg },
     header: {
       flexDirection: 'row',

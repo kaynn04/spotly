@@ -18,11 +18,14 @@ import {
   ScrollView,
   ActivityIndicator,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useOutsideService } from '../../services/OutsideService';
+import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 
 interface SessionFormModalProps {
   visible: boolean;
@@ -36,6 +39,7 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
   const colorScheme = useColorScheme();
   const outsideService = useOutsideService();
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
   const isDark = colorScheme === 'dark';
 
   const [title, setTitle] = useState('');
@@ -83,10 +87,14 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={() => { Keyboard.dismiss(); handleCancel(); }}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoider}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); handleCancel(); }}>
           <View style={styles.overlay}>
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 + keyboardHeight }]}>
                 {/* Handle */}
                 <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
@@ -95,6 +103,8 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
 
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="on-drag"
+                  nestedScrollEnabled
                   showsVerticalScrollIndicator={false}
                   bounces={false}
                   style={styles.scrollContent}
@@ -160,11 +170,15 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoider: {
+    flex: 1,
+  },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
