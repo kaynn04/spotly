@@ -31,7 +31,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faChevronLeft, faBox, faHandshake, faCheck, faTrash, faMapPin, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faFilter, faList, faGrip, faPen, faRightLeft } from '@fortawesome/free-solid-svg-icons';
+import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faChevronLeft, faBox, faHandshake, faCheck, faTrash, faMapPin, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faFilter, faList, faGrip, faPen, faRightLeft, faEllipsisVertical } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -54,6 +54,7 @@ import { OutsideService } from '@/src/features/outside/services/OutsideService';
 import ItemFormModal from '@/src/features/spaces/screens/components/ItemFormModal';
 import ContainerFormModal from '@/src/features/spaces/screens/components/ContainerFormModal';
 import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
+import SpaceFormModal from '@/src/features/spaces/screens/components/SpaceFormModal';
 import ItemActionSheet from '@/src/features/spaces/screens/components/ItemActionSheet';
 
 const PRIMARY = '#6b7f99';
@@ -122,6 +123,8 @@ export default function SpaceDetailScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const selectModeRef = useRef(false);
   selectModeRef.current = selectMode;
+  const [showSpaceMenu, setShowSpaceMenu] = useState(false);
+  const [editingSpace, setEditingSpace] = useState<Space | null>(null);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [editingContainer, setEditingContainer] = useState<Container | null>(null);
 
@@ -587,6 +590,20 @@ export default function SpaceDetailScreen() {
     await loadContainers();
   };
 
+  const handleEditSpaceSubmit = async (name: string, photoUri?: string | null) => {
+    if (!space) return;
+    await SpaceRepository.updateName(space.id, name);
+    if (photoUri && photoUri !== space.photoUri) {
+      const savedUri = await PhotoService.savePhoto(photoUri, `space_${space.id}`);
+      await SpaceRepository.updatePhotoUri(space.id, savedUri);
+    } else if (!photoUri && space.photoUri) {
+      await PhotoService.deletePhoto(space.photoUri);
+      await SpaceRepository.updatePhotoUri(space.id, null);
+    }
+    setEditingSpace(null);
+    await loadSpace();
+  };
+
   async function handleAddItem(name: string, description?: string, quantity?: number, photoUri?: string | null, warrantyExpiry?: Date | null) {
     // Create item first to get the ID, then save photo if provided
     const item = await ItemService.createItem(id!, name, null, description, quantity);
@@ -651,6 +668,12 @@ export default function SpaceDetailScreen() {
     setShowMenu(false);
   };
 
+  const sortLabel =
+    sortMode === 'name-asc' ? 'A-Z' :
+    sortMode === 'name-desc' ? 'Z-A' :
+    sortMode === 'newest' ? 'Newest' :
+    'Oldest';
+
   const spaceLevelItems = items.filter((item) => !item.containerId);
 
   // Sort items and containers
@@ -699,6 +722,9 @@ export default function SpaceDetailScreen() {
     return true;
   });
 
+  const visibleContainerCount = filteredData.filter((entry) => entry.type === 'container').length;
+  const visibleItemCount = filteredData.filter((entry) => entry.type === 'item').length;
+
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
       {/* Header */}
@@ -711,22 +737,8 @@ export default function SpaceDetailScreen() {
         </Text>
         {!selectMode && (
           <View style={styles.headerControls}>
-            <TouchableOpacity
-              onPress={() => switchViewMode('list')}
-              style={[styles.iconToggle, viewMode === 'list' && styles.iconToggleActive]}
-              accessibilityLabel="List view"
-            >
-              <FontAwesomeIcon icon={faList} size={15} color={viewMode === 'list' ? PRIMARY : subtleText} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => switchViewMode('grid')}
-              style={[styles.iconToggle, viewMode === 'grid' && styles.iconToggleActive]}
-              accessibilityLabel="Grid view"
-            >
-              <FontAwesomeIcon icon={faGrip} size={15} color={viewMode === 'grid' ? PRIMARY : subtleText} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowMenu(true)} style={styles.iconToggle} accessibilityLabel="Sort">
-              <FontAwesomeIcon icon={faFilter} size={15} color={subtleText} />
+            <TouchableOpacity onPress={() => setShowSpaceMenu(true)} style={styles.iconToggle} accessibilityLabel="Space actions">
+              <FontAwesomeIcon icon={faEllipsisVertical} size={15} color={PRIMARY} />
             </TouchableOpacity>
           </View>
         )}
@@ -814,6 +826,38 @@ export default function SpaceDetailScreen() {
             </View>
           </View>
 
+          <View style={styles.contentToolbar}>
+            <Text style={[styles.sectionLabel, { color: subtleText, marginBottom: 0 }]} numberOfLines={1}>
+              {visibleContainerCount} container{visibleContainerCount !== 1 ? 's' : ''} {'\u00B7'} {visibleItemCount} item{visibleItemCount !== 1 ? 's' : ''}
+            </Text>
+            <View style={styles.contentControls}>
+              <View style={[styles.viewSegment, { backgroundColor: isDark ? '#1c1c1e' : '#eef0f3', borderColor }]}>
+                <TouchableOpacity
+                  onPress={() => switchViewMode('list')}
+                  style={[styles.segmentIconBtn, viewMode === 'list' && [styles.segmentIconBtnActive, { backgroundColor: cardBg }]]}
+                  accessibilityLabel="List view"
+                >
+                  <FontAwesomeIcon icon={faList} size={14} color={viewMode === 'list' ? PRIMARY : subtleText} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => switchViewMode('grid')}
+                  style={[styles.segmentIconBtn, viewMode === 'grid' && [styles.segmentIconBtnActive, { backgroundColor: cardBg }]]}
+                  accessibilityLabel="Grid view"
+                >
+                  <FontAwesomeIcon icon={faGrip} size={14} color={viewMode === 'grid' ? PRIMARY : subtleText} />
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowMenu(true)}
+                style={[styles.sortFilterButton, { backgroundColor: cardBg, borderColor }]}
+                accessibilityLabel="Sort contents"
+              >
+                <FontAwesomeIcon icon={faFilter} size={13} color={PRIMARY} />
+                <Text style={[styles.sortFilterText, { color: colors.text }]}>{sortLabel}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* List */}
           <FlatList
             data={filteredData}
@@ -825,19 +869,7 @@ export default function SpaceDetailScreen() {
             columnWrapperStyle={viewMode === 'grid' ? styles.gridRow : undefined}
             contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 80 }]}
             showsVerticalScrollIndicator={false}
-            ListHeaderComponent={
-              filteredData.length > 0 ? (
-                <Text style={[styles.sectionLabel, { color: subtleText }]}>
-                  {filterSegment === 'all'
-                    ? <>{filteredData.filter(e => e.type === 'container').length} container{filteredData.filter(e => e.type === 'container').length !== 1 ? 's' : ''} {`\u00B7`} {filteredData.filter(e => e.type === 'item').length} item{filteredData.filter(e => e.type === 'item').length !== 1 ? 's' : ''} {`\u00B7`} <Text style={{ fontStyle: 'italic' }}>Long press to select</Text></>
-                    : filterSegment === 'containers'
-                    ? <>{filteredData.length} container{filteredData.length !== 1 ? 's' : ''} {`\u00B7`} <Text style={{ fontStyle: 'italic' }}>Long press to select</Text></>
-                    : filterSegment === 'items'
-                    ? <>{filteredData.length} item{filteredData.length !== 1 ? 's' : ''} {`\u00B7`} <Text style={{ fontStyle: 'italic' }}>Long press to select</Text></>
-                    : <>{filteredData.length} lent item{filteredData.length !== 1 ? 's' : ''}</>}
-                </Text>
-              ) : null
-            }
+            ListHeaderComponent={null}
             renderItem={({ item: entry }) => {
               const isSelected = selectedIds.has(entry.data.id);
 
@@ -1234,18 +1266,29 @@ export default function SpaceDetailScreen() {
         onGallery={() => handleSpacePhoto('gallery')}
       />
 
-      {/* 3-dot Menu */}
+      {/* Sort Sheet */}
       <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
         <TouchableWithoutFeedback onPress={() => setShowMenu(false)}>
           <View style={styles.menuOverlay}>
             <TouchableWithoutFeedback>
-              <View style={[styles.menuCard, { backgroundColor: cardBg, borderColor }]}>
-              <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
-                {/* Sort section */}
-                <Text style={[styles.menuTitle, { color: subtleText }]}>Sort</Text>
+              <View style={[styles.menuSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+                <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+                <View style={styles.sheetHeader}>
+                  <View style={styles.sheetTitleWrap}>
+                    <Text style={[styles.sheetTitle, { color: colors.text }]}>Sort Contents</Text>
+                    <Text style={[styles.sheetSubtitle, { color: subtleText }]} numberOfLines={1}>
+                      Containers and items, {sortLabel}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setShowMenu(false)} style={styles.sheetCloseBtn} accessibilityLabel="Close sort">
+                    <FontAwesomeIcon icon={faTimes} size={16} color={subtleText} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+                <Text style={[styles.menuTitle, { color: subtleText }]}>Sort by</Text>
                 {([
-                  { key: 'name-asc' as SortMode, icon: faArrowDownAZ, label: 'Name A→Z' },
-                  { key: 'name-desc' as SortMode, icon: faArrowDownZA, label: 'Name Z→A' },
+                  { key: 'name-asc' as SortMode, icon: faArrowDownAZ, label: 'Name A-Z' },
+                  { key: 'name-desc' as SortMode, icon: faArrowDownZA, label: 'Name Z-A' },
                   { key: 'newest' as SortMode, icon: faCalendarPlus, label: 'Newest first' },
                   { key: 'oldest' as SortMode, icon: faCalendar, label: 'Oldest first' },
                 ]).map((opt) => (
@@ -1261,6 +1304,46 @@ export default function SpaceDetailScreen() {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Space Actions */}
+      <Modal visible={showSpaceMenu} transparent animationType="fade" onRequestClose={() => setShowSpaceMenu(false)}>
+        <TouchableWithoutFeedback onPress={() => setShowSpaceMenu(false)}>
+          <View style={styles.menuOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.menuSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+                <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+                <View style={styles.sheetHeader}>
+                  <View style={styles.sheetTitleWrap}>
+                    <Text style={[styles.sheetTitle, { color: colors.text }]}>Space Actions</Text>
+                    <Text style={[styles.sheetSubtitle, { color: subtleText }]} numberOfLines={1}>
+                      {space?.name ?? 'Space'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setShowSpaceMenu(false)} style={styles.sheetCloseBtn} accessibilityLabel="Close space actions">
+                    <FontAwesomeIcon icon={faTimes} size={16} color={subtleText} />
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  style={styles.menuOption}
+                  onPress={() => { setShowSpaceMenu(false); setEditingSpace(space); }}
+                  activeOpacity={0.7}
+                >
+                  <FontAwesomeIcon icon={faPen} size={14} color={PRIMARY} />
+                  <Text style={[styles.menuOptionText, { color: colors.text }]}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.menuOption}
+                  onPress={() => { setShowSpaceMenu(false); handleDeleteSpace(); }}
+                  activeOpacity={0.7}
+                >
+                  <FontAwesomeIcon icon={faTrash} size={14} color="#e53e3e" />
+                  <Text style={[styles.menuOptionText, { color: '#e53e3e' }]}>Delete</Text>
+                </TouchableOpacity>
               </View>
             </TouchableWithoutFeedback>
           </View>
@@ -1377,6 +1460,14 @@ export default function SpaceDetailScreen() {
         initialName={editingContainer?.name}
         initialPhotoUri={editingContainer?.photoUri}
       />
+      <SpaceFormModal
+        visible={editingSpace !== null}
+        onClose={() => setEditingSpace(null)}
+        onSubmit={handleEditSpaceSubmit}
+        editMode
+        initialName={editingSpace?.name}
+        initialPhotoUri={editingSpace?.photoUri}
+      />
     </View>
   );
 }
@@ -1396,6 +1487,43 @@ const styles = StyleSheet.create({
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   listContent: { paddingHorizontal: 16, paddingTop: 12 },
   sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3, marginBottom: 12 },
+  contentToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 2, paddingBottom: 8, gap: 12 },
+  contentControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  viewSegment: {
+    height: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 9,
+    borderWidth: 1,
+    padding: 2,
+    gap: 2,
+  },
+  segmentIconBtn: {
+    width: 32,
+    height: 28,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentIconBtnActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  sortFilterButton: {
+    height: 34,
+    minWidth: 74,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 9,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    gap: 6,
+  },
+  sortFilterText: { fontSize: 12, fontWeight: '700' },
   containerCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 8, gap: 12 },
   containerThumb: { width: 36, height: 36, borderRadius: 6 },
   containerIcon: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
@@ -1468,11 +1596,26 @@ const styles = StyleSheet.create({
   menuOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
-    paddingTop: 100,
-    paddingRight: 20,
+    justifyContent: 'flex-end',
   },
+  menuSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    maxHeight: '78%',
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 14,
+  },
+  sheetTitleWrap: { flex: 1 },
+  sheetTitle: { fontSize: 20, fontWeight: '700' },
+  sheetSubtitle: { fontSize: 13, marginTop: 2 },
+  sheetCloseBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   menuCard: {
     borderRadius: 14,
     borderWidth: 1,
@@ -1487,8 +1630,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   menuTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 4, textTransform: 'uppercase' },
-  menuOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8 },
-  menuOptionActive: {},
+  menuOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, marginBottom: 4 },
+  menuOptionActive: { backgroundColor: 'rgba(107,127,153,0.1)' },
   menuOptionText: { fontSize: 14, fontWeight: '500', flex: 1 },
   menuCheck: { marginLeft: 'auto' },
   menuDivider: { height: 1, marginVertical: 6, marginHorizontal: 8 },

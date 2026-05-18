@@ -72,3 +72,41 @@ export const WALKTHROUGH_STEPS: WalkthroughStep[] = [
     spotlightPadding: 8,
   },
 ];
+
+export const SPACES_WALKTHROUGH_STEPS: WalkthroughStep[] = [
+  {
+    id: 'spaces-search',
+    index: 1,
+    description: 'Search helps you quickly find spaces, containers, and items once your inventory grows.',
+    targetRef: 'spaces-search',
+    spotlightPadding: 8,
+  },
+  {
+    id: 'spaces-card',
+    index: 2,
+    description: 'This is a space card. Tap it to open the space and manage what belongs inside.',
+    targetRef: 'spaces-first-card',
+    spotlightPadding: 8,
+  },
+  {
+    id: 'spaces-view',
+    index: 3,
+    description: 'Switch between list and grid view depending on how you prefer to scan your spaces.',
+    targetRef: 'spaces-view-toggle',
+    spotlightPadding: 8,
+  },
+  {
+    id: 'spaces-sort-filter',
+    index: 4,
+    description: 'Sort and filter keep your spaces organized by name, activity, or contents.',
+    targetRef: 'spaces-sort-filter',
+    spotlightPadding: 8,
+  },
+  {
+    id: 'spaces-long-press',
+    index: 5,
+    description: 'Long press a space to select it and reveal hidden actions like edit and delete.',
+    targetRef: 'spaces-first-card',
+    spotlightPadding: 8,
+  },
+];

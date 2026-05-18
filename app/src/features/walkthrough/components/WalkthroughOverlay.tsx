@@ -14,13 +14,14 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PRIMARY = '#6b7f99';
-const TOTAL_STEPS = 8;
 
 interface WalkthroughOverlayProps {
   visible: boolean;
   step: WalkthroughStep | null;
   spotlightRect: SpotlightRect | null;
   currentIndex: number;
+  totalSteps?: number;
+  finalButtonLabel?: string;
   onNext: () => void;
   onSkip: () => void;
 }
@@ -30,6 +31,8 @@ export default function WalkthroughOverlay({
   step,
   spotlightRect,
   currentIndex,
+  totalSteps = 8,
+  finalButtonLabel = 'Get started',
   onNext,
   onSkip,
 }: WalkthroughOverlayProps) {
@@ -61,7 +64,7 @@ export default function WalkthroughOverlay({
 
   // Place tooltip above or below the spotlight
   const tooltipAbove = rect.y > SCREEN_HEIGHT * 0.55;
-  const isLastStep = currentIndex === TOTAL_STEPS - 1;
+  const isLastStep = currentIndex === totalSteps - 1;
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const textColor = isDark ? '#ffffff' : '#111111';
@@ -121,12 +124,12 @@ export default function WalkthroughOverlay({
         >
           {/* Step counter */}
           <Text style={[styles.stepCounter, { color: subtleText }]}>
-            Step {currentIndex + 1} of {TOTAL_STEPS}
+            Step {currentIndex + 1} of {totalSteps}
           </Text>
 
           {/* Dot indicators */}
           <View style={styles.dots}>
-            {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+            {Array.from({ length: totalSteps }).map((_, i) => (
               <View
                 key={i}
                 style={[
@@ -145,7 +148,7 @@ export default function WalkthroughOverlay({
           {/* Action button */}
           <Pressable style={styles.nextButton} onPress={onNext}>
             <Text style={styles.nextButtonText}>
-              {isLastStep ? 'Get started' : 'Next'}
+              {isLastStep ? finalButtonLabel : 'Next'}
             </Text>
           </Pressable>
         </View>

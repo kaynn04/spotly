@@ -28,21 +28,21 @@ import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faFileAlt, faFileArchive, faTrash, faPen, faList, faGrip, faArrowDownAZ, faArrowDownZA, faCubes, faCalendarPlus, faCalendar, faFilter, faCheck } from '@fortawesome/free-solid-svg-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { useScrollHide } from '@/hooks/use-scroll-hide';
 import { useTabBarPadding } from '@/hooks/use-tab-bar-padding';
-import type { Space } from '@/src/models/Space';
-import type { SpaceWithCount } from '@/src/models/Space';
-import type { Item } from '@/src/models/Item';
-import type { Container } from '@/src/models/Container';
+import type { Space, SpaceWithCount } from '@/src/models/Space';
 import { SpaceService } from '@/src/services/SpaceService';
 import { SpaceRepository } from '@/src/repositories/SpaceRepository';
 import { PhotoService } from '@/src/services/PhotoService';
 import { ItemRepository } from '@/src/repositories/ItemRepository';
 import { ContainerRepository } from '@/src/repositories/ContainerRepository';
 import SpaceFormModal from './components/SpaceFormModal';
+import WalkthroughOverlay from '@/src/features/walkthrough/components/WalkthroughOverlay';
+import { SPACES_WALKTHROUGH_STEPS, type SpotlightRect } from '@/src/features/walkthrough/models/WalkthroughStep';
+import { WalkthroughService } from '@/src/features/walkthrough/services/WalkthroughService';
 
 interface SearchResult {
   type: 'item' | 'container';
@@ -74,6 +74,7 @@ export default function SpacesPage() {
   const { width: screenWidth } = useWindowDimensions();
   const GRID_ITEM_WIDTH = (screenWidth - GRID_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
   const router = useRouter();
+  const { openCreate } = useLocalSearchParams<{ openCreate?: string }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
@@ -94,6 +95,13 @@ export default function SpacesPage() {
   const [deleting, setDeleting] = useState(false);
   const [editingSpace, setEditingSpace] = useState<SpaceWithCount | null>(null);
   const formVisibleRef = useRef(false);
+  const spacesSearchRef = useRef<View>(null);
+  const firstSpaceCardRef = useRef<View>(null);
+  const spacesViewRef = useRef<View>(null);
+  const spacesSortRef = useRef<View>(null);
+  const [spacesWalkthroughVisible, setSpacesWalkthroughVisible] = useState(false);
+  const [spacesWalkthroughIndex, setSpacesWalkthroughIndex] = useState(0);
+  const [spacesSpotlightRect, setSpacesSpotlightRect] = useState<SpotlightRect | null>(null);
 
   const openCreateSpaceForm = useCallback(() => {
     setEditingSpace(null);
@@ -129,6 +137,20 @@ export default function SpacesPage() {
     }, [openCreateSpaceForm])
   );
 
+  // Auto-open New Space when another screen navigates to this tab with openCreate=1.
+  useFocusEffect(
+    useCallback(() => {
+      if (openCreate !== '1') return;
+
+      const timer = setTimeout(() => {
+        openCreateSpaceForm();
+        router.setParams({ openCreate: '' } as any);
+      }, 0);
+
+      return () => clearTimeout(timer);
+    }, [openCreate, openCreateSpaceForm, router])
+  );
+
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<SectionedSearchItem[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -142,6 +164,51 @@ export default function SpacesPage() {
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
   const subtleText = isDark ? '#8e8e93' : '#a0aec0';
+
+  const measureSpacesStep = async (index: number): Promise<SpotlightRect | null> => {
+    const step = SPACES_WALKTHROUGH_STEPS[index];
+    if (!step) return null;
+    const refMap: Record<string, React.RefObject<View | null>> = {
+      'spaces-search': spacesSearchRef,
+      'spaces-first-card': firstSpaceCardRef,
+      'spaces-view-toggle': spacesViewRef,
+      'spaces-sort-filter': spacesSortRef,
+    };
+    const ref = refMap[step.targetRef];
+    if (!ref?.current) return null;
+
+    return new Promise<SpotlightRect>((resolve, reject) => {
+      ref.current?.measure((_x, _y, width, height, pageX, pageY) => {
+        resolve({ x: pageX, y: pageY, width, height });
+      }) ?? reject(new Error('walkthrough ref not found'));
+    }).catch(() => null);
+  };
+
+  const startSpacesWalkthrough = async () => {
+    DeviceEventEmitter.emit('synop:hide-tab-bar');
+    const rect = await measureSpacesStep(0);
+    setSpacesSpotlightRect(rect);
+    setSpacesWalkthroughIndex(0);
+    setSpacesWalkthroughVisible(true);
+  };
+
+  const finishSpacesWalkthrough = async () => {
+    await WalkthroughService.markSpacesDone();
+    setSpacesWalkthroughVisible(false);
+    DeviceEventEmitter.emit('synop:show-tab-bar');
+  };
+
+  const handleSpacesWalkthroughNext = async () => {
+    const nextIndex = spacesWalkthroughIndex + 1;
+    if (nextIndex >= SPACES_WALKTHROUGH_STEPS.length) {
+      await finishSpacesWalkthrough();
+      return;
+    }
+
+    const rect = await measureSpacesStep(nextIndex);
+    setSpacesSpotlightRect(rect);
+    setSpacesWalkthroughIndex(nextIndex);
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -157,8 +224,11 @@ export default function SpacesPage() {
       if (selectModeRef.current) {
         DeviceEventEmitter.emit('synop:show-tab-bar');
       }
+      if (spacesWalkthroughVisible) {
+        DeviceEventEmitter.emit('synop:show-tab-bar');
+      }
     };
-  }, []);
+  }, [spacesWalkthroughVisible]);
 
   // Listen for refresh events from voice feature or other sources
   useEffect(() => {
@@ -324,12 +394,18 @@ export default function SpacesPage() {
   };
 
   const handleCreateSpace = async (name: string, photoUri?: string | null) => {
+    const shouldShowSpacesGuide = spaces.length === 0 && !(await WalkthroughService.isSpacesDone());
     const space = await SpaceService.createSpace(name);
     if (photoUri && space) {
       const savedUri = await PhotoService.savePhoto(photoUri, `space_${space.id}`);
       await SpaceRepository.updatePhotoUri(space.id, savedUri);
     }
     await loadSpaces();
+    if (shouldShowSpacesGuide) {
+      setTimeout(() => {
+        startSpacesWalkthrough();
+      }, 500);
+    }
   };
 
   const handleEditSpace = async (name: string, photoUri?: string | null) => {
@@ -379,13 +455,6 @@ export default function SpacesPage() {
     ]);
   };
 
-  const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-
   const switchViewMode = (mode: ViewMode) => {
     setViewMode(mode);
     setShowMenu(false);
@@ -403,6 +472,15 @@ export default function SpacesPage() {
     setShowMenu(false);
     AsyncStorage.setItem(FILTER_KEY, mode).catch(() => {});
   };
+
+  const sortLabel =
+    sortMode === 'name-asc' ? 'A-Z' :
+    sortMode === 'name-desc' ? 'Z-A' :
+    sortMode === 'most-items' ? 'Most' :
+    sortMode === 'newest' ? 'Newest' :
+    'Oldest';
+
+  const filterLabel = filterMode === 'non-empty' ? 'Non-empty' : 'All';
 
   const displayedSpaces = useMemo(() => {
     let result = [...spaces];
@@ -510,6 +588,7 @@ export default function SpacesPage() {
     if (viewMode === 'grid' && !isSearching) {
       return (
         <TouchableOpacity
+          ref={!isSearching && index === 0 ? firstSpaceCardRef : undefined}
           style={[styles.gridCard, { backgroundColor: cardBg, borderColor: isSelected ? PRIMARY : borderColor, width: GRID_ITEM_WIDTH }, isSelected && styles.selectedCard]}
           onPress={handlePress}
           onLongPress={handleLongPress}
@@ -537,6 +616,7 @@ export default function SpacesPage() {
 
     return (
     <TouchableOpacity
+      ref={!isSearching && index === 0 ? firstSpaceCardRef : undefined}
       style={[styles.spaceCard, { backgroundColor: cardBg, borderColor: isSelected ? PRIMARY : borderColor }, isSelected && styles.selectedCard]}
       onPress={handlePress}
       onLongPress={handleLongPress}
@@ -605,7 +685,7 @@ export default function SpacesPage() {
         </View>
 
         {/* Search bar */}
-        <View style={[styles.searchWrapper, { backgroundColor: isDark ? '#1c1c1e' : '#ffffff', borderColor }]}>
+        <View ref={spacesSearchRef} style={[styles.searchWrapper, { backgroundColor: isDark ? '#1c1c1e' : '#ffffff', borderColor }]}>
           <FontAwesomeIcon icon={faMagnifyingGlass} size={16} color={colors.text} />
           <TextInput
             ref={searchInputRef}
@@ -640,28 +720,33 @@ export default function SpacesPage() {
           </View>
         ) : spaces.length > 0 ? (
           <View style={styles.sectionLabelRow}>
-            <Text style={[styles.sectionLabel, { color: subtleText }]}>YOUR SPACES <Text style={styles.longPressHint}>{'\u00B7'} Long press to select</Text></Text>
+            <Text style={[styles.sectionLabel, { color: subtleText }]}>YOUR SPACES</Text>
             <View style={styles.contentControls}>
+              <View ref={spacesViewRef} style={[styles.viewSegment, { backgroundColor: isDark ? '#1c1c1e' : '#eef0f3', borderColor }]}>
+                <TouchableOpacity
+                  style={[styles.segmentIconBtn, viewMode === 'list' && [styles.segmentIconBtnActive, { backgroundColor: cardBg }]]}
+                  onPress={() => switchViewMode('list')}
+                  accessibilityLabel="List view"
+                >
+                  <FontAwesomeIcon icon={faList} size={14} color={viewMode === 'list' ? PRIMARY : subtleText} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.segmentIconBtn, viewMode === 'grid' && [styles.segmentIconBtnActive, { backgroundColor: cardBg }]]}
+                  onPress={() => switchViewMode('grid')}
+                  accessibilityLabel="Grid view"
+                >
+                  <FontAwesomeIcon icon={faGrip} size={14} color={viewMode === 'grid' ? PRIMARY : subtleText} />
+                </TouchableOpacity>
+              </View>
               <TouchableOpacity
-                style={[styles.iconToggle, viewMode === 'list' && styles.iconToggleActive]}
-                onPress={() => switchViewMode('list')}
-                accessibilityLabel="List view"
-              >
-                <FontAwesomeIcon icon={faList} size={15} color={viewMode === 'list' ? PRIMARY : subtleText} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.iconToggle, viewMode === 'grid' && styles.iconToggleActive]}
-                onPress={() => switchViewMode('grid')}
-                accessibilityLabel="Grid view"
-              >
-                <FontAwesomeIcon icon={faGrip} size={15} color={viewMode === 'grid' ? PRIMARY : subtleText} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.iconToggle}
+                ref={spacesSortRef}
+                style={[styles.sortFilterButton, { backgroundColor: cardBg, borderColor }]}
                 onPress={() => setShowMenu(true)}
                 accessibilityLabel="Sort and filter"
               >
-                <FontAwesomeIcon icon={faFilter} size={15} color={subtleText} />
+                <FontAwesomeIcon icon={faFilter} size={13} color={PRIMARY} />
+                <Text style={[styles.sortFilterText, { color: colors.text }]}>{sortLabel}</Text>
+                {filterMode !== 'all' && <View style={[styles.filterDot, { backgroundColor: PRIMARY }]} />}
               </TouchableOpacity>
             </View>
           </View>
@@ -846,18 +931,40 @@ export default function SpacesPage() {
         })()}
       />
 
-      {/* Menu */}
+      <WalkthroughOverlay
+        visible={spacesWalkthroughVisible}
+        step={SPACES_WALKTHROUGH_STEPS[spacesWalkthroughIndex] ?? null}
+        spotlightRect={spacesSpotlightRect}
+        currentIndex={spacesWalkthroughIndex}
+        totalSteps={SPACES_WALKTHROUGH_STEPS.length}
+        finalButtonLabel="Done"
+        onNext={handleSpacesWalkthroughNext}
+        onSkip={finishSpacesWalkthrough}
+      />
+
+      {/* Sort / Filter Sheet */}
       <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
         <TouchableWithoutFeedback onPress={() => setShowMenu(false)}>
           <View style={styles.menuOverlay}>
             <TouchableWithoutFeedback>
-              <View style={[styles.menuCard, { backgroundColor: cardBg, borderColor }]}>
-              <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
-                {/* Sort section */}
-                <Text style={[styles.menuTitle, { color: subtleText }]}>Sort</Text>
+              <View style={[styles.menuSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+                <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+                <View style={styles.sheetHeader}>
+                  <View style={styles.sheetTitleWrap}>
+                    <Text style={[styles.sheetTitle, { color: colors.text }]}>Sort & Filter</Text>
+                    <Text style={[styles.sheetSubtitle, { color: subtleText }]} numberOfLines={1}>
+                      {filterLabel} spaces, {sortLabel}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setShowMenu(false)} style={styles.sheetCloseBtn} accessibilityLabel="Close sort and filter">
+                    <FontAwesomeIcon icon={faTimes} size={16} color={subtleText} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+                <Text style={[styles.menuTitle, { color: subtleText }]}>Sort by</Text>
                 {[
-                  { key: 'name-asc' as SortMode, icon: faArrowDownAZ, label: 'Name A→Z' },
-                  { key: 'name-desc' as SortMode, icon: faArrowDownZA, label: 'Name Z→A' },
+                  { key: 'name-asc' as SortMode, icon: faArrowDownAZ, label: 'Name A-Z' },
+                  { key: 'name-desc' as SortMode, icon: faArrowDownZA, label: 'Name Z-A' },
                   { key: 'most-items' as SortMode, icon: faCubes, label: 'Most items' },
                   { key: 'newest' as SortMode, icon: faCalendarPlus, label: 'Newest first' },
                   { key: 'oldest' as SortMode, icon: faCalendar, label: 'Oldest first' },
@@ -876,8 +983,7 @@ export default function SpacesPage() {
 
                 <View style={[styles.menuDivider, { backgroundColor: borderColor }]} />
 
-                {/* Filter section */}
-                <Text style={[styles.menuTitle, { color: subtleText }]}>Filter</Text>
+                <Text style={[styles.menuTitle, { color: subtleText }]}>Show</Text>
                 {[
                   { key: 'all' as FilterMode, label: 'All spaces' },
                   { key: 'non-empty' as FilterMode, label: 'Non-empty only' },
@@ -925,7 +1031,43 @@ const styles = StyleSheet.create({
   },
   countBadgeText: { fontSize: 14, fontWeight: '600' },
   menuBtn: { padding: 8, marginTop: 4 },
-  contentControls: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  contentControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  viewSegment: {
+    height: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 9,
+    borderWidth: 1,
+    padding: 2,
+    gap: 2,
+  },
+  segmentIconBtn: {
+    width: 32,
+    height: 28,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentIconBtnActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  sortFilterButton: {
+    height: 34,
+    minWidth: 74,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 9,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    gap: 6,
+  },
+  sortFilterText: { fontSize: 12, fontWeight: '700' },
+  filterDot: { width: 6, height: 6, borderRadius: 3 },
   iconToggle: {
     width: 32,
     height: 32,
@@ -953,7 +1095,6 @@ const styles = StyleSheet.create({
   resultHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
   sectionLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0 },
-  longPressHint: { fontSize: 11, fontStyle: 'italic' },
   sectionHeader: { fontSize: 12, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', paddingTop: 12, paddingBottom: 6 },
 
   // Search results
@@ -1066,10 +1207,38 @@ const styles = StyleSheet.create({
   menuOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
-    paddingTop: 100,
-    paddingRight: 20,
+    justifyContent: 'flex-end',
+  },
+  menuSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    maxHeight: '78%',
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 18,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 14,
+  },
+  sheetTitleWrap: { flex: 1 },
+  sheetTitle: { fontSize: 20, fontWeight: '700' },
+  sheetSubtitle: { fontSize: 13, marginTop: 2 },
+  sheetCloseBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   menuCard: {
     borderRadius: 14,
@@ -1090,9 +1259,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 8,
-    marginHorizontal: 4,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginHorizontal: 0,
+    marginBottom: 4,
   },
   menuOptionActive: { backgroundColor: 'rgba(107,127,153,0.1)' },
   menuOptionText: { fontSize: 14, fontWeight: '500', flex: 1 },

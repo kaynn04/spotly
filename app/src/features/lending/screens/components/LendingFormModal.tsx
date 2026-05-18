@@ -41,6 +41,8 @@ interface LendingFormModalProps {
   onSubmit: () => void;
   onCancel: () => void;
   loading: boolean;
+  title?: string;
+  submitLabel?: string;
 }
 
 export default function LendingFormModal({
@@ -55,6 +57,8 @@ export default function LendingFormModal({
   onSubmit,
   onCancel,
   loading,
+  title = 'Lend Item',
+  submitLabel = 'Lend Item',
 }: LendingFormModalProps) {
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
@@ -119,7 +123,7 @@ export default function LendingFormModal({
                 </View>
 
                 {/* Title */}
-                <Text style={[styles.sheetTitle, { color: textColor }]}>Lend Item</Text>
+                <Text style={[styles.sheetTitle, { color: textColor }]}>{title}</Text>
 
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
@@ -238,7 +242,7 @@ export default function LendingFormModal({
                       <ActivityIndicator color="#fff" size="small" />
                     ) : (
                       <Text style={[styles.submitBtnText, { color: isValid ? '#fff' : subtleText }]}>
-                        Lend Item
+                        {submitLabel}
                       </Text>
                     )}
                   </TouchableOpacity>
