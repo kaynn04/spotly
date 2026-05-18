@@ -19,7 +19,6 @@ import {
   TouchableOpacity,
   TextInput,
   Keyboard,
-  Dimensions,
   FlatList,
   Animated,
   KeyboardAvoidingView,
@@ -43,7 +42,6 @@ import {
 import { UserService } from '@/src/services/UserService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PRIMARY = '#6b7f99';
 const ONBOARDING_DONE_KEY = '@synop/onboarding_done';
 
@@ -127,12 +125,12 @@ export default function OnboardingScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const isDark = colorScheme === 'dark';
 
-  const listRef = useRef<FlatList>(null);
+  const listRef = useRef<FlatList<Slide>>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [name, setName] = useState('');
   const [nameError, setNameError] = useState<string | null>(null);
-  const { height: SCREEN_HEIGHT } = useWindowDimensions();
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   // Height available for each slide (full screen minus bottom bar ~130px)
   const slideHeight = SCREEN_HEIGHT - insets.bottom - 16 - 130;
 
@@ -238,6 +236,12 @@ export default function OnboardingScreen() {
         )}
         scrollEventThrottle={16}
         style={{ flex: 1 }}
+        extraData={SCREEN_WIDTH}
+        getItemLayout={(_, index) => ({
+          length: SCREEN_WIDTH,
+          offset: SCREEN_WIDTH * index,
+          index,
+        })}
       />
 
       {/* Bottom controls */}
@@ -290,7 +294,6 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
 
   slide: {
-    width: SCREEN_WIDTH,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
@@ -315,15 +318,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     textAlign: 'center',
-    maxWidth: 300,
+    maxWidth: 360,
   },
   nameInputWrapper: {
     marginTop: 28,
     width: '100%',
+    maxWidth: 420,
   },
   bulletsWrapper: {
     marginTop: 20,
     width: '100%',
+    maxWidth: 420,
     gap: 10,
   },
   bulletText: {
@@ -347,6 +352,9 @@ const styles = StyleSheet.create({
   },
 
   bottomBar: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
     paddingHorizontal: 24,
     paddingTop: 16,
     gap: 20,

@@ -4,10 +4,10 @@ import {
   AlertButton,
   AlertOptions,
   Modal,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
@@ -63,15 +63,21 @@ export default function AppAlertProvider({ children }: PropsWithChildren) {
   }, []);
 
   const closeAlert = useCallback((button?: AlertButton) => {
+    if (closingRef.current) return;
     const alertToClose = currentAlertRef.current;
     closingRef.current = true;
     setCurrentAlert(null);
 
-    setTimeout(() => {
+    try {
       button?.onPress?.();
       if (!button && alertToClose?.options?.onDismiss) {
         alertToClose.options.onDismiss();
       }
+    } catch (error) {
+      console.error('[AppAlertProvider] Alert action failed:', error);
+    }
+
+    setTimeout(() => {
       closingRef.current = false;
       showNextAlert();
     }, 120);
@@ -130,47 +136,44 @@ export default function AppAlertProvider({ children }: PropsWithChildren) {
     <>
       {children}
       <Modal visible={currentAlert !== null} transparent animationType="fade" statusBarTranslucent onRequestClose={() => canDismiss && closeAlert()}>
-        <TouchableWithoutFeedback onPress={() => canDismiss && closeAlert()}>
-          <View style={[styles.backdrop, { backgroundColor: colors.backdrop }]}>
-            <TouchableWithoutFeedback>
-              <View style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-                <View style={[styles.iconWrap, { backgroundColor: `${colors.toneColor}18` }]}>
-                  <FontAwesomeIcon icon={icon} size={22} color={colors.toneColor} />
-                </View>
-                <Text style={[styles.title, { color: colors.text }]}>{currentAlert?.title}</Text>
-                {!!currentAlert?.message && (
-                  <Text style={[styles.message, { color: colors.subtle }]}>{currentAlert.message}</Text>
-                )}
-                <View style={styles.actions}>
-                  {currentAlert?.buttons.map((button, index) => {
-                    const isCancel = button.style === 'cancel';
-                    const isDestructive = button.style === 'destructive';
-                    const isPrimary = !isCancel && !isDestructive && index === currentAlert.buttons.length - 1;
-                    const actionColor = isDestructive ? DESTRUCTIVE : isPrimary ? PRIMARY : colors.subtle;
-                    return (
-                      <TouchableOpacity
-                        key={`${button.text ?? 'OK'}-${index}`}
-                        style={[
-                          styles.actionButton,
-                          {
-                            backgroundColor: isPrimary || isDestructive ? `${actionColor}18` : colors.rowBg,
-                            borderColor: colors.border,
-                          },
-                        ]}
-                        onPress={() => closeAlert(button)}
-                        activeOpacity={0.75}
-                      >
-                        <Text style={[styles.actionText, { color: actionColor }]}>
-                          {button.text ?? 'OK'}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            </TouchableWithoutFeedback>
+        <View style={[styles.backdrop, { backgroundColor: colors.backdrop }]}>
+          {canDismiss && <Pressable style={StyleSheet.absoluteFill} onPress={() => closeAlert()} />}
+          <View style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+            <View style={[styles.iconWrap, { backgroundColor: `${colors.toneColor}18` }]}>
+              <FontAwesomeIcon icon={icon} size={22} color={colors.toneColor} />
+            </View>
+            <Text style={[styles.title, { color: colors.text }]}>{currentAlert?.title}</Text>
+            {!!currentAlert?.message && (
+              <Text style={[styles.message, { color: colors.subtle }]}>{currentAlert.message}</Text>
+            )}
+            <View style={styles.actions}>
+              {currentAlert?.buttons.map((button, index) => {
+                const isCancel = button.style === 'cancel';
+                const isDestructive = button.style === 'destructive';
+                const isPrimary = !isCancel && !isDestructive && index === currentAlert.buttons.length - 1;
+                const actionColor = isDestructive ? DESTRUCTIVE : isPrimary ? PRIMARY : colors.subtle;
+                return (
+                  <TouchableOpacity
+                    key={`${button.text ?? 'OK'}-${index}`}
+                    style={[
+                      styles.actionButton,
+                      {
+                        backgroundColor: isPrimary || isDestructive ? `${actionColor}18` : colors.rowBg,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                    onPress={() => closeAlert(button)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.actionText, { color: actionColor }]}>
+                      {button.text ?? 'OK'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
-        </TouchableWithoutFeedback>
+        </View>
       </Modal>
     </>
   );
