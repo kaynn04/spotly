@@ -51,6 +51,7 @@ export default function AppAlertProvider({ children }: PropsWithChildren) {
   const [currentAlert, setCurrentAlert] = useState<QueuedAlert | null>(null);
   const queueRef = useRef<QueuedAlert[]>([]);
   const currentAlertRef = useRef<QueuedAlert | null>(null);
+  const closingRef = useRef(false);
 
   useEffect(() => {
     currentAlertRef.current = currentAlert;
@@ -63,6 +64,7 @@ export default function AppAlertProvider({ children }: PropsWithChildren) {
 
   const closeAlert = useCallback((button?: AlertButton) => {
     const alertToClose = currentAlertRef.current;
+    closingRef.current = true;
     setCurrentAlert(null);
 
     setTimeout(() => {
@@ -70,6 +72,7 @@ export default function AppAlertProvider({ children }: PropsWithChildren) {
       if (!button && alertToClose?.options?.onDismiss) {
         alertToClose.options.onDismiss();
       }
+      closingRef.current = false;
       showNextAlert();
     }, 120);
   }, [showNextAlert]);
@@ -82,7 +85,7 @@ export default function AppAlertProvider({ children }: PropsWithChildren) {
       options,
     };
 
-    if (currentAlertRef.current) {
+    if (currentAlertRef.current || closingRef.current) {
       queueRef.current.push(alertData);
       return;
     }
