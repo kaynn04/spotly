@@ -42,7 +42,6 @@ export const ImportService = {
   async pickAndImport(mode: ImportMode): Promise<ImportResult | null> {
     const result = await DocumentPicker.getDocumentAsync({
       type: 'application/json',
-      copyToCacheDir: true,
     });
 
     if (result.canceled || !result.assets?.length) {

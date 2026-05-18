@@ -38,7 +38,7 @@ import {
 
 import { VoiceParserService } from '../../services/VoiceParserService';
 import { VoiceMatcherService } from '../../services/VoiceMatcherService';
-import type { ParsedVoiceCommand, VoiceSessionState } from '../../models/VoiceCommand';
+import type { ParsedVoiceCommand, VoiceAction, VoiceSessionState } from '../../models/VoiceCommand';
 import type { Space } from '@/src/models/Space';
 import type { Container } from '@/src/models/Container';
 import type { Item } from '@/src/models/Item';
@@ -143,7 +143,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
     // Language pack not yet downloaded — this is fatal
     const msg = event.message || event.error || '';
     if (msg.toLowerCase().includes('not yet downloaded') || event.error === 'language-not-supported') {
-      ExpoSpeechRecognitionModule.abort()?.catch(() => {});
+      abortRecognition();
       setSessionState({ phase: 'needs-language' });
       return;
     }
@@ -158,8 +158,9 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
     }
 
     // For permission and availability errors, abort and show
-    if (event.error === 'permission-denied' || event.error === 'service-not-available' || event.error === 'recognizer-busy') {
-      ExpoSpeechRecognitionModule.abort()?.catch(() => {});
+    const errorCode = String(event.error);
+    if (errorCode === 'permission-denied' || errorCode === 'service-not-available' || errorCode === 'recognizer-busy') {
+      abortRecognition();
       setSessionState({ phase: 'error', message: msg || 'Microphone error — try again' });
       return;
     }
@@ -176,6 +177,14 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
+    }
+  };
+
+  const abortRecognition = () => {
+    try {
+      ExpoSpeechRecognitionModule.abort();
+    } catch {
+      // Ignore native recognizer cleanup failures.
     }
   };
 
@@ -243,12 +252,14 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
 
   const processTranscript = async (transcript: string) => {
     setSessionState({ phase: 'processing' });
+    let detectedAction: VoiceAction | undefined;
     try {
       const spaces = await SpaceService.getAllSpaces();
       setAllSpaces(spaces);
 
       const lendingService = new LendingService(new LendingRepository(), new ItemRepository());
       const parts = VoiceParserService.parse(transcript, spaces.map(s => s.name));
+      detectedAction = parts.action;
 
       // For create-space action: show confirmation with editable name
       if (parts.action === 'create-space') {
@@ -265,7 +276,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
       }
 
       if (!parts.itemName && !parts.itemNames) {
-        setSessionState({ phase: 'error', message: "Couldn't understand — try saying it differently", transcript, detectedAction: parts.action });
+        setSessionState({ phase: 'error', message: "Couldn't understand — try saying it differently", transcript, detectedAction });
         return;
       }
 
@@ -370,8 +381,13 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
 
       // For find action: search items by name and show results
       if (parts.action === 'find') {
+        const itemName = parts.itemName;
+        if (!itemName) {
+          setSessionState({ phase: 'error', message: "Couldn't catch the item name - try again", transcript, detectedAction: 'find' });
+          return;
+        }
         const allItems = await ItemService.getAllItems();
-        const spokenItem = parts.itemName.toLowerCase();
+        const spokenItem = itemName.toLowerCase();
 
         // Exact matches first
         const exactMatches = allItems.filter(i => i.name.toLowerCase() === spokenItem);
@@ -382,20 +398,25 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
 
         // Fuzzy match
         const fuzzysort = (await import('fuzzysort')).default;
-        const results = fuzzysort.go(parts.itemName, allItems, { key: 'name', limit: 5, threshold: -5000 });
+        const results = fuzzysort.go(itemName, allItems, { keys: ['name'], limit: 5, threshold: -5000 });
         if (results.length > 0) {
           setSessionState({ phase: 'found', items: results.map(r => r.obj) });
           return;
         }
 
-        setSessionState({ phase: 'error', message: `No items matching "${parts.itemName}" found`, transcript, detectedAction: 'find' });
+        setSessionState({ phase: 'error', message: `No items matching "${itemName}" found`, transcript, detectedAction: 'find' });
         return;
       }
 
       // For move action: find the existing item by fuzzy name match
       if (parts.action === 'move') {
+        const itemName = parts.itemName;
+        if (!itemName) {
+          setSessionState({ phase: 'error', message: "Couldn't catch the item name - try again", transcript, detectedAction: 'move' });
+          return;
+        }
         const allItems = await ItemService.getAllItems();
-        const spokenItem = parts.itemName.toLowerCase();
+        const spokenItem = itemName.toLowerCase();
         const exactItem = allItems.find(i => i.name.toLowerCase() === spokenItem);
         let foundItem: Item | null = null;
         if (exactItem) {
@@ -403,11 +424,11 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
         } else {
           // Fuzzy match item name
           const fuzzysort = (await import('fuzzysort')).default;
-          const results = fuzzysort.go(parts.itemName, allItems, { key: 'name', limit: 1, threshold: -5000 });
+          const results = fuzzysort.go(itemName, allItems, { keys: ['name'], limit: 1, threshold: -5000 });
           if (results.length > 0) {
             foundItem = results[0].obj;
           } else {
-            setSessionState({ phase: 'error', message: `Item "${parts.itemName}" not found \u2014 try again`, transcript, detectedAction: 'move' });
+            setSessionState({ phase: 'error', message: `Item "${itemName}" not found \u2014 try again`, transcript, detectedAction: 'move' });
             return;
           }
         }
@@ -474,7 +495,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
       setItemNameOverride(parsed.itemName);
       setSessionState({ phase: 'confirming', parsed, itemNames: multiItemNames, editedItemName: parsed.itemName ?? undefined });
     } catch {
-      setSessionState({ phase: 'error', message: 'Something went wrong — try again', transcript, detectedAction: parts.action });
+      setSessionState({ phase: 'error', message: 'Something went wrong — try again', transcript, detectedAction });
     }
   };
 
@@ -557,11 +578,13 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
     const { parsed } = sessionState;    const finalSpaceId = confirmedSpaceId;
     const finalContainerId =
       confirmedContainerId === undefined ? null : confirmedContainerId;
+    let isMultiAdd = false;
+    if (!finalSpaceId) return;
 
     try {
       // Check if this is multi-add — prefer itemNamesOverride (user-edited) over sessionState.itemNames (original)
       const multiItems = itemNamesOverride.length > 0 ? itemNamesOverride : (sessionState.itemNames ?? null);
-      const isMultiAdd = (multiItems?.length ?? 0) > 0;
+      isMultiAdd = (multiItems?.length ?? 0) > 0;
       if (isMultiAdd) {
         // Add multiple items
         for (const name of multiItems!) {
@@ -580,7 +603,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
       }
 
       // Single item flow — read from ref to avoid stale closure issues
-      const finalItemName = itemNameRef.current.trim() || parsed.itemName;
+      const finalItemName = itemNameRef.current.trim() || parsed.itemName || '';
       if (!finalSpaceId || !finalItemName) return;
 
       if (parsed.action === 'move' && matchedItem) {
@@ -637,7 +660,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
     if (!visible) {
       clearListenTimeout();
       resultReceivedRef.current = false;
-      ExpoSpeechRecognitionModule.abort()?.catch(() => {});
+      abortRecognition();
     }
   }, [visible]);
 

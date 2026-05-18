@@ -294,6 +294,7 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
         onChange={setWarrantyPickerDate}
         value={warrantyPickerDate}
         minimumDate={new Date()}
+        purpose="warranty"
         textColor={textColor}
         subtleText={subtleText}
         cardBg={cardBg}

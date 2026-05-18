@@ -267,6 +267,36 @@ export class LendingRepository {
     return updated;
   }
 
+  async update(
+    id: string,
+    updates: { borrower_name: string; note?: string | null; due_date?: Date | null }
+  ): Promise<Lending> {
+    const now = new Date().toISOString();
+    await this.db.runAsync(
+      `UPDATE lendings
+       SET borrower_name = ?, note = ?, due_date = ?, updated_at = ?
+       WHERE id = ? AND status = ?`,
+      [
+        updates.borrower_name,
+        updates.note || null,
+        updates.due_date ? updates.due_date.toISOString() : null,
+        now,
+        id,
+        LendingStatus.ACTIVE,
+      ]
+    );
+
+    const updated = await this.getById(id);
+    if (!updated) {
+      throw new Error('Failed to retrieve updated lending');
+    }
+    return updated;
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.db.runAsync(`DELETE FROM lendings WHERE id = ?`, [id]);
+  }
+
   async setReminderId(id: string, reminderId: string | null): Promise<void> {
     await this.db.runAsync(
       `UPDATE lendings SET reminder_id = ?, updated_at = ? WHERE id = ?`,

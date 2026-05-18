@@ -17,6 +17,7 @@ import { Lending, LendingCreateInput, LendingStatus } from '../models/Lending';
 import { LendingPhoto, LendingPhotoPhase } from '../models/LendingPhoto';
 import { ItemRepository } from '../../../repositories/ItemRepository';
 import { PhotoService } from '../../../services/PhotoService';
+import { ReminderService } from '../../../services/ReminderService';
 
 /**
  * Service Error
@@ -192,6 +193,23 @@ export class LendingService {
       );
     }
 
+    if (input.due_date) {
+      try {
+        const reminderId = await ReminderService.scheduleDueDateReminders(
+          lending.id,
+          lending.borrower_name,
+          item.name,
+          input.due_date
+        );
+        if (reminderId) {
+          await this.lendingRepository.setReminderId(lending.id, reminderId);
+          lending.reminder_id = reminderId;
+        }
+      } catch (error) {
+        console.warn('[LendingService.createLending] Failed to schedule due-date reminder:', error);
+      }
+    }
+
     return lending;
   }
 
@@ -239,6 +257,14 @@ export class LendingService {
       );
     }
 
+    if (lending.reminder_id) {
+      try {
+        await ReminderService.cancelReminders(lending.reminder_id);
+      } catch (error) {
+        console.warn('[LendingService.markAsReturned] Failed to cancel due-date reminder:', error);
+      }
+    }
+
     // All validations passed, mark as returned
     let updated: Lending;
     try {
@@ -251,6 +277,70 @@ export class LendingService {
     }
 
     return updated;
+  }
+
+  async updateLending(
+    lendingId: string,
+    updates: { borrower_name: string; note?: string | null; due_date?: Date | null }
+  ): Promise<Lending> {
+    if (!updates.borrower_name || !updates.borrower_name.trim()) {
+      throw createServiceError('INVALID_BORROWER_NAME', 'Borrower name is required');
+    }
+
+    let existing: Lending | null;
+    try {
+      existing = await this.lendingRepository.getById(lendingId);
+    } catch {
+      throw createServiceError('DATABASE_ERROR', 'Failed to find lending');
+    }
+
+    if (!existing) {
+      throw createServiceError('LENDING_NOT_FOUND', 'Lending not found');
+    }
+
+    if (existing.status !== LendingStatus.ACTIVE) {
+      throw createServiceError('INVALID_STATUS_TRANSITION', 'Returned lendings cannot be edited');
+    }
+
+    let updated: Lending;
+    try {
+      updated = await this.lendingRepository.update(lendingId, {
+        borrower_name: updates.borrower_name.trim(),
+        note: updates.note?.trim() || null,
+        due_date: updates.due_date ?? null,
+      });
+    } catch {
+      throw createServiceError('DATABASE_ERROR', 'Failed to update lending');
+    }
+
+    return updated;
+  }
+
+  async deleteLending(lendingId: string): Promise<void> {
+    let lending: Lending | null;
+    try {
+      lending = await this.lendingRepository.getById(lendingId);
+    } catch {
+      throw createServiceError('DATABASE_ERROR', 'Failed to find lending');
+    }
+
+    if (!lending) {
+      throw createServiceError('LENDING_NOT_FOUND', 'Lending not found');
+    }
+
+    if (lending.reminder_id) {
+      try {
+        await ReminderService.cancelReminders(lending.reminder_id);
+      } catch (error) {
+        console.warn('[LendingService.deleteLending] Failed to cancel due-date reminder:', error);
+      }
+    }
+
+    try {
+      await this.lendingRepository.delete(lendingId);
+    } catch {
+      throw createServiceError('DATABASE_ERROR', 'Failed to delete lending');
+    }
   }
 
   /**

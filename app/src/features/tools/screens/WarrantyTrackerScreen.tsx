@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import {
   faShield,
+  faChevronLeft,
   faChevronRight,
   faTriangleExclamation,
   faCheckCircle,
@@ -119,9 +120,19 @@ export default function WarrantyTrackerScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: borderColor }]}>
-        <FontAwesomeIcon icon={faShield} size={20} color={WARRANTY_AMBER} />
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Warranty Tracker</Text>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => router.back()}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityLabel="Back"
+        >
+          <FontAwesomeIcon icon={faChevronLeft} size={16} color={WARRANTY_AMBER} />
+        </TouchableOpacity>
+        <View style={styles.headerCopy}>
+          <Text style={[styles.title, { color: colors.text }]}>Warranty Tracker</Text>
+          <Text style={[styles.subtitle, { color: subtleText }]}>Track warranty dates and upcoming expirations</Text>
+        </View>
       </View>
 
       {loading ? (
@@ -186,15 +197,27 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingTop: 4,
+    paddingBottom: 20,
   },
-  headerTitle: {
-    fontSize: 18,
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCopy: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 30,
     fontWeight: '700',
+    letterSpacing: -0.5,
   },
+  subtitle: { fontSize: 13, marginTop: 2 },
   centered: {
     flex: 1,
     alignItems: 'center',

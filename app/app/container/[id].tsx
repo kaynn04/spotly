@@ -29,7 +29,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faChevronLeft, faMapPin, faEllipsisVertical, faBox, faHandshake, faCheck, faTrash, faFolder, faRightLeft, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faList, faGrip, faPen, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faChevronLeft, faMapPin, faBox, faHandshake, faCheck, faTrash, faFolder, faRightLeft, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faFilter, faList, faGrip, faPen, faTimes, faEllipsisVertical } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -51,6 +51,7 @@ import { OutsideService } from '@/src/features/outside/services/OutsideService';
 import ItemFormModal from '@/src/features/spaces/screens/components/ItemFormModal';
 import ItemActionSheet from '@/src/features/spaces/screens/components/ItemActionSheet';
 import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
+import ContainerFormModal from '@/src/features/spaces/screens/components/ContainerFormModal';
 
 const PRIMARY = '#6b7f99';
 const LENDING = '#9b72cb';
@@ -85,6 +86,7 @@ export default function ContainerDetailScreen() {
   const [selectedMoveItemIds, setSelectedMoveItemIds] = useState<Set<string>>(new Set());
   const [actionSheetItem, setActionSheetItem] = useState<Item | null>(null);
   const [showContainerMenu, setShowContainerMenu] = useState(false);
+  const [showSortMenu, setShowSortMenu] = useState(false);
   const [showMoveContainerModal, setShowMoveContainerModal] = useState(false);
   const [spaceContainers, setSpaceContainers] = useState<Record<string, Container[]>>({});
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
@@ -95,6 +97,7 @@ export default function ContainerDetailScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const selectModeRef = useRef(false);
   selectModeRef.current = selectMode;
+  const [editingContainer, setEditingContainer] = useState<Container | null>(null);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
 
   // Lending state
@@ -218,10 +221,12 @@ export default function ContainerDetailScreen() {
         item_id: selectedLendItem.id,
         borrower_name: borrowerName.trim(),
         note: lendNote.trim() || undefined,
+        due_date: dueDate ?? undefined,
       });
       setShowLendModal(false);
       setBorrowerName('');
       setLendNote('');
+      setDueDate(null);
       setSelectedLendItem(null);
       await loadActiveLendings();
     } catch (err: any) {
@@ -244,8 +249,14 @@ export default function ContainerDetailScreen() {
   const switchSortMode = (mode: SortMode) => {
     setSortMode(mode);
     AsyncStorage.setItem(CONTAINER_SORT_KEY, mode).catch(() => {});
-    setShowContainerMenu(false);
+    setShowSortMenu(false);
   };
+
+  const sortLabel =
+    sortMode === 'name-asc' ? 'A-Z' :
+    sortMode === 'name-desc' ? 'Z-A' :
+    sortMode === 'newest' ? 'Newest' :
+    'Oldest';
 
   const switchViewMode = (mode: ViewMode) => {
     setViewMode(mode);
@@ -383,6 +394,20 @@ export default function ContainerDetailScreen() {
     setEditingItem(null);
     exitSelectMode();
     await loadItems();
+  };
+
+  const handleEditContainerSubmit = async (name: string, photoUri?: string | null) => {
+    if (!container) return;
+    await ContainerService.updateContainer(container.id, { name });
+    if (photoUri && photoUri !== container.photoUri) {
+      const savedUri = await PhotoService.savePhoto(photoUri, `container_${container.id}`);
+      await ContainerRepository.updatePhotoUri(container.id, savedUri);
+    } else if (!photoUri && container.photoUri) {
+      await PhotoService.deletePhoto(container.photoUri);
+      await ContainerRepository.updatePhotoUri(container.id, null);
+    }
+    setEditingContainer(null);
+    await loadContainer();
   };
 
   async function handleMoveContainerToSpace(targetSpaceId: string) {
@@ -553,9 +578,11 @@ export default function ContainerDetailScreen() {
           )}
         </View>
         {!selectMode ? (
-          <TouchableOpacity style={styles.headerMenuBtn} onPress={handleContainerMenuPress}>
-            <FontAwesomeIcon icon={faEllipsisVertical} size={18} color={PRIMARY} />
-          </TouchableOpacity>
+          <View style={styles.headerControls}>
+            <TouchableOpacity style={styles.iconToggle} onPress={handleContainerMenuPress} accessibilityLabel="Container actions">
+              <FontAwesomeIcon icon={faEllipsisVertical} size={15} color={PRIMARY} />
+            </TouchableOpacity>
+          </View>
         ) : (
           <TouchableOpacity onPress={handleSelectAll} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Text style={{ color: PRIMARY, fontSize: 14, fontWeight: '500' }}>All</Text>
@@ -593,21 +620,46 @@ export default function ContainerDetailScreen() {
           <ActivityIndicator size="large" color={PRIMARY} />
         </View>
       ) : (
-        <FlatList
-          data={sortedItems}
-          keyExtractor={(item) => item.id}
-          key={viewMode === 'grid' ? 'grid' : 'list'}
-          numColumns={viewMode === 'grid' ? GRID_COLUMNS : 1}
-          columnWrapperStyle={viewMode === 'grid' ? styles.gridRow : undefined}
-          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 80 }]}
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            items.length > 0 ? (
-              <Text style={[styles.sectionLabel, { color: subtleText }]}>
-                {items.length} item{items.length !== 1 ? 's' : ''} {'\u00B7'} <Text style={{ fontStyle: 'italic' }}>Long press to select</Text>
-              </Text>
-            ) : null
-          }
+        <>
+          <View style={styles.contentToolbar}>
+            <Text style={[styles.sectionLabel, { color: subtleText, marginBottom: 0 }]} numberOfLines={1}>
+              {items.length} item{items.length !== 1 ? 's' : ''}
+            </Text>
+            <View style={styles.contentControls}>
+              <View style={[styles.viewSegment, { backgroundColor: isDark ? '#1c1c1e' : '#eef0f3', borderColor }]}>
+                <TouchableOpacity
+                  style={[styles.segmentIconBtn, viewMode === 'list' && [styles.segmentIconBtnActive, { backgroundColor: cardBg }]]}
+                  onPress={() => switchViewMode('list')}
+                  accessibilityLabel="List view"
+                >
+                  <FontAwesomeIcon icon={faList} size={14} color={viewMode === 'list' ? PRIMARY : subtleText} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.segmentIconBtn, viewMode === 'grid' && [styles.segmentIconBtnActive, { backgroundColor: cardBg }]]}
+                  onPress={() => switchViewMode('grid')}
+                  accessibilityLabel="Grid view"
+                >
+                  <FontAwesomeIcon icon={faGrip} size={14} color={viewMode === 'grid' ? PRIMARY : subtleText} />
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                style={[styles.sortFilterButton, { backgroundColor: cardBg, borderColor }]}
+                onPress={() => setShowSortMenu(true)}
+                accessibilityLabel="Sort items"
+              >
+                <FontAwesomeIcon icon={faFilter} size={13} color={PRIMARY} />
+                <Text style={[styles.sortFilterText, { color: colors.text }]}>{sortLabel}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          <FlatList
+            data={sortedItems}
+            keyExtractor={(item) => item.id}
+            key={viewMode === 'grid' ? 'grid' : 'list'}
+            numColumns={viewMode === 'grid' ? GRID_COLUMNS : 1}
+            columnWrapperStyle={viewMode === 'grid' ? styles.gridRow : undefined}
+            contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 80 }]}
+            showsVerticalScrollIndicator={false}
           renderItem={({ item }) => {
             const activeLending = activeLendingMap[item.id];
             const isLent = !!activeLending;
@@ -709,6 +761,7 @@ export default function ContainerDetailScreen() {
             </View>
           }
         />
+        </>
       )}
 
       {/* Bottom Action Bar */}
@@ -832,47 +885,67 @@ export default function ContainerDetailScreen() {
         contextLabel={container?.name}
       />
 
+      {/* Sort Sheet */}
+      <Modal visible={showSortMenu} transparent animationType="fade" onRequestClose={() => setShowSortMenu(false)}>
+        <TouchableWithoutFeedback onPress={() => setShowSortMenu(false)}>
+          <View style={styles.menuOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.menuSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+                <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+                <View style={styles.sheetHeader}>
+                  <View style={styles.sheetTitleWrap}>
+                    <Text style={[styles.sheetTitle, { color: colors.text }]}>Sort Items</Text>
+                    <Text style={[styles.sheetSubtitle, { color: subtleText }]} numberOfLines={1}>
+                      Items in {container?.name ?? 'container'}, {sortLabel}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setShowSortMenu(false)} style={styles.sheetCloseBtn} accessibilityLabel="Close sort">
+                    <FontAwesomeIcon icon={faTimes} size={16} color={subtleText} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+                  <Text style={[styles.menuTitle, { color: subtleText }]}>Sort by</Text>
+                  {([
+                    { key: 'name-asc' as SortMode, icon: faArrowDownAZ, label: 'Name A-Z' },
+                    { key: 'name-desc' as SortMode, icon: faArrowDownZA, label: 'Name Z-A' },
+                    { key: 'newest' as SortMode, icon: faCalendarPlus, label: 'Newest first' },
+                    { key: 'oldest' as SortMode, icon: faCalendar, label: 'Oldest first' },
+                  ]).map((opt) => (
+                    <TouchableOpacity key={opt.key} style={[styles.menuOption, sortMode === opt.key && styles.menuOptionActive]} onPress={() => switchSortMode(opt.key)} activeOpacity={0.7}>
+                      <FontAwesomeIcon icon={opt.icon} size={14} color={sortMode === opt.key ? PRIMARY : subtleText} />
+                      <Text style={[styles.menuOptionText, { color: sortMode === opt.key ? PRIMARY : colors.text }]}>{opt.label}</Text>
+                      {sortMode === opt.key && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
       {/* Container action menu */}
       <Modal visible={showContainerMenu} transparent animationType="fade" onRequestClose={() => setShowContainerMenu(false)}>
         <TouchableWithoutFeedback onPress={() => setShowContainerMenu(false)}>
           <View style={styles.menuOverlay}>
             <TouchableWithoutFeedback>
-              <View style={[styles.menuCard, { backgroundColor: cardBg, borderColor }]}>
-              <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
-                {/* View section */}
-                <Text style={[styles.menuTitle, { color: subtleText }]}>View</Text>
-                <TouchableOpacity style={[styles.menuOption, viewMode === 'list' && styles.menuOptionActive]} onPress={() => switchViewMode('list')} activeOpacity={0.7}>
-                  <FontAwesomeIcon icon={faList} size={14} color={viewMode === 'list' ? PRIMARY : subtleText} />
-                  <Text style={[styles.menuOptionText, { color: viewMode === 'list' ? PRIMARY : colors.text }]}>List</Text>
-                  {viewMode === 'list' && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.menuOption, viewMode === 'grid' && styles.menuOptionActive]} onPress={() => switchViewMode('grid')} activeOpacity={0.7}>
-                  <FontAwesomeIcon icon={faGrip} size={14} color={viewMode === 'grid' ? PRIMARY : subtleText} />
-                  <Text style={[styles.menuOptionText, { color: viewMode === 'grid' ? PRIMARY : colors.text }]}>Grid</Text>
-                  {viewMode === 'grid' && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
-                </TouchableOpacity>
-
-                <View style={[styles.menuDivider, { backgroundColor: borderColor }]} />
-
-                {/* Sort section */}
-                <Text style={[styles.menuTitle, { color: subtleText }]}>Sort</Text>
-                {([
-                  { key: 'name-asc' as SortMode, icon: faArrowDownAZ, label: 'Name A→Z' },
-                  { key: 'name-desc' as SortMode, icon: faArrowDownZA, label: 'Name Z→A' },
-                  { key: 'newest' as SortMode, icon: faCalendarPlus, label: 'Newest first' },
-                  { key: 'oldest' as SortMode, icon: faCalendar, label: 'Oldest first' },
-                ]).map((opt) => (
-                  <TouchableOpacity key={opt.key} style={[styles.menuOption, sortMode === opt.key && styles.menuOptionActive]} onPress={() => switchSortMode(opt.key)} activeOpacity={0.7}>
-                    <FontAwesomeIcon icon={opt.icon} size={14} color={sortMode === opt.key ? PRIMARY : subtleText} />
-                    <Text style={[styles.menuOptionText, { color: sortMode === opt.key ? PRIMARY : colors.text }]}>{opt.label}</Text>
-                    {sortMode === opt.key && <FontAwesomeIcon icon={faCheck} size={12} color={PRIMARY} style={styles.menuCheck} />}
+              <View style={[styles.menuSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+                <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+                <View style={styles.sheetHeader}>
+                  <View style={styles.sheetTitleWrap}>
+                    <Text style={[styles.sheetTitle, { color: colors.text }]}>Container Actions</Text>
+                    <Text style={[styles.sheetSubtitle, { color: subtleText }]} numberOfLines={1}>
+                      {container?.name ?? 'Container'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setShowContainerMenu(false)} style={styles.sheetCloseBtn} accessibilityLabel="Close container actions">
+                    <FontAwesomeIcon icon={faTimes} size={16} color={subtleText} />
                   </TouchableOpacity>
-                ))}
-
-                <View style={[styles.menuDivider, { backgroundColor: borderColor }]} />
-
-                {/* Container section */}
-                <Text style={[styles.menuTitle, { color: subtleText }]}>Container</Text>
+                </View>
+                <TouchableOpacity style={[styles.menuOption]} onPress={() => { setShowContainerMenu(false); setEditingContainer(container); }} activeOpacity={0.7}>
+                  <FontAwesomeIcon icon={faPen} size={14} color={PRIMARY} />
+                  <Text style={[styles.menuOptionText, { color: colors.text }]}>Edit</Text>
+                </TouchableOpacity>
                 <TouchableOpacity style={[styles.menuOption]} onPress={() => { setShowContainerMenu(false); setShowMoveContainerModal(true); }} activeOpacity={0.7}>
                   <FontAwesomeIcon icon={faRightLeft} size={14} color={PRIMARY} />
                   <Text style={[styles.menuOptionText, { color: colors.text }]}>Move</Text>
@@ -881,7 +954,6 @@ export default function ContainerDetailScreen() {
                   <FontAwesomeIcon icon={faTrash} size={14} color="#d32f2f" />
                   <Text style={[styles.menuOptionText, { color: '#d32f2f' }]}>Delete</Text>
                 </TouchableOpacity>
-              </ScrollView>
               </View>
             </TouchableWithoutFeedback>
           </View>
@@ -1057,6 +1129,14 @@ export default function ContainerDetailScreen() {
         initialQuantity={editingItem?.quantity}
         initialPhotoUri={editingItem?.photoUri}
       />
+      <ContainerFormModal
+        visible={editingContainer !== null}
+        onClose={() => setEditingContainer(null)}
+        onSubmit={handleEditContainerSubmit}
+        editMode
+        initialName={editingContainer?.name}
+        initialPhotoUri={editingContainer?.photoUri}
+      />
     </View>
   );
 }
@@ -1070,15 +1150,30 @@ const styles = StyleSheet.create({
   breadcrumb: { fontSize: 11, fontWeight: '500', letterSpacing: 0.2, marginBottom: 1 },
   headerTitle: { fontSize: 17, fontWeight: '600' },
   headerMenuBtn: { paddingLeft: 12, paddingVertical: 8 },
+  headerControls: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  iconToggle: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconToggleActive: { backgroundColor: 'rgba(107,127,153,0.12)' },
   containerPhotoWrap: { marginHorizontal: 16, marginTop: 8, borderRadius: 12, overflow: 'hidden', borderWidth: 1 },
   containerPhoto: { width: '100%', height: 160 },
   containerPhotoPlaceholder: { marginHorizontal: 16, marginTop: 8, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', paddingVertical: 14, alignItems: 'center' },
   containerPhotoPlaceholderText: { fontSize: 14, fontWeight: '500' },
-  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-start', alignItems: 'flex-end', paddingTop: 100, paddingRight: 20 },
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
+  menuSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '78%' },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 },
+  sheetTitleWrap: { flex: 1 },
+  sheetTitle: { fontSize: 20, fontWeight: '700' },
+  sheetSubtitle: { fontSize: 13, marginTop: 2 },
+  sheetCloseBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   menuCard: { borderRadius: 14, borderWidth: 1, paddingVertical: 8, paddingHorizontal: 4, minWidth: 180, maxHeight: '60%', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8 },
   menuTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 4, textTransform: 'uppercase' },
-  menuOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8 },
-  menuOptionActive: {},
+  menuOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, marginBottom: 4 },
+  menuOptionActive: { backgroundColor: 'rgba(107,127,153,0.1)' },
   menuOptionText: { fontSize: 14, fontWeight: '500', flex: 1 },
   menuCheck: { marginLeft: 'auto' },
   menuDivider: { height: 1, marginVertical: 6, marginHorizontal: 8 },
@@ -1095,6 +1190,13 @@ const styles = StyleSheet.create({
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   listContent: { paddingHorizontal: 16, paddingTop: 12 },
   sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3, marginBottom: 12 },
+  contentToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 2, paddingBottom: 8, gap: 12 },
+  contentControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  viewSegment: { height: 34, flexDirection: 'row', alignItems: 'center', borderRadius: 9, borderWidth: 1, padding: 2, gap: 2 },
+  segmentIconBtn: { width: 32, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
+  segmentIconBtnActive: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 2, elevation: 1 },
+  sortFilterButton: { height: 34, minWidth: 74, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 9, borderWidth: 1, paddingHorizontal: 10, gap: 6 },
+  sortFilterText: { fontSize: 12, fontWeight: '700' },
   itemCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, paddingVertical: 14, paddingHorizontal: 14, marginBottom: 6, gap: 10 },
   itemDot: { width: 6, height: 6, borderRadius: 3 },
   itemThumb: { width: 40, height: 40, borderRadius: 8 },

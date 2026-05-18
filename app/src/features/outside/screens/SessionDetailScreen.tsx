@@ -63,6 +63,7 @@ export default function SessionDetailScreen() {
   const [showLendModal, setShowLendModal] = useState(false);
   const [borrowerName, setBorrowerName] = useState('');
   const [lendNote, setLendNote] = useState('');
+  const [dueDate, setDueDate] = useState<Date | null>(null);
   const [lendLoading, setLendLoading] = useState(false);
 
   const lendingService = useMemo(
@@ -242,10 +243,12 @@ export default function SessionDetailScreen() {
         item_id: putAwayItem.item_id,
         borrower_name: borrowerName.trim(),
         note: lendNote.trim() || undefined,
+        due_date: dueDate ?? undefined,
       });
       setShowLendModal(false);
       setBorrowerName('');
       setLendNote('');
+      setDueDate(null);
       // Check the item off since it's been dealt with
       await outsideService.checkItem(id!, putAwayItem.item_id);
       setPutAwayItem(null);
@@ -282,7 +285,7 @@ export default function SessionDetailScreen() {
           onPress: async () => {
             try {
               await outsideService.deleteSession(id!);
-              router.replace('/(tabs)/outside');
+              router.replace('/(tabs)/tools' as any);
             } catch (err) {
               console.error('Error deleting session:', err);
               Alert.alert('Error', 'Failed to delete session');
@@ -513,7 +516,7 @@ export default function SessionDetailScreen() {
         {items.length === 0 ? (
           <View style={styles.center}>
             <Text style={[styles.emptyText, { color: subtleText }]}>No items yet</Text>
-            <Text style={[styles.emptyHint, { color: subtleText }]}>Tap "+ Add Items" to get started</Text>
+            <Text style={[styles.emptyHint, { color: subtleText }]}>Tap &quot;+ Add Items&quot; to get started</Text>
           </View>
         ) : (
           <FlatList
@@ -609,7 +612,7 @@ export default function SessionDetailScreen() {
           <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
           <Text style={[styles.sheetTitle, { color: colors.text }]}>Check Off</Text>
           <Text style={[styles.sheetSubtitle, { color: subtleText }]}>
-            What do you want to do with "{putAwayItem?.item_name}"?
+            What do you want to do with &quot;{putAwayItem?.item_name}&quot;?
           </Text>
           <View style={styles.sheetActions}>
             <TouchableOpacity
@@ -644,6 +647,7 @@ export default function SessionDetailScreen() {
                 setShowPutAwaySheet(false);
                 setBorrowerName('');
                 setLendNote('');
+                setDueDate(null);
                 setShowLendModal(true);
               }}
               activeOpacity={0.7}
@@ -651,7 +655,7 @@ export default function SessionDetailScreen() {
               <FontAwesomeIcon icon={faHandshake} size={18} color={PRIMARY} />
               <View style={styles.sheetOptionText}>
                 <Text style={[styles.sheetOptionLabel, { color: colors.text }]}>Lend to someone</Text>
-                <Text style={[styles.sheetOptionDesc, { color: subtleText }]}>Track who you're lending this to</Text>
+                <Text style={[styles.sheetOptionDesc, { color: subtleText }]}>Track who you&apos;re lending this to</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -743,8 +747,10 @@ export default function SessionDetailScreen() {
         onBorrowerNameChange={setBorrowerName}
         note={lendNote}
         onNoteChange={setLendNote}
+        dueDate={dueDate}
+        onDueDateChange={setDueDate}
         onSubmit={handleLendSubmit}
-        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setPutAwayItem(null); }}
+        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setDueDate(null); setPutAwayItem(null); }}
         loading={lendLoading}
       />
     </SafeAreaView>

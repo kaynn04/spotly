@@ -48,7 +48,7 @@ const TAB_ICONS: Record<string, any> = {
   index: faHome,
   spaces: faBook,
   lending: faHandshake,
-  outside: faWrench,
+  tools: faWrench,
 };
 
 type SheetStep = 'actions' | 'pick-space' | 'pick-location';
@@ -104,7 +104,7 @@ const FloatingTabBar = forwardRef<TabBarHandle, BottomTabBarProps>(function Floa
         if (key === 'tab-mic') target = micRef.current;
         else if (key === 'tab-spaces') target = tabRefs.current['spaces'];
         else if (key === 'tab-lending') target = tabRefs.current['lending'];
-        else if (key === 'tab-outside') target = tabRefs.current['outside'];
+        else if (key === 'tab-tools') target = tabRefs.current['tools'];
         else if (key === 'tab-home') target = tabRefs.current['index'];
         if (!target) { reject(new Error(`No ref for key: ${key}`)); return; }
         target.measure((_, __, width, height, pageX, pageY) => {

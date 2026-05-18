@@ -1,9 +1,8 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import * as SystemUI from 'expo-system-ui';
@@ -65,19 +64,16 @@ export default function RootLayout() {
     checkOnboarding();
   }, [dbReady, router]);
 
-  // Effect 3: Notification deep-link — tapping a warranty/reminder notification opens the item
+  // Effect 3: Notification deep-link
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const itemId = response.notification.request.content.data?.itemId as string | undefined;
-      if (itemId) router.push(`/item/${itemId}` as any);
-    });
-    return () => sub.remove();
-  }, [router]);
-
-  // Effect 3: Notification deep-link — tapping a warranty/reminder notification opens the item
-  useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const itemId = response.notification.request.content.data?.itemId as string | undefined;
+      const data = response.notification.request.content.data;
+      const lendingId = data?.lendingId as string | undefined;
+      const itemId = data?.itemId as string | undefined;
+      if (lendingId) {
+        router.push(`/lending/${lendingId}` as any);
+        return;
+      }
       if (itemId) router.push(`/item/${itemId}` as any);
     });
     return () => sub.remove();

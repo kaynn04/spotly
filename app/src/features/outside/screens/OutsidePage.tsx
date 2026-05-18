@@ -16,7 +16,7 @@ import {
   DeviceEventEmitter,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faSuitcase, faChevronRight, faCheckCircle, faClockRotateLeft } from '@fortawesome/free-solid-svg-icons';
+import { faSuitcase, faChevronLeft, faChevronRight, faCheckCircle, faClockRotateLeft } from '@fortawesome/free-solid-svg-icons';
 import { OutsideSession } from '../models/OutsideSession';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -163,9 +163,19 @@ export default function OutsidePage() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View>
-            <Text style={[styles.title, { color: colors.text }]}>Outside</Text>
-            <Text style={[styles.subtitle, { color: subtleText }]}>Track items you've taken out</Text>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => router.back()}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityLabel="Back"
+            >
+              <FontAwesomeIcon icon={faChevronLeft} size={16} color={PRIMARY} />
+            </TouchableOpacity>
+            <View>
+              <Text style={[styles.title, { color: colors.text }]}>Outside</Text>
+              <Text style={[styles.subtitle, { color: subtleText }]}>Track items you&apos;ve taken out</Text>
+            </View>
           </View>
           <TouchableOpacity style={[styles.historyPill, { borderColor: borderColor, backgroundColor: cardBg }]} onPress={handleViewHistory}>
             <Text style={[styles.historyPillText, { color: PRIMARY }]}>History</Text>
@@ -351,8 +361,16 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 20,
+  },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: { fontSize: 30, fontWeight: '700', letterSpacing: -0.5 },
   subtitle: { fontSize: 13, marginTop: 2 },

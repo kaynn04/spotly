@@ -72,12 +72,38 @@ function formatDate(dateString: string) {
   return new Date(dateString).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+function startOfDay(date: Date) {
+  const result = new Date(date);
+  result.setHours(0, 0, 0, 0);
+  return result;
+}
+
+function getDaysRemaining(date: Date) {
+  const due = startOfDay(date);
+  const today = startOfDay(new Date());
+  return Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function formatDueLabel(daysRemaining: number) {
+  if (daysRemaining < 0) return `${Math.abs(daysRemaining)}d overdue`;
+  if (daysRemaining === 0) return 'Today';
+  if (daysRemaining === 1) return 'Tomorrow';
+  return `${daysRemaining}d`;
+}
+
+type DashboardDueLending = Lending & {
+  item_name: string;
+  daysRemaining: number;
+  urgency: 'overdue' | 'critical' | 'warning';
+};
+
 interface DashboardData {
   stats: { totalItems: number; totalSpaces: number; totalContainers: number };
   recentItems: { id: string; name: string; spaceName: string; containerName: string | null; spaceId: string; containerId: string | null; createdAt: string; photoUri: string | null }[];
   recentlyMoved: DashboardMovedItem[];
   expiringWarranties: { id: string; name: string; spaceName: string; containerName: string | null; spaceId: string; containerId: string | null; warrantyExpiry: string; daysRemaining: number; urgency: 'critical' | 'warning' }[];
   activeLendings: (Lending & { item_name: string })[];
+  dueLendings: DashboardDueLending[];
   activeSession: { id: string; title: string; itemCount: number; checkedCount: number } | null;
   isEmpty: boolean;
 }
@@ -235,12 +261,28 @@ export default function HomePage() {
       if (!name) setShowNamePrompt(true);
       else setUserName(name);
 
+      const dueLendings: DashboardDueLending[] = activeLendings
+        .filter((lending) => lending.due_date)
+        .map((lending) => {
+          const daysRemaining = getDaysRemaining(lending.due_date!);
+          const urgency: DashboardDueLending['urgency'] =
+            daysRemaining < 0 ? 'overdue' : daysRemaining <= 1 ? 'critical' : 'warning';
+          return {
+            ...lending,
+            daysRemaining,
+            urgency,
+          };
+        })
+        .filter((lending) => lending.daysRemaining <= 7)
+        .sort((a, b) => a.daysRemaining - b.daysRemaining);
+
       setData({
         stats: dashboard.stats,
         recentItems: dashboard.recentItems,
         recentlyMoved: dashboard.recentlyMoved,
         expiringWarranties: dashboard.expiringWarranties,
         activeLendings,
+        dueLendings,
         activeSession: session
           ? { id: session.id, title: session.title, itemCount: session.itemCount, checkedCount: session.checkedCount }
           : null,
@@ -258,13 +300,14 @@ export default function HomePage() {
       ? Math.round((data.activeSession.checkedCount / data.activeSession.itemCount) * 100)
       : 0;
 
+  const firstDueLending = data?.dueLendings?.[0];
   const firstWarranty = data?.expiringWarranties?.[0];
   const firstLending = data?.activeLendings?.[0];
   const showLendGuidance = !!data && !data.isEmpty && data.stats.totalItems > 0 && (data.activeLendings?.length ?? 0) === 0 && !dismissedGuidanceCards.has('lend');
   const showOutsideGuidance = !!data && !data.isEmpty && data.stats.totalItems > 0 && !data.activeSession && !dismissedGuidanceCards.has('outside');
   const hasTodayContent = !!data?.activeSession || (data?.activeLendings?.length ?? 0) > 0 || showLendGuidance || showOutsideGuidance;
   const hasActivityContent = (data?.recentItems?.length ?? 0) > 0 || (data?.recentlyMoved?.length ?? 0) > 0 || (!!data && !data.isEmpty && data.stats.totalItems === 0);
-  const hasAlertContent = (data?.expiringWarranties?.length ?? 0) > 0;
+  const hasAlertContent = (data?.dueLendings?.length ?? 0) > 0 || (data?.expiringWarranties?.length ?? 0) > 0;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]} edges={['top']}>
@@ -362,6 +405,7 @@ export default function HomePage() {
                   style={[styles.priorityCard, { backgroundColor: cardBg, borderColor }]}
                   onPress={() => {
                     if (data?.activeSession) router.push(`/outside/${data.activeSession.id}` as any);
+                    else if (firstDueLending) router.push(`/lending/${firstDueLending.id}` as any);
                     else if (firstWarranty) router.push('/tools/warranty-tracker' as any);
                     else if (firstLending) router.push('/(tabs)/lending' as any);
                     else router.push('/(tabs)/spaces' as any);
@@ -370,18 +414,20 @@ export default function HomePage() {
                 >
                   <View style={[styles.priorityIcon, { backgroundColor: `${PRIMARY}18` }]}>
                     <FontAwesomeIcon
-                      icon={data?.activeSession ? faSuitcase : firstWarranty ? faShieldAlt : firstLending ? faHandshake : faBox}
+                      icon={data?.activeSession ? faSuitcase : firstDueLending ? faHandshake : firstWarranty ? faShieldAlt : firstLending ? faHandshake : faBox}
                       size={20}
                       color={PRIMARY}
                     />
                   </View>
                   <View style={styles.priorityContent}>
                     <Text style={[styles.priorityEyebrow, { color: subtleText }]}>
-                      {data?.activeSession ? 'Current Focus' : firstWarranty ? 'Upcoming Alert' : firstLending ? 'Active Lending' : 'Next Step'}
+                      {data?.activeSession ? 'Current Focus' : firstDueLending || firstWarranty ? 'Upcoming Alert' : firstLending ? 'Active Lending' : 'Next Step'}
                     </Text>
                     <Text style={[styles.priorityTitle, { color: colors.text }]} numberOfLines={1}>
                       {data?.activeSession
                         ? data.activeSession.title
+                        : firstDueLending
+                        ? `${firstDueLending.item_name} due`
                         : firstWarranty
                         ? `${firstWarranty.name} warranty`
                         : firstLending
@@ -393,6 +439,8 @@ export default function HomePage() {
                     <Text style={[styles.prioritySubtitle, { color: subtleText }]} numberOfLines={2}>
                       {data?.activeSession
                         ? `${data.activeSession.checkedCount}/${data.activeSession.itemCount} items checked`
+                        : firstDueLending
+                        ? `${formatDueLabel(firstDueLending.daysRemaining)} · Lent to ${firstDueLending.borrower_name}`
                         : firstWarranty
                         ? firstWarranty.daysRemaining === 0 ? 'Expires today' : `Expires in ${firstWarranty.daysRemaining} day${firstWarranty.daysRemaining !== 1 ? 's' : ''}`
                         : firstLending
@@ -461,7 +509,7 @@ export default function HomePage() {
               <View style={[styles.guidanceCard, { backgroundColor: cardBg, borderColor }]}>
                 <TouchableOpacity
                   style={styles.guidanceCardContentWithClose}
-                  onPress={() => router.push('/(tabs)/outside' as any)}
+                  onPress={() => router.push('/(tabs)/tools' as any)}
                   activeOpacity={0.7}
                 >
                   <View style={styles.guidanceCardContent}>
@@ -529,6 +577,64 @@ export default function HomePage() {
             )}
 
             {/* ── Expiring warranties ────────────────────────── */}
+            {dashboardSegment === 'alerts' && (data?.dueLendings?.length ?? 0) > 0 && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Lendings Due Soon</Text>
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/lending' as any)}>
+                    <Text style={[styles.seeAll, { color: PRIMARY }]}>See all</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+                  {data!.dueLendings.slice(0, 3).map((lending, index) => {
+                    const urgencyColor = lending.urgency === 'overdue' ? '#d32f2f' : lending.urgency === 'critical' ? '#f57c00' : PRIMARY;
+                    const isLastItem = index === Math.min(data!.dueLendings.length, 3) - 1;
+
+                    return (
+                      <TouchableOpacity
+                        key={lending.id}
+                        style={[
+                          styles.lendingRow,
+                          !isLastItem && {
+                            borderBottomWidth: 1,
+                            borderBottomColor: borderColor,
+                          },
+                        ]}
+                        onPress={() => router.push(`/lending/${lending.id}` as any)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.lendingDot, { backgroundColor: urgencyColor }]} />
+                        <View style={styles.lendingContent}>
+                          <Text style={[styles.lendingBorrower, { color: colors.text }]} numberOfLines={1}>
+                            {lending.item_name}
+                          </Text>
+                          <Text style={[styles.lendingMeta, { color: subtleText }]} numberOfLines={1}>
+                            Lent to {lending.borrower_name} · Due {formatDate(lending.due_date!.toString())}
+                          </Text>
+                        </View>
+                        <View style={styles.warrantyRight}>
+                          <Text style={[styles.warrantyDays, { color: urgencyColor, fontWeight: '600' }]}>
+                            {formatDueLabel(lending.daysRemaining)}
+                          </Text>
+                          <FontAwesomeIcon icon={faChevronRight} size={12} color={subtleText} style={{ marginLeft: 6 }} />
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  {data!.dueLendings.length > 3 && (
+                    <TouchableOpacity
+                      style={styles.viewAllRow}
+                      onPress={() => router.push('/(tabs)/lending' as any)}
+                    >
+                      <Text style={[styles.viewAllText, { color: PRIMARY }]}>
+                        +{data!.dueLendings.length - 3} more
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            )}
+
             {dashboardSegment === 'alerts' && (data?.expiringWarranties?.length ?? 0) > 0 && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
@@ -807,7 +913,7 @@ export default function HomePage() {
 
             {dashboardSegment === 'alerts' && !data?.isEmpty && !hasAlertContent && (
               <View style={[styles.emptyPanel, { backgroundColor: cardBg, borderColor }]}>
-                <Text style={[styles.emptyPanelText, { color: subtleText }]}>No warranty alerts right now.</Text>
+                <Text style={[styles.emptyPanelText, { color: subtleText }]}>No alerts right now.</Text>
               </View>
             )}
 
