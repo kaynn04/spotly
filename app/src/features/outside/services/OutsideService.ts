@@ -165,8 +165,12 @@ export class OutsideService {
       const existingItems = await this.itemRepository.getSessionItems(sessionId);
       const existingItemIds = new Set(existingItems.map(item => item.item_id));
 
-      // Filter out duplicates
-      const newItemIds = itemIds.filter(id => !existingItemIds.has(id));
+      // Filter out duplicates and lost items
+      const candidateItemIds = itemIds.filter(id => !existingItemIds.has(id));
+      const candidateItems = await Promise.all(candidateItemIds.map(id => ItemRepository.getItemById(id)));
+      const newItemIds = candidateItems
+        .filter(item => item && !item.lostAt)
+        .map(item => item!.id);
 
       if (newItemIds.length === 0) {
         console.log(`⚠ No new items to add (all ${itemIds.length} already exist)`);

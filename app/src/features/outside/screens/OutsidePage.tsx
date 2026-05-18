@@ -141,10 +141,11 @@ export default function OutsidePage() {
   const handleCreateSession = async () => {
     try {
       const items = await new ItemRepository().getAll();
-      if (items.length === 0) {
+      const availableItems = items.filter(item => !item.lostAt);
+      if (availableItems.length === 0) {
         Alert.alert(
-          'No Items Yet',
-          'Add items to your spaces first before starting an outside session.',
+          'No Available Items',
+          'Add items to your spaces or mark lost items as found before starting an outside session.',
           [{ text: 'OK' }]
         );
         return;
@@ -302,12 +303,13 @@ export default function OutsidePage() {
                 </View>
               )}
 
-              {/* Tap hint */}
-              <View style={styles.tapHintRow}>
-                <Text style={[styles.tapHintText, { color: PRIMARY }]}>
-                  Tap to open checklist
-                </Text>
-              </View>
+              {sessionCard.itemCount === 0 && (
+                <View style={styles.tapHintRow}>
+                  <Text style={[styles.tapHintText, { color: PRIMARY }]}>
+                    Tap to open checklist
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
 
             {/* Quick Action: Continue */}
