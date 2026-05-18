@@ -6,7 +6,7 @@
  * Implementation: T010
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -41,10 +41,21 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
   const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();
   const isDark = colorScheme === 'dark';
+  const titleInputRef = useRef<TextInput>(null);
 
   const [title, setTitle] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    const focusTimer = setTimeout(() => {
+      titleInputRef.current?.focus();
+    }, 250);
+
+    return () => clearTimeout(focusTimer);
+  }, [visible]);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const inputBg = isDark ? '#2c2c2e' : '#f8f9fa';
@@ -116,6 +127,7 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
                   {/* Input */}
                   <View style={[styles.inputWrapper, { backgroundColor: inputBg, borderColor: error ? '#d32f2f' : borderColor }]}>
                     <TextInput
+                      ref={titleInputRef}
                       style={[styles.input, { color: textColor }]}
                       placeholder="e.g., Grocery run, Airport trip"
                       placeholderTextColor={subtleText}
@@ -123,7 +135,6 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
                       onChangeText={(t) => { setTitle(t); setError(null); }}
                       maxLength={100}
                       editable={!loading}
-                      autoFocus
                       returnKeyType="done"
                       onSubmitEditing={handleCreateSession}
                     />
