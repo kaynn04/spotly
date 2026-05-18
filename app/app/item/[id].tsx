@@ -38,7 +38,7 @@ import { Lending } from '@/src/features/lending/models/Lending';
 import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
 import { OutsideService } from '@/src/features/outside/services/OutsideService';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faBox, faHandshake, faCheck, faTrash, faMapPin, faFolder, faEllipsisVertical, faChevronLeft, faShield } from '@fortawesome/free-solid-svg-icons';
+import { faBox, faHandshake, faCheck, faTrash, faMapPin, faFolder, faEllipsisVertical, faChevronLeft, faShield, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import DatePickerSheet from '@/src/features/lending/screens/components/DatePickerSheet';
 import { parseDateOnly, startOfLocalDay } from '@/src/utils/dateOnly';
 
@@ -262,6 +262,16 @@ export default function ItemDetailScreen() {
     }
   }
 
+  async function handleMarkFound() {
+    if (!item) return;
+    try {
+      await ItemRepository.markFound(item.id);
+      await loadItem();
+    } catch {
+      Alert.alert('Error', 'Failed to mark item as found');
+    }
+  }
+
   // Delete
   function handleDelete() {
     if (!item) return;
@@ -363,6 +373,7 @@ export default function ItemDetailScreen() {
 
   const isLent = !!activeLending;
   const isOutside = activeOutsideSession;
+  const isLost = !!item.lostAt;
   const locationText = item.container?.name
     ? `${item.space?.name ?? 'Unknown'} › ${item.container.name}`
     : item.space?.name ?? 'Unknown space';
@@ -379,6 +390,16 @@ export default function ItemDetailScreen() {
       'This item is currently lent out. Mark it as returned before moving it.'
     );
 
+  const lostGuard = () =>
+    Alert.alert(
+      'Item is Lost',
+      'Mark this item as found before moving or lending it.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Mark Found', onPress: handleMarkFound },
+      ]
+    );
+
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
       {/* Header */}
@@ -393,6 +414,25 @@ export default function ItemDetailScreen() {
       </View>
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
+        {isLost && (
+          <View style={[styles.lendingBanner, { backgroundColor: '#d32f2f15', borderColor: '#d32f2f40' }]}>
+            <FontAwesomeIcon icon={faTriangleExclamation} size={16} color="#d32f2f" />
+            <Text style={[styles.lendingBannerText, { color: '#d32f2f', flex: 1 }]}>
+              Reported lost{item.lostAt ? ` · ${new Date(item.lostAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}
+            </Text>
+            <TouchableOpacity style={[styles.foundBtn, { backgroundColor: '#d32f2f18' }]} onPress={handleMarkFound}>
+              <Text style={styles.foundBtnText}>Found</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {isLost && item.lostNote && (
+          <View style={[styles.fieldCard, { backgroundColor: cardBg, borderColor: '#d32f2f40' }]}>
+            <Text style={[styles.fieldLabel, { color: '#d32f2f' }]}>Lost note</Text>
+            <Text style={[styles.fieldValue, { color: colors.text }]}>{item.lostNote}</Text>
+          </View>
+        )}
+
         {/* Lending badge */}
         {isLent && (
           <View style={[styles.lendingBanner, { backgroundColor: `${LENDING}15`, borderColor: `${LENDING}40` }]}>
@@ -594,10 +634,10 @@ export default function ItemDetailScreen() {
           <View style={[styles.menuDropdown, { backgroundColor: cardBg, borderColor, top: insets.top + 44 }]}>  
             <TouchableOpacity
               style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]}
-              onPress={() => { setShowMenu(false); if (isOutside) { outsideGuard(); } else if (isLent) { lendingGuard(); } else { openMoveModal(); } }}
+              onPress={() => { setShowMenu(false); if (isLost) { lostGuard(); } else if (isOutside) { outsideGuard(); } else if (isLent) { lendingGuard(); } else { openMoveModal(); } }}
             >
-              <FontAwesomeIcon icon={faBox} size={18} color={isOutside ? '#e67e22' : isLent ? '#e67e22' : PRIMARY} />
-              <Text style={[styles.menuItemText, { color: isOutside ? '#e67e22' : isLent ? '#e67e22' : colors.text }]}>Move to...</Text>
+              <FontAwesomeIcon icon={faBox} size={18} color={isLost ? '#d32f2f' : isOutside ? '#e67e22' : isLent ? '#e67e22' : PRIMARY} />
+              <Text style={[styles.menuItemText, { color: isLost ? '#d32f2f' : isOutside ? '#e67e22' : isLent ? '#e67e22' : colors.text }]}>Move to...</Text>
             </TouchableOpacity>
             {isLent ? (
               <TouchableOpacity style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]} onPress={() => { setShowMenu(false); handleMarkReturned(); }}>
@@ -607,10 +647,10 @@ export default function ItemDetailScreen() {
             ) : (
               <TouchableOpacity
                 style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]}
-              onPress={() => { setShowMenu(false); if (isOutside) { outsideGuard(); } else { setBorrowerName(''); setLendNote(''); setDueDate(null); setShowLendModal(true); } }}
+              onPress={() => { setShowMenu(false); if (isLost) { lostGuard(); } else if (isOutside) { outsideGuard(); } else { setBorrowerName(''); setLendNote(''); setDueDate(null); setShowLendModal(true); } }}
               >
-                <FontAwesomeIcon icon={faHandshake} size={18} color={isOutside ? '#e67e22' : PRIMARY} />
-                <Text style={[styles.menuItemText, { color: isOutside ? '#e67e22' : colors.text }]}>Lend item</Text>
+                <FontAwesomeIcon icon={faHandshake} size={18} color={isLost ? '#d32f2f' : isOutside ? '#e67e22' : PRIMARY} />
+                <Text style={[styles.menuItemText, { color: isLost ? '#d32f2f' : isOutside ? '#e67e22' : colors.text }]}>Lend item</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity style={styles.menuItem} onPress={() => { setShowMenu(false); handleDelete(); }}>
@@ -749,6 +789,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   lendingBannerText: { fontSize: 14, fontWeight: '500' },
+  foundBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
+  foundBtnText: { color: '#d32f2f', fontSize: 12, fontWeight: '700' },
 
   photoCard: {
     borderRadius: 12,

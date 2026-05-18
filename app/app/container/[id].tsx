@@ -20,6 +20,7 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  TextInput,
   ScrollView,
   Modal,
   Image,
@@ -29,7 +30,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faChevronLeft, faMapPin, faBox, faHandshake, faCheck, faTrash, faFolder, faRightLeft, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faFilter, faList, faGrip, faPen, faTimes, faEllipsisVertical } from '@fortawesome/free-solid-svg-icons';
+import { faChevronLeft, faMapPin, faBox, faHandshake, faCheck, faTrash, faFolder, faRightLeft, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faFilter, faList, faGrip, faPen, faTimes, faEllipsisVertical, faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -91,6 +92,7 @@ export default function ContainerDetailScreen() {
   const [spaceContainers, setSpaceContainers] = useState<Record<string, Container[]>>({});
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [searchText, setSearchText] = useState('');
 
   // Select mode
   const [selectMode, setSelectMode] = useState(false);
@@ -275,6 +277,15 @@ export default function ContainerDetailScreen() {
     return sorted;
   }, [items, sortMode]);
 
+  const filteredItems = useMemo(() => {
+    const query = searchText.trim().toLowerCase();
+    if (!query) return sortedItems;
+    return sortedItems.filter((item) =>
+      item.name.toLowerCase().includes(query) ||
+      (item.description ?? '').toLowerCase().includes(query)
+    );
+  }, [searchText, sortedItems]);
+
   // --- Select mode ---
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -304,7 +315,7 @@ export default function ContainerDetailScreen() {
   };
 
   const handleSelectAll = () => {
-    setSelectedIds(new Set(sortedItems.map((i) => i.id)));
+    setSelectedIds(new Set(filteredItems.map((i) => i.id)));
   };
 
   const handleBulkDelete = () => {
@@ -335,11 +346,12 @@ export default function ContainerDetailScreen() {
   const handleBulkMove = () => {
     if (selectedIds.size === 0) return;
     
-    // Check if any selected items are lent or outside
+    // Check if any selected items are lent, outside, or lost
     const blockedItems = [...selectedIds].filter((itemId) => {
       const isOutside = activeOutsideItemIds.has(itemId);
       const isLent = !!activeLendingMap[itemId];
-      return isOutside || isLent;
+      const isLost = !!items.find((item) => item.id === itemId)?.lostAt;
+      return isOutside || isLent || isLost;
     });
     
     if (blockedItems.length > 0) {
@@ -348,7 +360,7 @@ export default function ContainerDetailScreen() {
         .join(', ');
       Alert.alert(
         'Items are Blocked',
-        `Cannot move: ${blockedNames}. Complete outside sessions and mark lent items as returned first.`
+        `Cannot move: ${blockedNames}. Complete outside sessions, mark lent items as returned, or mark lost items as found first.`
       );
       return;
     }
@@ -365,12 +377,17 @@ export default function ContainerDetailScreen() {
     if (!item) return;
     const isOutside = activeOutsideItemIds.has(item.id);
     const isLent = !!activeLendingMap[item.id];
+    const isLost = !!item.lostAt;
     if (isOutside) {
       Alert.alert('Item is Outside', 'Complete the outside session before lending.');
       return;
     }
     if (isLent) {
       Alert.alert('Already Lent', 'This item is already lent out.');
+      return;
+    }
+    if (isLost) {
+      Alert.alert('Item is Lost', 'Mark this item as found before lending it.');
       return;
     }
     exitSelectMode();
@@ -615,6 +632,30 @@ export default function ContainerDetailScreen() {
         )
       )}
 
+      {!loading && container && (
+        <View style={[styles.searchWrapper, { backgroundColor: cardBg, borderColor }]}>
+          <FontAwesomeIcon icon={faMagnifyingGlass} size={14} color={colors.text} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Search items in this container..."
+            placeholderTextColor={subtleText}
+            value={searchText}
+            onChangeText={setSearchText}
+            returnKeyType="search"
+          />
+          {searchText.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearchText('')}
+              style={styles.clearSearchBtn}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityLabel="Clear search"
+            >
+              <FontAwesomeIcon icon={faTimes} size={13} color={subtleText} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
       {loading ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={PRIMARY} />
@@ -623,7 +664,9 @@ export default function ContainerDetailScreen() {
         <>
           <View style={styles.contentToolbar}>
             <Text style={[styles.sectionLabel, { color: subtleText, marginBottom: 0 }]} numberOfLines={1}>
-              {items.length} item{items.length !== 1 ? 's' : ''}
+              {searchText.trim()
+                ? `${filteredItems.length} of ${items.length} item${items.length !== 1 ? 's' : ''}`
+                : `${items.length} item${items.length !== 1 ? 's' : ''}`}
             </Text>
             <View style={styles.contentControls}>
               <View style={[styles.viewSegment, { backgroundColor: isDark ? '#1c1c1e' : '#eef0f3', borderColor }]}>
@@ -653,7 +696,7 @@ export default function ContainerDetailScreen() {
             </View>
           </View>
           <FlatList
-            data={sortedItems}
+            data={filteredItems}
             keyExtractor={(item) => item.id}
             key={viewMode === 'grid' ? 'grid' : 'list'}
             numColumns={viewMode === 'grid' ? GRID_COLUMNS : 1}
@@ -664,12 +707,13 @@ export default function ContainerDetailScreen() {
             const activeLending = activeLendingMap[item.id];
             const isLent = !!activeLending;
             const isOutside = activeOutsideItemIds.has(item.id);
+            const isLost = !!item.lostAt;
             const isSelected = selectedIds.has(item.id);
 
             if (viewMode === 'grid') {
               return (
                 <TouchableOpacity
-                  style={[styles.gridCard, { backgroundColor: cardBg, borderColor: isSelected ? PRIMARY : borderColor, width: GRID_ITEM_WIDTH }, isSelected && styles.selectedCard]}
+                  style={[styles.gridCard, { backgroundColor: cardBg, borderColor: isSelected ? PRIMARY : isLost ? '#d32f2f40' : isOutside ? '#e67e2240' : isLent ? `${LENDING}40` : borderColor, width: GRID_ITEM_WIDTH }, isSelected && styles.selectedCard]}
                   onPress={() => {
                     if (selectMode) { toggleSelect(item.id); return; }
                     router.push({ pathname: '../item/[id]' as any, params: { id: item.id } });
@@ -693,9 +737,11 @@ export default function ContainerDetailScreen() {
                     </View>
                   )}
                   <View style={styles.gridContent}>
+                    {isLost && <Text style={[styles.gridBadge, { color: '#d32f2f' }]}>Lost</Text>}
                     {isLent && <Text style={[styles.gridBadge, { color: LENDING }]}>Lent</Text>}
                     {isOutside && !isLent && <Text style={[styles.gridBadge, { color: '#e67e22' }]}>Outside</Text>}
                     <Text style={[styles.gridName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
+                    {isLost && <Text style={[styles.gridMeta, { color: '#d32f2f' }]} numberOfLines={1}>Reported lost</Text>}
                     {isLent && <Text style={[styles.gridMeta, { color: LENDING }]} numberOfLines={1}>To {activeLending.borrower_name}</Text>}
                   </View>
                 </TouchableOpacity>
@@ -704,7 +750,7 @@ export default function ContainerDetailScreen() {
 
             return (
               <TouchableOpacity
-                style={[styles.itemCard, { backgroundColor: cardBg, borderColor: isSelected ? PRIMARY : (isOutside ? '#e67e2240' : isLent ? `${LENDING}40` : borderColor) }, isSelected && styles.selectedCard]}
+                style={[styles.itemCard, { backgroundColor: cardBg, borderColor: isSelected ? PRIMARY : isLost ? '#d32f2f40' : isOutside ? '#e67e2240' : isLent ? `${LENDING}40` : borderColor }, isSelected && styles.selectedCard]}
                 onPress={() => {
                   if (selectMode) { toggleSelect(item.id); return; }
                   router.push({ pathname: '../item/[id]' as any, params: { id: item.id } });
@@ -714,13 +760,13 @@ export default function ContainerDetailScreen() {
                   else toggleSelect(item.id);
                 }}
                 activeOpacity={0.7}
-              >
+                >
                 {selectMode ? (
                   <View style={[styles.selectCircle, isSelected && { backgroundColor: PRIMARY, borderColor: PRIMARY }]}>
                     {isSelected && <FontAwesomeIcon icon={faCheck} size={10} color="#fff" />}
                   </View>
                 ) : (
-                  <View style={[styles.itemDot, { backgroundColor: isOutside ? '#e67e22' : isLent ? LENDING : isDark ? '#48484a' : '#c7c7cc' }]} />
+                  <View style={[styles.itemDot, { backgroundColor: isLost ? '#d32f2f' : isOutside ? '#e67e22' : isLent ? LENDING : isDark ? '#48484a' : '#c7c7cc' }]} />
                 )}
                 {item.photoUri ? (
                   <Image source={{ uri: item.photoUri }} style={styles.itemThumb} />
@@ -729,6 +775,11 @@ export default function ContainerDetailScreen() {
                   <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={1}>
                     {item.name}
                   </Text>
+                  {isLost && (
+                    <Text style={[styles.itemLentMeta, { color: '#d32f2f' }]} numberOfLines={1}>
+                      Reported lost
+                    </Text>
+                  )}
                   {isLent && (
                     <Text style={[styles.itemLentMeta, { color: LENDING }]} numberOfLines={1}>
                       Lent to {activeLending.borrower_name}
@@ -740,12 +791,17 @@ export default function ContainerDetailScreen() {
                     </Text>
                   )}
                 </View>
-                {!selectMode && isOutside && (
+                {!selectMode && isLost && (
+                  <View style={[styles.lentBadge, { backgroundColor: '#d32f2f15' }]}>
+                    <Text style={[styles.lentBadgeText, { color: '#d32f2f' }]}>Lost</Text>
+                  </View>
+                )}
+                {!selectMode && !isLost && isOutside && (
                   <View style={[styles.lentBadge, { backgroundColor: '#e67e2215' }]}>
                     <Text style={[styles.lentBadgeText, { color: '#e67e22' }]}>Outside</Text>
                   </View>
                 )}
-                {!selectMode && !isOutside && isLent && (
+                {!selectMode && !isLost && !isOutside && isLent && (
                   <View style={[styles.lentBadge, { backgroundColor: `${LENDING}15` }]}>
                     <Text style={[styles.lentBadgeText, { color: LENDING }]}>Lent</Text>
                   </View>
@@ -756,7 +812,9 @@ export default function ContainerDetailScreen() {
           ListEmptyComponent={
             <View style={[styles.emptyCard, { backgroundColor: cardBg, borderColor }]}>
               <Text style={[styles.emptyText, { color: subtleText }]}>
-                {'No items in this container yet.\nTap the button below to add one.'}
+                {searchText.trim()
+                  ? 'No items match your search.'
+                  : 'No items in this container yet.\nTap the button below to add one.'}
               </Text>
             </View>
           }
@@ -984,6 +1042,7 @@ export default function ContainerDetailScreen() {
           const lending = activeLendingMap[item.id];
           const isLent = !!lending;
           const isOutside = activeOutsideItemIds.has(item.id);
+          const isLost = !!item.lostAt;
           const outsideGuard = () =>
             Alert.alert(
               'Item is Outside',
@@ -994,12 +1053,17 @@ export default function ContainerDetailScreen() {
               'Item is Lent Out',
               'This item is currently lent out. Mark it as returned before moving it.'
             );
+          const lostGuard = () =>
+            Alert.alert(
+              'Item is Lost',
+              'Mark this item as found before moving or lending it.'
+            );
           return [
             {
               icon: faBox,
               label: 'Move',
-              description: isOutside ? 'In active outside session' : isLent ? 'Item is currently lent out' : 'Move to another space or container',
-              onPress: isOutside ? outsideGuard : isLent ? lendingGuard : () => { setSelectedMoveItemIds(new Set([item.id])); setShowMoveModal(true); },
+              description: isLost ? 'Item is marked lost' : isOutside ? 'In active outside session' : isLent ? 'Item is currently lent out' : 'Move to another space or container',
+              onPress: isLost ? lostGuard : isOutside ? outsideGuard : isLent ? lendingGuard : () => { setSelectedMoveItemIds(new Set([item.id])); setShowMoveModal(true); },
             },
             isLent
               ? {
@@ -1011,8 +1075,8 @@ export default function ContainerDetailScreen() {
               : {
                   icon: faHandshake,
                   label: 'Lend',
-                  description: isOutside ? 'In active outside session' : 'Track who you lent this item to',
-                  onPress: isOutside ? outsideGuard : () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setDueDate(null); setShowLendModal(true); },
+                  description: isLost ? 'Item is marked lost' : isOutside ? 'In active outside session' : 'Track who you lent this item to',
+                  onPress: isLost ? lostGuard : isOutside ? outsideGuard : () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setDueDate(null); setShowLendModal(true); },
                 },
             {
               icon: faTrash,
@@ -1040,7 +1104,7 @@ export default function ContainerDetailScreen() {
         let canMove = selectedIds.size > 0;
         if (canMove) {
           for (const id of selectedIds) {
-            if (activeOutsideItemIds.has(id) || activeLendingMap[id]) {
+            if (activeOutsideItemIds.has(id) || activeLendingMap[id] || items.find((item) => item.id === id)?.lostAt) {
               canMove = false;
               break;
             }
@@ -1062,6 +1126,7 @@ export default function ContainerDetailScreen() {
           if (selectedItem) {
             const activeLendingForItem = activeLendingMap[selectedItem.id];
             const isOutside = activeOutsideItemIds.has(selectedItem.id);
+            const isLost = !!selectedItem.lostAt;
 
             if (activeLendingForItem) {
               lendActionLabel = 'Return';
@@ -1072,6 +1137,8 @@ export default function ContainerDetailScreen() {
                 exitSelectMode();
               };
               lendActionDisabled = false;
+            } else if (isLost) {
+              lendActionDisabled = true; // Cannot lend if lost
             } else if (isOutside) {
               lendActionDisabled = true; // Cannot lend if outside
             } else {
@@ -1163,6 +1230,20 @@ const styles = StyleSheet.create({
   containerPhoto: { width: '100%', height: 160 },
   containerPhotoPlaceholder: { marginHorizontal: 16, marginTop: 8, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', paddingVertical: 14, alignItems: 'center' },
   containerPhotoPlaceholderText: { fontSize: 14, fontWeight: '500' },
+  searchWrapper: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 8,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  searchInput: { flex: 1, fontSize: 15 },
+  clearSearchBtn: { padding: 4 },
   menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
   menuSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '78%' },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 },

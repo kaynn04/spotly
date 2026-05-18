@@ -56,6 +56,73 @@ const SUCCESS = '#6b9e7a';
 const DESTRUCTIVE = '#d32f2f';
 const LISTEN_TIMEOUT_MS = 10_000;
 
+const VOICE_GUIDE_SECTIONS = [
+  {
+    id: 'inventory',
+    title: 'Add, move, and find',
+    summary: 'Manage items and locations',
+    color: '#6b9e7a',
+    commands: [
+      {
+        label: 'Add one item',
+        pattern: 'Add [item] to [space] [container]',
+        examples: ['"Add drill to Garage"', '"Put charger in Bedroom drawer"'],
+      },
+      {
+        label: 'Add multiple items',
+        pattern: 'Add [item] and [item] to [space]',
+        examples: ['"Add pen and ruler and eraser to Office"', '"Add mouse, keyboard, and headset to Desk"'],
+      },
+      {
+        label: 'Move an item',
+        pattern: 'Move [item] to [space] [container]',
+        examples: ['"Move scissors to Kitchen"', '"Transfer charger to Bedroom drawer"'],
+      },
+      {
+        label: 'Find an item',
+        pattern: 'Find [item]',
+        examples: ['"Where is my charger?"', '"Locate scissors"'],
+      },
+    ],
+  },
+  {
+    id: 'lending',
+    title: 'Lend and return',
+    summary: 'Track borrowed items',
+    color: '#8b6db8',
+    commands: [
+      {
+        label: 'Lend an item',
+        pattern: 'Lend [item] to [person]',
+        examples: ['"Lend drill to John"', '"Let Sarah borrow my charger"'],
+      },
+      {
+        label: 'Mark returned',
+        pattern: '[item] is back',
+        examples: ['"Drill is back"', '"Return charger"', '"Scissors returned"'],
+      },
+    ],
+  },
+  {
+    id: 'setup',
+    title: 'Create spaces and containers',
+    summary: 'Build your inventory structure',
+    color: '#c08b4a',
+    commands: [
+      {
+        label: 'Create a space',
+        pattern: 'Create space [name]',
+        examples: ['"Create space Tool Shed"', '"New space Kitchen"'],
+      },
+      {
+        label: 'Create a container',
+        pattern: 'New [container] in [space]',
+        examples: ['"New shelf in Garage"', '"Create box in Kitchen"', '"Add drawer in Bedroom"'],
+      },
+    ],
+  },
+];
+
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -72,6 +139,7 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
   const isDark = colorScheme === 'dark';
   const styles = buildStyles(isDark);
   const [sessionState, setSessionState] = useState<VoiceSessionState>({ phase: 'idle' });
+  const [expandedGuideId, setExpandedGuideId] = useState<string>('inventory');
 
   // Confirmation-phase mutable state (overrides for unresolved fields)
   const [confirmedSpaceId, setConfirmedSpaceId] = useState<string | null>(null);
@@ -709,24 +777,52 @@ export default function VoiceModal({ visible, onClose, onItemAdded, onNavigateTo
                 <Text style={styles.heroCopy}>Tap the mic and speak naturally.</Text>
               </View>
 
-              <View style={styles.commandList}>
-                {[
-                  { label: 'Add item',       example: '"Add drill to Garage"',               color: '#6b9e7a' },
-                  { label: 'Add multiple',   example: '"Add pen and ruler and eraser to Office"', color: '#6b9e7a' },
-                  { label: 'Move item',      example: '"Move scissors to Kitchen"',           color: '#6b7f99' },
-                  { label: 'Find item',      example: '"Where is my charger?"',               color: '#6b7f99' },
-                  { label: 'Lend item',      example: '"Lend drill to John"',                 color: '#8b6db8' },
-                  { label: 'Mark returned',  example: '"Drill is back"',                      color: '#8b6db8' },
-                  { label: 'New space',      example: '"Create space Tool Shed"',             color: '#c08b4a' },
-                  { label: 'New container',  example: '"New shelf in Garage"',                color: '#c08b4a' },
-                ].map(({ label, example, color }) => (
-                  <View key={label} style={styles.commandRow}>
-                    <View style={[styles.commandBadge, { backgroundColor: `${color}22` }]}>
-                      <Text style={[styles.commandLabel, { color }]}>{label}</Text>
+              <View style={styles.voiceGuide}>
+                <View style={styles.voiceGuideHeader}>
+                  <Text style={styles.voiceGuideTitle}>Voice options</Text>
+                  <Text style={styles.voiceGuideSubtitle}>Open a section to see what you can say.</Text>
+                </View>
+
+                {VOICE_GUIDE_SECTIONS.map((section) => {
+                  const isExpanded = expandedGuideId === section.id;
+                  return (
+                    <View key={section.id} style={styles.accordionCard}>
+                      <TouchableOpacity
+                        style={styles.accordionHeader}
+                        onPress={() => setExpandedGuideId(isExpanded ? '' : section.id)}
+                        activeOpacity={0.75}
+                      >
+                        <View style={[styles.accordionAccent, { backgroundColor: section.color }]} />
+                        <View style={styles.accordionTitleWrap}>
+                          <Text style={styles.accordionTitle}>{section.title}</Text>
+                          <Text style={styles.accordionSummary}>{section.summary}</Text>
+                        </View>
+                        <FontAwesomeIcon
+                          icon={faChevronDown}
+                          size={14}
+                          color={isDark ? '#8e8e93' : '#6b7280'}
+                          style={isExpanded ? styles.accordionChevronOpen : undefined}
+                        />
+                      </TouchableOpacity>
+
+                      {isExpanded && (
+                        <View style={styles.accordionBody}>
+                          {section.commands.map((command) => (
+                            <View key={command.label} style={styles.commandBlock}>
+                              <View style={styles.commandBlockHeader}>
+                                <Text style={[styles.commandLabel, { color: section.color }]}>{command.label}</Text>
+                                <Text style={styles.commandPattern}>{command.pattern}</Text>
+                              </View>
+                              {command.examples.map((example) => (
+                                <Text key={example} style={styles.commandExample}>{example}</Text>
+                              ))}
+                            </View>
+                          ))}
+                        </View>
+                      )}
                     </View>
-                    <Text style={styles.commandExample}>{example}</Text>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             </View>
           )}
@@ -1568,8 +1664,50 @@ function buildStyles(isDark: boolean) {
       borderColor: border,
     },
     commandBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 5, minWidth: 106 },
-    commandLabel: { fontSize: 12, fontWeight: '800', textAlign: 'center' },
-    commandExample: { flex: 1, fontSize: 13, color: textSecondary, fontStyle: 'italic', lineHeight: 18 },
+    voiceGuide: { width: '100%', marginTop: 14, gap: 8 },
+    voiceGuideHeader: { paddingHorizontal: 2, marginBottom: 2 },
+    voiceGuideTitle: { fontSize: 15, fontWeight: '800', color: textPrimary },
+    voiceGuideSubtitle: { marginTop: 2, fontSize: 13, color: textSecondary, lineHeight: 18 },
+    accordionCard: {
+      borderRadius: 8,
+      backgroundColor: cardBg,
+      borderWidth: 1,
+      borderColor: border,
+      overflow: 'hidden',
+    },
+    accordionHeader: {
+      minHeight: 62,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      gap: 10,
+    },
+    accordionAccent: { width: 4, alignSelf: 'stretch', borderRadius: 2 },
+    accordionTitleWrap: { flex: 1 },
+    accordionTitle: { fontSize: 15, fontWeight: '800', color: textPrimary },
+    accordionSummary: { marginTop: 2, fontSize: 12, color: textSecondary },
+    accordionChevronOpen: { transform: [{ rotate: '180deg' }] },
+    accordionBody: {
+      borderTopWidth: 1,
+      borderTopColor: border,
+      padding: 12,
+      gap: 10,
+      backgroundColor: isDark ? '#161618' : '#fbfcfd',
+    },
+    commandBlock: {
+      paddingVertical: 10,
+      paddingHorizontal: 10,
+      borderRadius: 8,
+      backgroundColor: cardBg,
+      borderWidth: 1,
+      borderColor: border,
+      gap: 6,
+    },
+    commandBlockHeader: { gap: 3 },
+    commandLabel: { fontSize: 12, fontWeight: '800' },
+    commandPattern: { fontSize: 12, color: textSecondary, fontWeight: '600' },
+    commandExample: { fontSize: 13, color: textSecondary, fontStyle: 'italic', lineHeight: 18 },
     errorText: { fontSize: 17, color: DESTRUCTIVE, textAlign: 'center', fontWeight: '800', lineHeight: 24 },
     transcriptText: {
       color: textSecondary,

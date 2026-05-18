@@ -23,6 +23,8 @@ import { LendingService } from '../services/LendingService';
 import { LendingRepository } from '../repositories/LendingRepository';
 import { ItemRepository } from '../../../repositories/ItemRepository';
 import { Lending } from '../models/Lending';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faChevronLeft } from '@fortawesome/free-solid-svg-icons';
 
 const PRIMARY = '#6b7f99';
 const LENDING = '#9b72cb';
@@ -130,7 +132,7 @@ export default function LendingHistoryScreen() {
   const headerBar = (
     <View style={[styles.headerBar, { borderBottomColor: borderColor, backgroundColor: isDark ? '#1c1c1e' : '#ffffff' }]}>
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Text style={[styles.backBtnText, { color: PRIMARY }]}>{'‹ Back'}</Text>
+        <FontAwesomeIcon icon={faChevronLeft} size={18} color={PRIMARY} />
       </TouchableOpacity>
       <Text style={[styles.headerTitle, { color: colors.text }]}>History</Text>
       <View style={styles.headerSpacer} />

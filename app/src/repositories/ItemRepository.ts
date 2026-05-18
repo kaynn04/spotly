@@ -22,6 +22,88 @@ function isUniqueConstraintError(error: unknown): boolean {
  * Uses parameterized SQL queries for safety
  */
 export class ItemRepository {
+  private static ensureLostColumnsPromise: Promise<void> | null = null;
+
+  private static async ensureLostColumns(): Promise<void> {
+    if (!ItemRepository.ensureLostColumnsPromise) {
+      ItemRepository.ensureLostColumnsPromise = (async () => {
+        const db = getDatabase();
+        const safeAddColumn = async (name: string, definition: string) => {
+          const columns = await db.getAllAsync<any>('PRAGMA table_info(items);');
+          if (columns.some((col: any) => col.name === name)) return;
+
+          try {
+            await db.execAsync(`ALTER TABLE items ADD COLUMN ${definition};`);
+          } catch (error: any) {
+            const message = String(error?.message ?? error).toLowerCase();
+            if (!message.includes('duplicate column')) throw error;
+          }
+        };
+
+        await safeAddColumn('lost_at', 'lost_at TEXT');
+        await safeAddColumn('lost_outside_session_id', 'lost_outside_session_id TEXT');
+        await safeAddColumn('lost_note', 'lost_note TEXT');
+      })().finally(() => {
+        ItemRepository.ensureLostColumnsPromise = null;
+      });
+    }
+
+    await ItemRepository.ensureLostColumnsPromise;
+  }
+
+  static async markLost(itemIds: string[], outsideSessionId?: string, note?: string): Promise<void> {
+    const db = getDatabase();
+    await ItemRepository.ensureLostColumns();
+    const now = new Date().toISOString();
+
+    for (const itemId of itemIds) {
+      await db.runAsync(
+        'UPDATE items SET lost_at = ?, lost_outside_session_id = ?, lost_note = ?, updated_at = ? WHERE id = ?',
+        [now, outsideSessionId ?? null, note ?? null, now, itemId]
+      );
+    }
+  }
+
+  static async markFound(itemId: string): Promise<void> {
+    const db = getDatabase();
+    await ItemRepository.ensureLostColumns();
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'UPDATE items SET lost_at = NULL, lost_outside_session_id = NULL, lost_note = NULL, updated_at = ? WHERE id = ?',
+      [now, itemId]
+    );
+  }
+
+  static async getLostItems(): Promise<Array<{ id: string; name: string; spaceName: string; containerName: string | null; spaceId: string; containerId: string | null; lostAt: string }>> {
+    try {
+      const db = getDatabase();
+      await ItemRepository.ensureLostColumns();
+      const rows = await db.getAllAsync<any>(
+        `SELECT i.id, i.name, i.space_id, i.container_id, i.lost_at,
+                s.name as space_name,
+                c.name as container_name
+         FROM items i
+         JOIN spaces s ON i.space_id = s.id
+         LEFT JOIN containers c ON i.container_id = c.id
+         WHERE i.lost_at IS NOT NULL
+         ORDER BY i.lost_at DESC`
+      );
+
+      return rows.map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        spaceName: row.space_name,
+        containerName: row.container_name ?? null,
+        spaceId: row.space_id,
+        containerId: row.container_id ?? null,
+        lostAt: row.lost_at,
+      }));
+    } catch (error) {
+      console.error('[ItemRepository.getLostItems] Database error:', error);
+      return [];
+    }
+  }
+
   /**
    * Create a new item in the database
    *
@@ -106,6 +188,7 @@ export class ItemRepository {
   static async getItemsBySpaceId(spaceId: string): Promise<Item[]> {
     try {
       const db = getDatabase();
+      await ItemRepository.ensureLostColumns();
 
       const result = await db.getAllAsync(
         'SELECT * FROM items WHERE space_id = ? ORDER BY created_at DESC',
@@ -121,6 +204,9 @@ export class ItemRepository {
         containerId: row.container_id,
         createdAt: row.created_at,
         photoUri: row.photo_uri ?? null,
+        lostAt: row.lost_at ?? null,
+        lostOutsideSessionId: row.lost_outside_session_id ?? null,
+        lostNote: row.lost_note ?? null,
       }));
     } catch (error) {
       // Convert database error to ServiceError
@@ -148,6 +234,7 @@ export class ItemRepository {
   static async getItemsByContainerId(containerId: string): Promise<Item[]> {
     try {
       const db = getDatabase();
+      await ItemRepository.ensureLostColumns();
 
       const result = await db.getAllAsync(
         'SELECT * FROM items WHERE container_id = ? ORDER BY created_at DESC',
@@ -163,6 +250,9 @@ export class ItemRepository {
         createdAt: row.created_at,
         containerId: row.container_id,
         photoUri: row.photo_uri ?? null,
+        lostAt: row.lost_at ?? null,
+        lostOutsideSessionId: row.lost_outside_session_id ?? null,
+        lostNote: row.lost_note ?? null,
       }));
     } catch (error) {
       // Convert database error to ServiceError
@@ -424,6 +514,7 @@ export class ItemRepository {
   async getAll(): Promise<Item[]> {
     try {
       const db = getDatabase();
+      await ItemRepository.ensureLostColumns();
       const result = await db.getAllAsync(`
         SELECT 
           i.id,
@@ -436,6 +527,9 @@ export class ItemRepository {
           i.photo_uri,
           i.warranty_expiry,
           i.warranty_reminder_id,
+          i.lost_at,
+          i.lost_outside_session_id,
+          i.lost_note,
           s.name as space,
           c.name as container
         FROM items i
@@ -455,6 +549,9 @@ export class ItemRepository {
         photoUri: row.photo_uri ?? null,
         warrantyExpiry: row.warranty_expiry ?? null,
         warrantyReminderId: row.warranty_reminder_id ?? null,
+        lostAt: row.lost_at ?? null,
+        lostOutsideSessionId: row.lost_outside_session_id ?? null,
+        lostNote: row.lost_note ?? null,
         space: row.space ? { name: row.space } : null,
         container: row.container ? { name: row.container } : null,
       }));
@@ -478,6 +575,7 @@ export class ItemRepository {
     console.log('[ItemRepository.getById] Looking up item:', id);
     try {
       const db = getDatabase();
+      await ItemRepository.ensureLostColumns();
       const result = await db.getFirstAsync<any>(`
         SELECT 
           i.id,
@@ -490,6 +588,9 @@ export class ItemRepository {
           i.photo_uri,
           i.warranty_expiry,
           i.warranty_reminder_id,
+          i.lost_at,
+          i.lost_outside_session_id,
+          i.lost_note,
           s.name as space,
           c.name as container
         FROM items i
@@ -514,6 +615,9 @@ export class ItemRepository {
         photoUri: result.photo_uri ?? null,
         warrantyExpiry: result.warranty_expiry ?? null,
         warrantyReminderId: result.warranty_reminder_id ?? null,
+        lostAt: result.lost_at ?? null,
+        lostOutsideSessionId: result.lost_outside_session_id ?? null,
+        lostNote: result.lost_note ?? null,
         space: result.space ? { name: result.space } : null,
         container: result.container ? { name: result.container } : null,
       };

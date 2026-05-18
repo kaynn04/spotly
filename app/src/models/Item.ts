@@ -23,6 +23,9 @@ export interface Item {
   photoUri?: string | null;      // Optional: local file path to item photo
   warrantyExpiry?: string | null;     // ISO date "YYYY-MM-DD" — optional warranty expiry
   warrantyReminderId?: string | null; // comma-separated expo-notifications IDs for warranty reminders
+  lostAt?: string | null;
+  lostOutsideSessionId?: string | null;
+  lostNote?: string | null;
   space?: { name: string } | null;       // Optional: space details with name
   container?: { name: string } | null;   // Optional: container details with name
 }
@@ -44,6 +47,9 @@ export interface ItemRow {
   photo_uri?: string | null;     // Optional: local photo file path
   warranty_expiry?: string | null;     // ISO date, nullable
   warranty_reminder_id?: string | null; // comma-separated notification IDs, nullable
+  lost_at?: string | null;
+  lost_outside_session_id?: string | null;
+  lost_note?: string | null;
 }
 
 /**

@@ -54,6 +54,10 @@ export async function createOutsideSessionsTables(db: SQLiteDatabase) {
         item_id TEXT NOT NULL,
         is_checked INTEGER NOT NULL DEFAULT 0,
         checked_at TEXT,
+        return_checked INTEGER NOT NULL DEFAULT 0,
+        return_checked_at TEXT,
+        issue_status TEXT,
+        issue_reported_at TEXT,
         FOREIGN KEY (session_id) REFERENCES outside_sessions(id) ON DELETE CASCADE,
         FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
       );
@@ -84,8 +88,42 @@ export async function createOutsideSessionsTables(db: SQLiteDatabase) {
     const hasMovedToSpace = tableInfo.some((col: any) => col.name === 'moved_to_space_name');
     if (!hasMovedToSpace) {
       await db.execAsync(`ALTER TABLE outside_session_items ADD COLUMN moved_to_space_name TEXT;`);
+      console.log('✓ Added moved_to_space_name column to outside_session_items');
+    }
+
+    const latestTableInfo = await db.getAllAsync<any>("PRAGMA table_info(outside_session_items);");
+    const hasMovedToContainer = latestTableInfo.some((col: any) => col.name === 'moved_to_container_name');
+    if (!hasMovedToContainer) {
       await db.execAsync(`ALTER TABLE outside_session_items ADD COLUMN moved_to_container_name TEXT;`);
-      console.log('✓ Added moved_to columns to outside_session_items');
+      console.log('✓ Added moved_to_container_name column to outside_session_items');
+    }
+
+    const returnTableInfo = await db.getAllAsync<any>("PRAGMA table_info(outside_session_items);");
+    const hasReturnChecked = returnTableInfo.some((col: any) => col.name === 'return_checked');
+    if (!hasReturnChecked) {
+      await db.execAsync(`ALTER TABLE outside_session_items ADD COLUMN return_checked INTEGER NOT NULL DEFAULT 0;`);
+      console.log('✓ Added return_checked column to outside_session_items');
+    }
+
+    const finalTableInfo = await db.getAllAsync<any>("PRAGMA table_info(outside_session_items);");
+    const hasReturnCheckedAt = finalTableInfo.some((col: any) => col.name === 'return_checked_at');
+    if (!hasReturnCheckedAt) {
+      await db.execAsync(`ALTER TABLE outside_session_items ADD COLUMN return_checked_at TEXT;`);
+      console.log('✓ Added return_checked_at column to outside_session_items');
+    }
+
+    const issueTableInfo = await db.getAllAsync<any>("PRAGMA table_info(outside_session_items);");
+    const hasIssueStatus = issueTableInfo.some((col: any) => col.name === 'issue_status');
+    if (!hasIssueStatus) {
+      await db.execAsync(`ALTER TABLE outside_session_items ADD COLUMN issue_status TEXT;`);
+      console.log('✓ Added issue_status column to outside_session_items');
+    }
+
+    const finalIssueTableInfo = await db.getAllAsync<any>("PRAGMA table_info(outside_session_items);");
+    const hasIssueReportedAt = finalIssueTableInfo.some((col: any) => col.name === 'issue_reported_at');
+    if (!hasIssueReportedAt) {
+      await db.execAsync(`ALTER TABLE outside_session_items ADD COLUMN issue_reported_at TEXT;`);
+      console.log('✓ Added issue_reported_at column to outside_session_items');
     }
   } catch (error) {
     console.error('✗ Error creating outside sessions tables:', error);

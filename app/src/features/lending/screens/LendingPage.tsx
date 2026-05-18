@@ -203,7 +203,7 @@ export default function LendingPage() {
       ]);
       const activeLentIds = new Set(activeLendings.map((l) => l.item_id));
       const activeOutsideIds = new Set(activeSessionItemIds);
-      setAllItems(items.filter((i) => !activeLentIds.has(i.id) && !activeOutsideIds.has(i.id)));
+      setAllItems(items.filter((i) => !i.lostAt && !activeLentIds.has(i.id) && !activeOutsideIds.has(i.id)));
     } catch {
       Alert.alert('Error', 'Failed to load items');
       setShowItemPicker(false);

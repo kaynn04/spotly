@@ -50,7 +50,7 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
 
   const handleCreateSession = async () => {
     if (!title.trim()) {
-      setError('Please enter a session title');
+      setError('Please enter a checklist title');
       return;
     }
     if (title.length > 100) {
@@ -91,7 +91,7 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
                 <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
                 {/* Title */}
-                <Text style={[styles.sheetTitle, { color: textColor }]}>New Session</Text>
+                <Text style={[styles.sheetTitle, { color: textColor }]}>New Checklist</Text>
 
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
@@ -100,7 +100,7 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
                   style={styles.scrollContent}
                 >
                   <Text style={[styles.sheetSubtitle, { color: subtleText }]}>
-                    Name this tracking session
+                    Name this temporary outside checklist
                   </Text>
 
                   {/* Input */}
@@ -123,7 +123,7 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
                     {error ? (
                       <Text style={styles.errorText}>{error}</Text>
                     ) : (
-                      <Text style={[styles.hint, { color: subtleText }]}>Press Create to start tracking</Text>
+                      <Text style={[styles.hint, { color: subtleText }]}>Press Create to start checking items</Text>
                     )}
                     <Text style={[styles.charCount, { color: subtleText }]}>{title.length}/100</Text>
                   </View>

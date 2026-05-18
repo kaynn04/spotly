@@ -65,7 +65,7 @@ export default function ItemSelectionModal({
         outsideSessionItemRepository.getActiveSessionItemIds(),
       ]);
       const activeSet = new Set(activeSessionItemIds);
-      setItems((result || []).filter((item: any) => !activeSet.has(item.id)));
+      setItems((result || []).filter((item: any) => !item.lostAt && !activeSet.has(item.id)));
     } catch (err: any) {
       setError('Failed to load items');
       console.error('Error loading items:', err);
