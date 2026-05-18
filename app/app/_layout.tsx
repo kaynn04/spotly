@@ -21,7 +21,6 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const [dbReady, setDbReady] = useState(false);
-  const [navChecked, setNavChecked] = useState(false);
 
   const isDark = colorScheme === 'dark';
   const navBg = isDark ? '#000000' : '#f8f9fa';
@@ -58,8 +57,6 @@ export default function RootLayout() {
         }
       } catch (err) {
         console.error('✗ Onboarding check failed:', err);
-      } finally {
-        setNavChecked(true);
       }
     };
     checkOnboarding();

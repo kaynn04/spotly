@@ -279,7 +279,7 @@ export class ContainerRepository {
 
   static async getRecentlyMovedContainers(
     limit: number = 5
-  ): Promise<Array<{ id: string; name: string; spaceName: string; containerName: null; updatedAt: string; photoUri: string | null }>> {
+  ): Promise<{ id: string; name: string; spaceName: string; containerName: null; updatedAt: string; photoUri: string | null }[]> {
     try {
       const db = getDatabase();
       const sanitizedLimit = Math.max(1, Math.min(1000, Math.floor(limit)));

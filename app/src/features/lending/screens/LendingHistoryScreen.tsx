@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Lending History Screen
  *
  * Minimalist redesign â€” uniform with Outside feature
@@ -16,7 +16,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { LendingService } from '../services/LendingService';

@@ -6,7 +6,7 @@
  * Implementation: T011
  */
 
-import React, { useCallback, useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -53,6 +53,8 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
 
   useEffect(() => {
     loadItems();
+    // Load once when the picker opens for this session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadItems = async () => {

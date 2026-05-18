@@ -154,7 +154,11 @@ export default function SpaceDetailScreen() {
     }).catch(() => {});
   }, []);
 
-  useEffect(() => { loadAll(); }, [id]);
+  useEffect(() => {
+    loadAll();
+    // loadAll intentionally refreshes all local screen resources for this route id.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   // Auto-open modal when navigated here via the + button
   useEffect(() => {
@@ -172,6 +176,8 @@ export default function SpaceDetailScreen() {
   useFocusEffect(
     useCallback(() => {
       if (id) { loadItems(); loadContainers(); loadActiveLendings(); loadActiveOutsideItems(); }
+      // These loaders are stable for the current route id during focus refresh.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id])
   );
 
@@ -239,14 +245,6 @@ export default function SpaceDetailScreen() {
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to mark as returned');
     }
-  }
-
-  function handleItemPress(item: Item) {
-    setActionSheetItem(item);
-  }
-
-  function handleContainerLongPress(container: Container) {
-    setActionSheetContainer(container);
   }
 
   function confirmDeleteContainer(container: Container) {

@@ -9,8 +9,6 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { getDatabase } from '../db/client';
 
-const PHOTOS_DIR = `${FileSystem.documentDirectory}photos/`;
-
 /** Read a photo file and return base64, or null if missing */
 async function readPhotoBase64(photoUri: string | null | undefined): Promise<string | null> {
   if (!photoUri) return null;

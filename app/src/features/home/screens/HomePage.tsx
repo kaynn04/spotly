@@ -167,12 +167,16 @@ export default function HomePage() {
   useFocusEffect(
     useCallback(() => {
       loadAll();
+      // loadAll intentionally refreshes the full dashboard on focus.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   );
 
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('synop:refresh-home', loadAll);
     return () => sub.remove();
+    // Register the refresh listener once for the dashboard lifetime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useFocusEffect(
@@ -188,6 +192,8 @@ export default function HomePage() {
       };
       check();
       return () => { cancelled = true; };
+      // startWalkthrough is intentionally captured for the initial dashboard guide check.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   );
 

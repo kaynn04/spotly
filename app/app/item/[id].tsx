@@ -104,6 +104,8 @@ export default function ItemDetailScreen() {
   useFocusEffect(
     useCallback(() => {
       if (itemId) loadItem();
+      // loadItem intentionally reads the current repositories and route state.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [itemId])
   );
 

@@ -245,7 +245,7 @@ export class LendingService {
     let lending: Lending | null;
     try {
       lending = await this.lendingRepository.getById(lendingId);
-    } catch (error) {
+    } catch {
       throw createServiceError(
         'DATABASE_ERROR',
         'Failed to find lending'
@@ -276,7 +276,7 @@ export class LendingService {
     let updated: Lending;
     try {
       updated = await this.lendingRepository.markAsReturned(lendingId);
-    } catch (error) {
+    } catch {
       throw createServiceError(
         'DATABASE_ERROR',
         'Failed to mark lending as returned'
@@ -363,7 +363,7 @@ export class LendingService {
   async getActiveLendings(): Promise<Lending[]> {
     try {
       return await this.lendingRepository.getByStatus(LendingStatus.ACTIVE);
-    } catch (error) {
+    } catch {
       throw createServiceError(
         'DATABASE_ERROR',
         'Failed to fetch active lendings'
@@ -374,7 +374,7 @@ export class LendingService {
   async getActiveLendingsWithItemNames(): Promise<(Lending & { item_name: string })[]> {
     try {
       return await this.lendingRepository.getActiveLendingsWithItemNames();
-    } catch (error) {
+    } catch {
       throw createServiceError(
         'DATABASE_ERROR',
         'Failed to fetch active lendings'
@@ -395,7 +395,7 @@ export class LendingService {
   async getAllLendings(): Promise<Lending[]> {
     try {
       return await this.lendingRepository.getAll();
-    } catch (error) {
+    } catch {
       throw createServiceError(
         'DATABASE_ERROR',
         'Failed to fetch lending history'
@@ -417,7 +417,7 @@ export class LendingService {
     try {
       const hasActive = await this.lendingRepository.hasActiveLending(itemId);
       return !hasActive;
-    } catch (error) {
+    } catch {
       throw createServiceError(
         'DATABASE_ERROR',
         'Failed to check item lend status'
@@ -438,7 +438,7 @@ export class LendingService {
   async getLendingById(lendingId: string): Promise<Lending | null> {
     try {
       return await this.lendingRepository.getById(lendingId);
-    } catch (error) {
+    } catch {
       throw createServiceError(
         'DATABASE_ERROR',
         'Failed to fetch lending'
@@ -459,7 +459,7 @@ export class LendingService {
   async getLendingsByItemId(itemId: string): Promise<Lending[]> {
     try {
       return await this.lendingRepository.getByItemId(itemId);
-    } catch (error) {
+    } catch {
       throw createServiceError(
         'DATABASE_ERROR',
         'Failed to fetch item lendings'
@@ -473,7 +473,7 @@ export class LendingService {
   async getActiveLendingForItem(itemId: string): Promise<Lending | null> {
     try {
       return await this.lendingRepository.getActiveLendingForItem(itemId);
-    } catch (error) {
+    } catch {
       throw createServiceError('DATABASE_ERROR', 'Failed to check lending status');
     }
   }
@@ -483,7 +483,7 @@ export class LendingService {
   async getPhotos(lendingId: string, phase?: LendingPhotoPhase): Promise<LendingPhoto[]> {
     try {
       return await this.lendingPhotoRepository.getByLendingId(lendingId, phase);
-    } catch (error) {
+    } catch {
       throw createServiceError('DATABASE_ERROR', 'Failed to fetch lending photos');
     }
   }
@@ -505,7 +505,7 @@ export class LendingService {
     try {
       await this.lendingPhotoRepository.delete(photoId);
       await PhotoService.deletePhoto(photoUri);
-    } catch (error) {
+    } catch {
       throw createServiceError('DATABASE_ERROR', 'Failed to delete lending photo');
     }
   }

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Lending Page
  *
  * Main lending tab â€” minimalist redesign, uniform with Outside feature

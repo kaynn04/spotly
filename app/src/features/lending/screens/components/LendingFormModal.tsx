@@ -112,6 +112,8 @@ export default function LendingFormModal({
 
   useEffect(() => {
     if (!visible) sheetTranslateY.setValue(0);
+    // sheetTranslateY is a stable Animated.Value ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   const handleCancel = () => {

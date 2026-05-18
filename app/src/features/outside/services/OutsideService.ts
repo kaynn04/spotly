@@ -10,8 +10,8 @@
 import { useMemo } from 'react';
 import { OutsideSessionRepository } from '../repositories/OutsideSessionRepository';
 import { OutsideSessionItemRepository } from '../repositories/OutsideSessionItemRepository';
-import { OutsideSession, OutsideSessionError, OutsideSessionErrorCode, OutsideSessionStatus } from '../models/OutsideSession';
-import { OutsideSessionItemWithContext, OutsideSessionItemError, OutsideSessionItemErrorCode } from '../models/OutsideSessionItem';
+import { OutsideSession, OutsideSessionError, OutsideSessionStatus } from '../models/OutsideSession';
+import { OutsideSessionItemWithContext, OutsideSessionItemError } from '../models/OutsideSessionItem';
 import { ItemRepository } from '@/src/repositories/ItemRepository';
 
 export enum OutsideServiceErrorCode {
