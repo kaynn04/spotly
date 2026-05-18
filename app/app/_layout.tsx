@@ -11,6 +11,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { initializeDatabase } from '@/src/db/migrations';
 import { isOnboardingDone } from './onboarding';
 import { ColorSchemeProvider } from '@/src/context/ColorSchemeContext';
+import AppAlertProvider from '@/components/AppAlertProvider';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -94,30 +95,32 @@ export default function RootLayout() {
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
     <ColorSchemeProvider>
       <ThemeProvider value={theme}>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: navBg },
-            animation: 'slide_from_right',
-            animationDuration: 250,
-            navigationBarColor: navBg,
-            gestureEnabled: true,
-          }}
-        >
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: true }} />
-          <Stack.Screen name="space/[id]" />
-          <Stack.Screen name="container/[id]" />
-          <Stack.Screen name="item/[id]" />
-          <Stack.Screen name="lending/[id]" />
-          <Stack.Screen name="lending/history" />
-          <Stack.Screen name="outside/[id]" />
-          <Stack.Screen name="outside/history" />
-          <Stack.Screen name="tools/warranty-tracker" />
-          <Stack.Screen name="settings" />
-        </Stack>
-        <StatusBar style="auto" backgroundColor={navBg} translucent={false} />
+        <AppAlertProvider>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: navBg },
+              animation: 'slide_from_right',
+              animationDuration: 250,
+              navigationBarColor: navBg,
+              gestureEnabled: true,
+            }}
+          >
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
+            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: true }} />
+            <Stack.Screen name="space/[id]" />
+            <Stack.Screen name="container/[id]" />
+            <Stack.Screen name="item/[id]" />
+            <Stack.Screen name="lending/[id]" />
+            <Stack.Screen name="lending/history" />
+            <Stack.Screen name="outside/[id]" />
+            <Stack.Screen name="outside/history" />
+            <Stack.Screen name="tools/warranty-tracker" />
+            <Stack.Screen name="settings" />
+          </Stack>
+          <StatusBar style="auto" backgroundColor={navBg} translucent={false} />
+        </AppAlertProvider>
       </ThemeProvider>
     </ColorSchemeProvider>
     </SafeAreaProvider>

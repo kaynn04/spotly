@@ -46,7 +46,9 @@ import { LendingRepository } from '@/src/features/lending/repositories/LendingRe
 import { ItemRepository } from '@/src/repositories/ItemRepository';
 import { PhotoService } from '@/src/services/PhotoService';
 import { ContainerRepository } from '@/src/repositories/ContainerRepository';
+import PhotoActionSheet from '@/components/PhotoActionSheet';
 import PhotoPickerSheet from '@/components/PhotoPickerSheet';
+import PhotoViewModal from '@/components/PhotoViewModal';
 import { Lending } from '@/src/features/lending/models/Lending';
 import { OutsideService } from '@/src/features/outside/services/OutsideService';
 import ItemFormModal from '@/src/features/spaces/screens/components/ItemFormModal';
@@ -82,7 +84,9 @@ export default function ContainerDetailScreen() {
   const [loading, setLoading] = useState(true);
 
   const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [showContainerPhotoActions, setShowContainerPhotoActions] = useState(false);
   const [showContainerPhotoPicker, setShowContainerPhotoPicker] = useState(false);
+  const [showContainerPhotoViewer, setShowContainerPhotoViewer] = useState(false);
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [selectedMoveItemIds, setSelectedMoveItemIds] = useState<Set<string>>(new Set());
   const [actionSheetItem, setActionSheetItem] = useState<Item | null>(null);
@@ -612,11 +616,7 @@ export default function ContainerDetailScreen() {
         container.photoUri ? (
           <TouchableOpacity
             style={[styles.containerPhotoWrap, { borderColor }]}
-            onPress={() => Alert.alert('Container Photo', '', [
-              { text: 'Replace Photo', onPress: () => setShowContainerPhotoPicker(true) },
-              { text: 'Remove Photo', style: 'destructive', onPress: handleRemoveContainerPhoto },
-              { text: 'Cancel', style: 'cancel' },
-            ])}
+            onPress={() => setShowContainerPhotoActions(true)}
             activeOpacity={0.8}
           >
             <Image source={{ uri: container.photoUri }} style={styles.containerPhoto} resizeMode="cover" />
@@ -1094,6 +1094,20 @@ export default function ContainerDetailScreen() {
         onClose={() => setShowContainerPhotoPicker(false)}
         onCamera={() => handleContainerPhoto('camera')}
         onGallery={() => handleContainerPhoto('gallery')}
+      />
+      <PhotoActionSheet
+        visible={showContainerPhotoActions}
+        title={container?.name ?? 'Container photo'}
+        onView={() => setShowContainerPhotoViewer(true)}
+        onReplace={() => setShowContainerPhotoPicker(true)}
+        onRemove={handleRemoveContainerPhoto}
+        onClose={() => setShowContainerPhotoActions(false)}
+      />
+      <PhotoViewModal
+        visible={showContainerPhotoViewer}
+        uri={container?.photoUri ?? null}
+        title={container?.name ?? 'Container photo'}
+        onClose={() => setShowContainerPhotoViewer(false)}
       />
 
       {/* Bulk action toolbar */}

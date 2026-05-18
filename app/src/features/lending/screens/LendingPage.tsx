@@ -109,6 +109,7 @@ export default function LendingPage() {
   const [borrowerName, setBorrowerName] = useState('');
   const [lendNote, setLendNote] = useState('');
   const [lendDueDate, setLendDueDate] = useState<Date | null>(null);
+  const [lendBeforePhotoUris, setLendBeforePhotoUris] = useState<string[]>([]);
   const [lendLoading, setLendLoading] = useState(false);
 
   const pickerTranslateY = useRef(new Animated.Value(0)).current;
@@ -218,6 +219,7 @@ export default function LendingPage() {
     setBorrowerName('');
     setLendNote('');
     setLendDueDate(null);
+    setLendBeforePhotoUris([]);
     setShowLendForm(true);
   };
 
@@ -225,19 +227,31 @@ export default function LendingPage() {
     if (!selectedLendItem || !borrowerName.trim()) return;
     setLendLoading(true);
     try {
-      await lendingService.createLending({
+      const lending = await lendingService.createLending({
         item_id: selectedLendItem.id,
         borrower_name: borrowerName.trim(),
         note: lendNote.trim() || undefined,
         due_date: lendDueDate ?? undefined,
       });
+      let failedPhotoCount = 0;
+      for (const uri of lendBeforePhotoUris) {
+        try {
+          await lendingService.addPhoto(lending.id, 'before', uri);
+        } catch {
+          failedPhotoCount += 1;
+        }
+      }
 
       setShowLendForm(false);
       setSelectedLendItem(null);
       setBorrowerName('');
       setLendNote('');
       setLendDueDate(null);
+      setLendBeforePhotoUris([]);
       await loadLendings();
+      if (failedPhotoCount > 0) {
+        Alert.alert('Photo not saved', `The lending was created, but ${failedPhotoCount} before photo${failedPhotoCount === 1 ? '' : 's'} could not be added.`);
+      }
     } catch (err: any) {
       Alert.alert('Error', err.code === 'DUPLICATE_ACTIVE_LENDING'
         ? 'This item is already lent out'
@@ -859,8 +873,10 @@ export default function LendingPage() {
         onNoteChange={setLendNote}
         dueDate={lendDueDate}
         onDueDateChange={setLendDueDate}
+        beforePhotoUris={lendBeforePhotoUris}
+        onBeforePhotosChange={setLendBeforePhotoUris}
         onSubmit={handleLendSubmit}
-        onCancel={() => { setShowLendForm(false); setSelectedLendItem(null); setBorrowerName(''); setLendNote(''); setLendDueDate(null); }}
+        onCancel={() => { setShowLendForm(false); setSelectedLendItem(null); setBorrowerName(''); setLendNote(''); setLendDueDate(null); setLendBeforePhotoUris([]); }}
         loading={lendLoading}
       />
 

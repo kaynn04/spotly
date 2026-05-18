@@ -618,7 +618,6 @@ export default function HomePage() {
                 </View>
                 <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
                   {data!.lostItems.slice(0, 3).map((item, index) => {
-                    const route = item.containerId ? `/container/${item.containerId}` : `/space/${item.spaceId}`;
                     const location = item.containerName
                       ? `${item.spaceName} â€º ${item.containerName}`
                       : item.spaceName;
@@ -634,7 +633,7 @@ export default function HomePage() {
                             borderBottomColor: borderColor,
                           },
                         ]}
-                        onPress={() => router.push(route as any)}
+                        onPress={() => router.push(`/item/${item.id}` as any)}
                         activeOpacity={0.7}
                       >
                         <View style={[styles.warrantyDot, { backgroundColor: '#d32f2f' }]} />

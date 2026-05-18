@@ -6,7 +6,7 @@
  * Supports delete via long-press confirmation.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faCamera, faPlus, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { LendingPhoto, LendingPhotoPhase, MAX_PHOTOS_PER_PHASE } from '../../models/LendingPhoto';
 import { PhotoService } from '../../../../services/PhotoService';
+import PhotoViewModal from '@/components/PhotoViewModal';
 
 const PHOTO_SIZE = 80;
 const GAP = 8;
@@ -53,6 +54,7 @@ export default function LendingPhotoSection({
 }: LendingPhotoSectionProps) {
   const canAdd = !readOnly && photos.length < MAX_PHOTOS_PER_PHASE;
   const label = phase === 'before' ? 'BEFORE PHOTOS' : 'AFTER PHOTOS';
+  const [viewPhotoUri, setViewPhotoUri] = useState<string | null>(null);
 
   const handleAdd = useCallback(async () => {
     Alert.alert('Add Photo', 'Choose source', [
@@ -98,7 +100,9 @@ export default function LendingPhotoSection({
         <View style={styles.grid}>
           {photos.map((photo) => (
             <View key={photo.id} style={styles.photoWrapper}>
-              <Image source={{ uri: photo.photo_uri }} style={styles.photo} />
+              <TouchableOpacity activeOpacity={0.8} onPress={() => setViewPhotoUri(photo.photo_uri)}>
+                <Image source={{ uri: photo.photo_uri }} style={styles.photo} />
+              </TouchableOpacity>
               {!readOnly && (
                 <TouchableOpacity
                   style={styles.deleteBtn}
@@ -128,6 +132,12 @@ export default function LendingPhotoSection({
           {photos.length}/{MAX_PHOTOS_PER_PHASE} photos
         </Text>
       )}
+      <PhotoViewModal
+        visible={viewPhotoUri !== null}
+        uri={viewPhotoUri}
+        title={phase === 'before' ? 'Before photo' : 'After photo'}
+        onClose={() => setViewPhotoUri(null)}
+      />
     </View>
   );
 }
