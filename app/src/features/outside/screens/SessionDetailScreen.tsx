@@ -452,6 +452,27 @@ export default function SessionDetailScreen() {
     );
   };
 
+  const handleStartGoingHomeCheck = () => {
+    if (items.length === 0) {
+      Alert.alert('No Items', 'Add items before starting the going home check.');
+      return;
+    }
+
+    const unpackedItems = items.filter(item => !item.is_checked);
+    if (unpackedItems.length === 0) {
+      setPhase('returning');
+      return;
+    }
+
+    const preview = unpackedItems.slice(0, 3).map(item => item.item_name).join(', ');
+    const more = unpackedItems.length > 3 ? ` and ${unpackedItems.length - 3} more` : '';
+    Alert.alert(
+      'Finish Leaving First',
+      `${unpackedItems.length} item${unpackedItems.length === 1 ? '' : 's'} still need${unpackedItems.length === 1 ? 's' : ''} to be packed: ${preview}${more}`,
+      [{ text: 'Review Checklist' }]
+    );
+  };
+
   const handleCompleteSession = () => {
     const unconfirmedCount = items.filter(item => !item.return_checked).length;
     const doComplete = () => startWrapUp();
@@ -471,7 +492,7 @@ export default function SessionDetailScreen() {
         'Before ending, switch to the going home checklist so you can confirm each item is still with you.',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Go to Check', onPress: () => setPhase('returning') },
+          { text: 'Go to Check', onPress: handleStartGoingHomeCheck },
         ]
       );
     } else if (unconfirmedCount > 0) {
@@ -654,7 +675,7 @@ export default function SessionDetailScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.phaseButton, phase === 'returning' && { backgroundColor: cardBg }]}
-            onPress={() => setPhase('returning')}
+            onPress={handleStartGoingHomeCheck}
             activeOpacity={0.75}
           >
             <Text style={[styles.phaseButtonText, { color: phase === 'returning' ? PRIMARY : subtleText }]}>
@@ -724,7 +745,7 @@ export default function SessionDetailScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.primaryButton, { flex: 1, backgroundColor: PRIMARY }]}
-            onPress={() => phase === 'leaving' ? setPhase('returning') : handleCompleteSession()}
+            onPress={() => phase === 'leaving' ? handleStartGoingHomeCheck() : handleCompleteSession()}
           >
             <Text style={styles.primaryButtonText}>{phase === 'leaving' ? 'Going Home Check' : 'End Session'}</Text>
           </TouchableOpacity>
