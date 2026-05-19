@@ -106,6 +106,7 @@ export default function SpaceDetailScreen() {
   const [borrowerName, setBorrowerName] = useState('');
   const [lendNote, setLendNote] = useState('');
   const [lendLoading, setLendLoading] = useState(false);
+  const [lendBeforePhotoUris, setLendBeforePhotoUris] = useState<string[]>([]);
 
   const [actionSheetItem, setActionSheetItem] = useState<Item | null>(null);
   const [actionSheetContainer, setActionSheetContainer] = useState<Container | null>(null);
@@ -379,19 +380,31 @@ export default function SpaceDetailScreen() {
     if (!borrowerName.trim() || !selectedLendItem) return;
     setLendLoading(true);
     try {
-      await lendingService.createLending({
+      const lending = await lendingService.createLending({
         item_id: selectedLendItem.id,
         borrower_name: borrowerName.trim(),
         note: lendNote.trim() || undefined,
         due_date: dueDate ?? undefined,
       });
+      let failedPhotoCount = 0;
+      for (const uri of lendBeforePhotoUris) {
+        try {
+          await lendingService.addPhoto(lending.id, 'before', uri);
+        } catch {
+          failedPhotoCount += 1;
+        }
+      }
       setShowLendModal(false);
       setBorrowerName('');
       setLendNote('');
       setDueDate(null);
+      setLendBeforePhotoUris([]);
       setSelectedLendItem(null);
       // Refresh active lendings map to show "Lent" badge immediately
       await loadActiveLendings();
+      if (failedPhotoCount > 0) {
+        Alert.alert('Photo not saved', `The lending was created, but ${failedPhotoCount} before photo${failedPhotoCount === 1 ? '' : 's'} could not be added.`);
+      }
     } catch (err: any) {
       Alert.alert('Error', err.code === 'DUPLICATE_ACTIVE_LENDING'
         ? 'This item is already lent out'
@@ -490,12 +503,32 @@ export default function SpaceDetailScreen() {
     const selItemIds = [...selectedIds].filter((sid) => items.some((i) => i.id === sid));
     const selContainerIds = [...selectedIds].filter((sid) => containers.some((c) => c.id === sid));
 
-    if (selItemIds.length > 0 && selContainerIds.length > 0) {
-      Alert.alert('Mixed Selection', 'Move items and containers separately so each destination is clear.');
-      return;
-    }
+    const openItemMove = () => {
+      if (selItemIds.length === 0) return;
 
-    if (selContainerIds.length > 0) {
+      const blockedItems = selItemIds.filter((itemId) =>
+        activeOutsideItemIds.has(itemId) || !!activeLendingMap[itemId] || !!items.find((i) => i.id === itemId)?.lostAt
+      );
+
+      if (blockedItems.length > 0) {
+        const blockedNames = blockedItems
+          .map((bid) => items.find((i) => i.id === bid)?.name ?? bid)
+          .join(', ');
+        Alert.alert(
+          'Items are Blocked',
+          `Cannot move: ${blockedNames}. Complete outside sessions, mark lent items as returned, or mark lost items as found first.`
+        );
+        return;
+      }
+
+      const moveIds = new Set(selItemIds);
+      exitSelectMode();
+      openMoveModal(moveIds);
+    };
+
+    const openContainerMove = () => {
+      if (selContainerIds.length === 0) return;
+
       const blockedItems = getBlockedContainerItems(selContainerIds);
       if (blockedItems.length > 0) {
         const blockedNames = blockedItems.map((item) => item.name).join(', ');
@@ -510,30 +543,27 @@ export default function SpaceDetailScreen() {
       setSelectedMoveContainer(null);
       setSelectedMoveContainerIds(new Set(selContainerIds));
       setShowMoveContainerModal(true);
-      return;
-    }
+    };
 
-    if (selItemIds.length === 0) return;
-
-    // Check if any selected items are lent, outside, or lost
-    const blockedItems = selItemIds.filter((itemId) =>
-      activeOutsideItemIds.has(itemId) || !!activeLendingMap[itemId] || !!items.find((i) => i.id === itemId)?.lostAt
-    );
-
-    if (blockedItems.length > 0) {
-      const blockedNames = blockedItems
-        .map((bid) => items.find((i) => i.id === bid)?.name ?? bid)
-        .join(', ');
+    if (selItemIds.length > 0 && selContainerIds.length > 0) {
       Alert.alert(
-        'Items are Blocked',
-        `Cannot move: ${blockedNames}. Complete outside sessions, mark lent items as returned, or mark lost items as found first.`
+        'Move Selection',
+        'Choose which selected type to move first.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: `Move Item${selItemIds.length !== 1 ? 's' : ''}`, onPress: openItemMove },
+          { text: `Move Container${selContainerIds.length !== 1 ? 's' : ''}`, onPress: openContainerMove },
+        ]
       );
       return;
     }
 
-    const moveIds = new Set(selItemIds);
-    exitSelectMode();
-    openMoveModal(moveIds);
+    if (selContainerIds.length > 0) {
+      openContainerMove();
+      return;
+    }
+
+    openItemMove();
   };
 
   const handleBulkLend = () => {
@@ -561,6 +591,7 @@ export default function SpaceDetailScreen() {
     setBorrowerName('');
     setLendNote('');
     setDueDate(null);
+    setLendBeforePhotoUris([]);
     setShowLendModal(true);
   };
 
@@ -1162,8 +1193,10 @@ export default function SpaceDetailScreen() {
         dueDate={dueDate}
         onDueDateChange={setDueDate}
         onSubmit={handleLendSubmit}
-        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setDueDate(null); setSelectedLendItem(null); }}
+        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); setSelectedLendItem(null); }}
         loading={lendLoading}
+        beforePhotoUris={lendBeforePhotoUris}
+        onBeforePhotosChange={setLendBeforePhotoUris}
       />
       <ItemActionSheet
         visible={actionSheetItem !== null}
@@ -1211,7 +1244,7 @@ export default function SpaceDetailScreen() {
                   icon: faHandshake,
                   label: 'Lend',
                   description: isLost ? 'Item is marked lost' : isOutside ? 'In active outside session' : 'Track who you lent this item to',
-                  onPress: isLost ? lostGuard : isOutside ? outsideGuard : () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setDueDate(null); setShowLendModal(true); },
+                  onPress: isLost ? lostGuard : isOutside ? outsideGuard : () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); setShowLendModal(true); },
                 },
             {
               icon: faTrash,
@@ -1395,20 +1428,23 @@ export default function SpaceDetailScreen() {
         const selContainerIds = selIds.filter((sid) => containers.some((c) => c.id === sid));
         const onlyOneItem = selItemIds.length === 1 && selContainerIds.length === 0;
     const canEdit = selectedIds.size === 1; // Can edit either one item or one container
-        // Can move multiple items if none are lent or outside
+        // Can move any selected type whose destination rules are valid.
         const hasOnlyItems = selItemIds.length > 0 && selContainerIds.length === 0;
         const hasOnlyContainers = selContainerIds.length > 0 && selItemIds.length === 0;
-        let canMove = hasOnlyItems || hasOnlyContainers;
-        if (hasOnlyItems) {
-          for (const itemId of selItemIds) {
-            if (activeOutsideItemIds.has(itemId) || activeLendingMap[itemId] || items.find((i) => i.id === itemId)?.lostAt) {
-              canMove = false;
-              break;
-            }
-          }
-        } else if (hasOnlyContainers) {
-          canMove = getBlockedContainerItems(selContainerIds).length === 0;
-        }
+        const selectedItemsCanMove =
+          selItemIds.length > 0 &&
+          selItemIds.every((itemId) =>
+            !activeOutsideItemIds.has(itemId) &&
+            !activeLendingMap[itemId] &&
+            !items.find((i) => i.id === itemId)?.lostAt
+          );
+        const selectedContainersCanMove =
+          selContainerIds.length > 0 && getBlockedContainerItems(selContainerIds).length === 0;
+        const canMove = hasOnlyItems
+          ? selectedItemsCanMove
+          : hasOnlyContainers
+            ? selectedContainersCanMove
+            : selectedItemsCanMove || selectedContainersCanMove;
         const canDelete = selectedIds.size > 0;
 
         // Logic for Lend/Return button

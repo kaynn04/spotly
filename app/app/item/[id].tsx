@@ -72,6 +72,7 @@ export default function ItemDetailScreen() {
   const [lendNote, setLendNote] = useState('');
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const [lendLoading, setLendLoading] = useState(false);
+  const [lendBeforePhotoUris, setLendBeforePhotoUris] = useState<string[]>([]);
 
   // Menu state
   const [showMenu, setShowMenu] = useState(false);
@@ -238,17 +239,29 @@ export default function ItemDetailScreen() {
     if (!borrowerName.trim() || !item) return;
     setLendLoading(true);
     try {
-      await lendingService.createLending({
+      const lending = await lendingService.createLending({
         item_id: item.id,
         borrower_name: borrowerName.trim(),
         note: lendNote.trim() || undefined,
         due_date: dueDate ?? undefined,
       });
+      let failedPhotoCount = 0;
+      for (const uri of lendBeforePhotoUris) {
+        try {
+          await lendingService.addPhoto(lending.id, 'before', uri);
+        } catch {
+          failedPhotoCount += 1;
+        }
+      }
       setShowLendModal(false);
       setBorrowerName('');
       setLendNote('');
       setDueDate(null);
+      setLendBeforePhotoUris([]);
       await loadItem();
+      if (failedPhotoCount > 0) {
+        Alert.alert('Photo not saved', `The lending was created, but ${failedPhotoCount} before photo${failedPhotoCount === 1 ? '' : 's'} could not be added.`);
+      }
     } catch (err: any) {
       Alert.alert('Error', err.code === 'DUPLICATE_ACTIVE_LENDING'
         ? 'This item is already lent out'
@@ -629,9 +642,13 @@ export default function ItemDetailScreen() {
       </ScrollView>
 
       {/* Action Menu */}
-      <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
-        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowMenu(false)}>
-          <View style={[styles.menuDropdown, { backgroundColor: cardBg, borderColor, top: insets.top + 44 }]}>  
+      <Modal visible={showMenu} transparent animationType="slide" onRequestClose={() => setShowMenu(false)}>
+        <TouchableWithoutFeedback onPress={() => setShowMenu(false)}>
+          <View style={styles.sheetOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.menuSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+                <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+                <Text style={[styles.menuTitle, { color: colors.text }]}>Item actions</Text>
             <TouchableOpacity
               style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]}
               onPress={() => { setShowMenu(false); if (isLost) { lostGuard(); } else if (isOutside) { outsideGuard(); } else if (isLent) { lendingGuard(); } else { openMoveModal(); } }}
@@ -647,7 +664,7 @@ export default function ItemDetailScreen() {
             ) : (
               <TouchableOpacity
                 style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]}
-              onPress={() => { setShowMenu(false); if (isLost) { lostGuard(); } else if (isOutside) { outsideGuard(); } else { setBorrowerName(''); setLendNote(''); setDueDate(null); setShowLendModal(true); } }}
+              onPress={() => { setShowMenu(false); if (isLost) { lostGuard(); } else if (isOutside) { outsideGuard(); } else { setBorrowerName(''); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); setShowLendModal(true); } }}
               >
                 <FontAwesomeIcon icon={faHandshake} size={18} color={isLost ? '#d32f2f' : isOutside ? '#e67e22' : PRIMARY} />
                 <Text style={[styles.menuItemText, { color: isLost ? '#d32f2f' : isOutside ? '#e67e22' : colors.text }]}>Lend item</Text>
@@ -657,8 +674,10 @@ export default function ItemDetailScreen() {
               <FontAwesomeIcon icon={faTrash} size={18} color="#e53e3e" />
               <Text style={[styles.menuItemText, { color: '#e53e3e' }]}>Delete item</Text>
             </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </TouchableOpacity>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Lend Modal */}
@@ -672,8 +691,10 @@ export default function ItemDetailScreen() {
         dueDate={dueDate}
         onDueDateChange={setDueDate}
         onSubmit={handleLendSubmit}
-        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setDueDate(null); }}
+        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); }}
         loading={lendLoading}
+        beforePhotoUris={lendBeforePhotoUris}
+        onBeforePhotosChange={setLendBeforePhotoUris}
       />
 
       {/* Move Modal */}
@@ -787,8 +808,8 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 16, paddingTop: 16 },
 
   menuBtn: { paddingLeft: 12, paddingVertical: 8 },
-  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
-  menuDropdown: { position: 'absolute', right: 16, borderRadius: 12, borderWidth: 1, minWidth: 180, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8 },
+  menuSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12 },
+  menuTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.3, marginBottom: 12 },
   menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, gap: 12 },
   menuItemText: { fontSize: 15, fontWeight: '500' },
 
