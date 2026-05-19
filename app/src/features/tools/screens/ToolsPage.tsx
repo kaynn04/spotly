@@ -55,10 +55,11 @@ const TOOLS: Tool[] = [
   {
     id: 'qrcode',
     title: 'Label & QR Generator',
-    description: 'Generate a scannable label for any box or container.',
+    description: 'Generate a scannable label for any space, box, or item.',
     icon: faQrcode,
     iconColor: '#9b7fd4',
-    available: false,
+    route: '/tools/label-qr',
+    available: true,
   },
   {
     id: 'barcode',

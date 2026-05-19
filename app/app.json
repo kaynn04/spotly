@@ -46,6 +46,12 @@
     "plugins": [
       "expo-router",
       "expo-notifications",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Synop needs camera access to scan QR labels for your spaces, containers, and items."
+        }
+      ],
       "expo-speech-recognition",
       "./plugins/withAndroidCompatibility",
       [
