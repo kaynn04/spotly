@@ -93,6 +93,10 @@ export class ContainerService {
     return ContainerRepository.getContainersBySpaceId(spaceId);
   }
 
+  static async getAllContainers(): Promise<Container[]> {
+    return ContainerRepository.getAllContainers();
+  }
+
   /**
    * Get a specific container by id
    *
