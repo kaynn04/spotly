@@ -13,6 +13,8 @@ import type { RawParsedParts, ParsedVoiceCommand, MatchResult } from '../models/
 export class VoiceMatcherService {
   // fuzzysort score threshold — lower is more permissive
   private static readonly SCORE_THRESHOLD = -5000;
+  private static readonly LEADING_LOCATION_WORDS =
+    /^(?:(?:the|a|an|my)\s+)?(?:(?:space|room|area|location|place|container|box|shelf|bin|drawer|cabinet|bag|basket|folder)\s+(?:is|called|named)\s+|(?:is|called|named)\s+)+/i;
 
   /**
    * Resolve parsed parts against the provided spaces and containers lists.
@@ -44,34 +46,57 @@ export class VoiceMatcherService {
   private static matchSpace(spoken: string | null, spaces: Space[]): MatchResult<Space> {
     if (!spoken) return { status: 'none', spoken: '' };
 
-    const exact = spaces.find(s => s.name.toLowerCase() === spoken.toLowerCase());
+    const cleaned = this.cleanSpokenName(spoken);
+    const exact = spaces.find(s => this.namesMatch(s.name, cleaned));
     if (exact) return { status: 'exact', record: exact };
 
-    const results = fuzzysort.go(spoken, spaces, {
-      key: 'name',
+    const results = fuzzysort.go(cleaned, spaces, {
+      keys: ['name', (space) => this.normalizeName(space.name)],
       limit: 3,
       threshold: this.SCORE_THRESHOLD,
     });
 
-    if (results.length === 0) return { status: 'none', spoken };
+    if (results.length === 0) return { status: 'none', spoken: cleaned };
     const candidates = results.map(r => r.obj);
-    return { status: 'fuzzy', candidates, spoken };
+    return { status: 'fuzzy', candidates, spoken: cleaned };
   }
 
   private static matchContainer(spoken: string, containers: Container[]): MatchResult<Container> {
     if (!spoken) return { status: 'none', spoken };
 
-    const exact = containers.find(c => c.name.toLowerCase() === spoken.toLowerCase());
+    const cleaned = this.cleanSpokenName(spoken);
+    const exact = containers.find(c => this.namesMatch(c.name, cleaned));
     if (exact) return { status: 'exact', record: exact };
 
-    const results = fuzzysort.go(spoken, containers, {
-      key: 'name',
+    const results = fuzzysort.go(cleaned, containers, {
+      keys: ['name', (container) => this.normalizeName(container.name)],
       limit: 3,
       threshold: this.SCORE_THRESHOLD,
     });
 
-    if (results.length === 0) return { status: 'none', spoken };
+    if (results.length === 0) return { status: 'none', spoken: cleaned };
     const candidates = results.map(r => r.obj);
-    return { status: 'fuzzy', candidates, spoken };
+    return { status: 'fuzzy', candidates, spoken: cleaned };
+  }
+
+  private static cleanSpokenName(value: string): string {
+    return value
+      .trim()
+      .replace(/[.,!?]+$/g, '')
+      .replace(/^(?:and|then)\s+/i, '')
+      .replace(this.LEADING_LOCATION_WORDS, '')
+      .replace(/^(?:the|a|an|my)\s+/i, '')
+      .trim();
+  }
+
+  private static namesMatch(recordName: string, spokenName: string): boolean {
+    return this.normalizeName(recordName) === this.normalizeName(spokenName);
+  }
+
+  private static normalizeName(value: string): string {
+    return value
+      .toLocaleLowerCase()
+      .replace(/&/g, ' and ')
+      .replace(/[^a-z0-9]+/g, '');
   }
 }

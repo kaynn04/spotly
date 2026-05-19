@@ -51,17 +51,17 @@ export class ContainerService {
         throw error;
       }
 
-      // Check for duplicate name in the same space
-      const existingContainers = await ContainerRepository.getContainersBySpaceId(spaceId);
-      if (existingContainers.some(c => c.name.toLowerCase() === trimmedName.toLowerCase())) {
-        const error = {
+      const existingContainers = await ContainerRepository.getAllContainers();
+      if (existingContainers.some((container) => container.name.toLowerCase() === trimmedName.toLowerCase())) {
+        const error: ServiceError = {
           code: 'DUPLICATE_NAME',
-          message: 'A container with this name already exists in this space.',
-        } as unknown as ServiceError;
+          message: 'A container with this name already exists.',
+        };
         throw error;
       }
 
       // Create container in database via repository
+      // Database enforces global UNIQUE constraint on container names
       const container = await ContainerRepository.createContainer(trimmedName, spaceId);
 
       return container;
@@ -91,6 +91,10 @@ export class ContainerService {
    */
   static async getContainersBySpaceId(spaceId: string): Promise<Container[]> {
     return ContainerRepository.getContainersBySpaceId(spaceId);
+  }
+
+  static async getAllContainers(): Promise<Container[]> {
+    return ContainerRepository.getAllContainers();
   }
 
   /**
@@ -133,18 +137,16 @@ export class ContainerService {
         throw error;
       }
 
-      // Check for duplicate name in the same space
-      const container = await ContainerRepository.getContainerById(id);
-      if (container) {
-        const existing = await ContainerRepository.getContainersBySpaceId(container.spaceId);
-        const isDuplicate = existing.some(c => 
-          c.id !== id && 
-          c.name.toLowerCase() === trimmed.toLowerCase()
-        );
-        if (isDuplicate) {
-          throw { code: 'DUPLICATE_NAME', message: 'A container with this name already exists in this space.' } as unknown as ServiceError;
-        }
+      // Database enforces global UNIQUE constraint on container names
+      const existingContainers = await ContainerRepository.getAllContainers();
+      if (existingContainers.some((container) => container.id !== id && container.name.toLowerCase() === trimmed.toLowerCase())) {
+        const error: ServiceError = {
+          code: 'DUPLICATE_NAME',
+          message: 'A container with this name already exists.',
+        };
+        throw error;
       }
+
       await ContainerRepository.updateName(id, trimmed);
     }
 

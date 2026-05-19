@@ -4,7 +4,7 @@
  * Bottom sheet -- create a new container inside a space
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,8 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   ActivityIndicator,
   Image,
@@ -23,6 +25,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import PhotoPickerSheet from '@/components/PhotoPickerSheet';
 import { PhotoService } from '@/src/services/PhotoService';
+import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 
 const PRIMARY = '#6b7f99';
 
@@ -30,11 +33,22 @@ interface ContainerFormModalProps {
   visible: boolean;
   onClose: () => void;
   onSubmit: (name: string, photoUri?: string | null) => Promise<void>;
+  editMode?: boolean;
+  initialName?: string;
+  initialPhotoUri?: string | null;
 }
 
-export default function ContainerFormModal({ visible, onClose, onSubmit }: ContainerFormModalProps) {
+export default function ContainerFormModal({
+  visible,
+  onClose,
+  onSubmit,
+  editMode,
+  initialName,
+  initialPhotoUri,
+}: ContainerFormModalProps) {
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
   const isDark = colorScheme === 'dark';
 
   const [name, setName] = useState('');
@@ -42,6 +56,13 @@ export default function ContainerFormModal({ visible, onClose, onSubmit }: Conta
   const [error, setError] = useState<string | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [showPhotoPicker, setShowPhotoPicker] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    setName(editMode ? (initialName ?? '') : '');
+    setPhotoUri(editMode ? (initialPhotoUri ?? null) : null);
+    setError(null);
+  }, [visible, editMode, initialName, initialPhotoUri]);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const inputBg = isDark ? '#2c2c2e' : '#f8f9fa';
@@ -65,8 +86,10 @@ export default function ContainerFormModal({ visible, onClose, onSubmit }: Conta
     setError(null);
     try {
       await onSubmit(name.trim(), photoUri);
-      setName('');
-      setPhotoUri(null);
+      if (!editMode) {
+        setName('');
+        setPhotoUri(null);
+      }
       onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to create container');
@@ -82,24 +105,30 @@ export default function ContainerFormModal({ visible, onClose, onSubmit }: Conta
       animationType="slide"
       onRequestClose={handleCancel}
     >
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoider}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <TouchableWithoutFeedback onPress={handleCancel}>
           <View style={styles.overlay}>
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 + keyboardHeight }]}>
                 {/* Handle */}
                 <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
                 {/* Title */}
-                <Text style={[styles.sheetTitle, { color: textColor }]}>New Container</Text>
+                <Text style={[styles.sheetTitle, { color: textColor }]}>{editMode ? 'Edit Container' : 'New Container'}</Text>
 
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="on-drag"
+                  nestedScrollEnabled
                   showsVerticalScrollIndicator={false}
                   bounces={false}
                   style={styles.scrollContent}
                 >
                   <Text style={[styles.sheetSubtitle, { color: subtleText }]}>
-                    Group related items together
+                    {editMode ? 'Update container details' : 'Group related items together'}
                   </Text>
 
                   {/* Input */}
@@ -168,7 +197,7 @@ export default function ContainerFormModal({ visible, onClose, onSubmit }: Conta
                     {loading ? (
                       <ActivityIndicator color="#fff" size="small" />
                     ) : (
-                      <Text style={[styles.createBtnText, { color: isValid ? '#fff' : subtleText }]}>Create</Text>
+                      <Text style={[styles.createBtnText, { color: isValid ? '#fff' : subtleText }]}>{editMode ? 'Save' : 'Create'}</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -176,6 +205,7 @@ export default function ContainerFormModal({ visible, onClose, onSubmit }: Conta
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
       <PhotoPickerSheet
         visible={showPhotoPicker}
         onClose={() => setShowPhotoPicker(false)}
@@ -195,6 +225,7 @@ export default function ContainerFormModal({ visible, onClose, onSubmit }: Conta
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoider: { flex: 1 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '85%' },
   scrollContent: { flexGrow: 0 },

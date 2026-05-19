@@ -41,8 +41,8 @@ export const ImportService = {
    */
   async pickAndImport(mode: ImportMode): Promise<ImportResult | null> {
     const result = await DocumentPicker.getDocumentAsync({
-      type: 'application/json',
-      copyToCacheDir: true,
+      type: '*/*',
+      copyToCacheDirectory: true,
     });
 
     if (result.canceled || !result.assets?.length) {
@@ -51,7 +51,12 @@ export const ImportService = {
 
     const asset = result.assets[0];
     const content = await FileSystem.readAsStringAsync(asset.uri);
-    const data = JSON.parse(content);
+    let data: any;
+    try {
+      data = JSON.parse(content);
+    } catch {
+      throw new Error('Please choose a valid Synop JSON export file.');
+    }
 
     return await this.importData(data, mode);
   },

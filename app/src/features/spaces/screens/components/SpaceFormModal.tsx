@@ -4,7 +4,7 @@
  * Bottom sheet -- create a new space, uniform with SessionFormModal
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,8 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   ActivityIndicator,
   Image,
@@ -23,6 +25,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import PhotoPickerSheet from '@/components/PhotoPickerSheet';
 import { PhotoService } from '@/src/services/PhotoService';
+import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 
 const PRIMARY = '#6b7f99';
 
@@ -38,6 +41,7 @@ interface SpaceFormModalProps {
 export default function SpaceFormModal({ visible, onClose, onSubmit, initialName, initialPhotoUri, editMode }: SpaceFormModalProps) {
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
   const isDark = colorScheme === 'dark';
 
   const [name, setName] = useState('');
@@ -45,13 +49,19 @@ export default function SpaceFormModal({ visible, onClose, onSubmit, initialName
   const [error, setError] = useState<string | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [showPhotoPicker, setShowPhotoPicker] = useState(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     if (visible) {
+      submittingRef.current = false;
       setName(initialName ?? '');
       setPhotoUri(initialPhotoUri ?? null);
       setError(null);
+    } else {
+      submittingRef.current = false;
     }
+  // The form should refresh from initial values only when opened/closed.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
@@ -71,7 +81,9 @@ export default function SpaceFormModal({ visible, onClose, onSubmit, initialName
   };
 
   const handleSubmit = async () => {
+    if (submittingRef.current) return;
     if (!name.trim()) { setError('Please enter a space name'); return; }
+    submittingRef.current = true;
     setLoading(true);
     setError(null);
     try {
@@ -81,6 +93,7 @@ export default function SpaceFormModal({ visible, onClose, onSubmit, initialName
       onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to create space');
+      submittingRef.current = false;
     } finally {
       setLoading(false);
     }
@@ -93,10 +106,14 @@ export default function SpaceFormModal({ visible, onClose, onSubmit, initialName
       animationType="slide"
       onRequestClose={handleCancel}
     >
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoider}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <TouchableWithoutFeedback onPress={handleCancel}>
           <View style={styles.overlay}>
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 + keyboardHeight }]}>
                 {/* Handle */}
                 <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
@@ -105,6 +122,8 @@ export default function SpaceFormModal({ visible, onClose, onSubmit, initialName
 
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="on-drag"
+                  nestedScrollEnabled
                   showsVerticalScrollIndicator={false}
                   bounces={false}
                   style={styles.scrollContent}
@@ -185,6 +204,7 @@ export default function SpaceFormModal({ visible, onClose, onSubmit, initialName
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
       <PhotoPickerSheet
         visible={showPhotoPicker}
         onClose={() => setShowPhotoPicker(false)}
@@ -204,6 +224,7 @@ export default function SpaceFormModal({ visible, onClose, onSubmit, initialName
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoider: { flex: 1 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '85%' },
   scrollContent: { flexGrow: 0 },

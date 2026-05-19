@@ -29,6 +29,7 @@ export interface OutsideSessionUpdateDTO {
 export interface OutsideSessionWithItemCount extends OutsideSession {
   item_count: number;
   checked_count: number;
+  return_checked_count: number;
 }
 
 /**

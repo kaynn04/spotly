@@ -5,7 +5,7 @@
  * Sections: Profile, Appearance, Data, About
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import {
   Alert,
   TextInput,
   ActivityIndicator,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import {
@@ -28,9 +30,11 @@ import {
   faInfoCircle,
   faChevronRight,
   faRotateRight,
+  faBookOpen,
+  faLayerGroup,
 } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useToggleColorScheme } from '@/src/context/ColorSchemeContext';
 import { Colors } from '@/constants/theme';
@@ -41,12 +45,104 @@ import type { ImportMode } from '@/src/services/ImportService';
 import { resetDatabase, initializeDatabase } from '@/src/db/migrations';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WalkthroughService } from '@/src/features/walkthrough/services/WalkthroughService';
+import { SpaceService } from '@/src/services/SpaceService';
+import { ContainerService } from '@/src/services/ContainerService';
 
 const PRIMARY = '#6b7f99';
 const DANGER = '#d32f2f';
 
+interface StarterTemplate {
+  id: string;
+  title: string;
+  description: string;
+  spaces: {
+    name: string;
+    containers: string[];
+  }[];
+}
+
+const STARTER_TEMPLATES: StarterTemplate[] = [
+  {
+    id: 'home',
+    title: 'Home Inventory',
+    description: 'A balanced setup for rooms, documents, tools, and everyday storage.',
+    spaces: [
+      { name: 'Living Room', containers: ['Cabinet', 'Media Shelf'] },
+      { name: 'Bedroom', containers: ['Drawer', 'Closet'] },
+      { name: 'Kitchen', containers: ['Pantry', 'Utility Drawer'] },
+      { name: 'Documents', containers: ['IDs', 'Receipts', 'Warranty Papers'] },
+    ],
+  },
+  {
+    id: 'apartment',
+    title: 'Dorm / Apartment',
+    description: 'Simple spaces for compact living and shared storage.',
+    spaces: [
+      { name: 'Desk', containers: ['Documents Tray', 'Cables'] },
+      { name: 'Closet', containers: ['Top Shelf', 'Travel Bag'] },
+      { name: 'Shared Kitchen', containers: ['Food Bin', 'Cookware'] },
+    ],
+  },
+  {
+    id: 'office',
+    title: 'Office Storage',
+    description: 'Track office supplies, equipment, and documents.',
+    spaces: [
+      { name: 'Office', containers: ['Desk Drawer', 'Filing Cabinet'] },
+      { name: 'Storage Room', containers: ['Supplies Box', 'Tech Equipment'] },
+      { name: 'Meeting Area', containers: ['Presentation Kit'] },
+    ],
+  },
+  {
+    id: 'travel',
+    title: 'Travel Essentials',
+    description: 'Prepare common travel groups for bags, documents, and gadgets.',
+    spaces: [
+      { name: 'Travel Bag', containers: ['Documents', 'Chargers', 'Toiletries'] },
+      { name: 'Carry-on', containers: ['Medicine Pouch', 'Gadget Pouch'] },
+    ],
+  },
+  {
+    id: 'tools',
+    title: 'Tools & Equipment',
+    description: 'Organize tools, spare parts, manuals, and safety gear.',
+    spaces: [
+      { name: 'Garage', containers: ['Toolbox', 'Power Tools', 'Spare Parts'] },
+      { name: 'Shed', containers: ['Garden Tools', 'Safety Gear'] },
+    ],
+  },
+];
+
+const GUIDE_TOPICS = [
+  {
+    title: 'Spaces, containers, and items',
+    body: 'Use spaces for locations, containers for boxes or drawers, and items for the things you want to track.',
+  },
+  {
+    title: 'Lending',
+    body: 'Track who borrowed an item, add due dates, and keep before/after photos when condition matters.',
+  },
+  {
+    title: 'Outside sessions',
+    body: 'Build a temporary checklist before leaving, then confirm what came back when you are going home.',
+  },
+  {
+    title: 'Lost items',
+    body: 'Mark an item lost from an outside session or item details, then clear the note when it is found.',
+  },
+  {
+    title: 'Import and export',
+    body: 'Export a JSON backup, then import it later by merging or replacing your current data.',
+  },
+  {
+    title: 'Offline first',
+    body: 'Synop keeps your inventory on your device, so core organizing tools work even without Wi-Fi or mobile data.',
+  },
+];
+
 export default function SettingsScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ openTemplates?: string }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const toggleColorScheme = useToggleColorScheme();
@@ -59,6 +155,9 @@ export default function SettingsScreen() {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templateLoadingId, setTemplateLoadingId] = useState<string | null>(null);
 
   const handleRestartWalkthrough = async () => {
     await WalkthroughService.reset();
@@ -70,6 +169,17 @@ export default function SettingsScreen() {
   const subtleText = isDark ? '#8e8e93' : '#a0aec0';
   const inputBg = isDark ? '#2c2c2e' : '#f8f9fa';
 
+  const buildAvailableName = (baseName: string, existingNames: Set<string>) => {
+    let candidate = baseName;
+    let suffix = 2;
+    while (existingNames.has(candidate.toLowerCase())) {
+      candidate = `${baseName} ${suffix}`;
+      suffix += 1;
+    }
+    existingNames.add(candidate.toLowerCase());
+    return candidate;
+  };
+
   useFocusEffect(
     useCallback(() => {
       UserService.getName().then((name) => {
@@ -78,6 +188,10 @@ export default function SettingsScreen() {
       });
     }, [])
   );
+
+  useEffect(() => {
+    if (params.openTemplates === '1') setShowTemplates(true);
+  }, [params.openTemplates]);
 
   const handleSaveName = async () => {
     const trimmed = nameInput.trim();
@@ -200,6 +314,43 @@ export default function SettingsScreen() {
         },
       ]
     );
+  };
+
+  const handleApplyTemplate = async (template: StarterTemplate) => {
+    setTemplateLoadingId(template.id);
+    try {
+      const [existingSpaces, existingContainers] = await Promise.all([
+        SpaceService.getAllSpaces(),
+        ContainerService.getAllContainers(),
+      ]);
+      const spaceNames = new Set(existingSpaces.map((space) => space.name.toLowerCase()));
+      const containerNames = new Set(existingContainers.map((container) => container.name.toLowerCase()));
+      let createdSpaces = 0;
+      let createdContainers = 0;
+
+      for (const templateSpace of template.spaces) {
+        const spaceName = buildAvailableName(templateSpace.name, spaceNames);
+        const createdSpace = await SpaceService.createSpace(spaceName);
+        createdSpaces += 1;
+
+        for (const templateContainer of templateSpace.containers) {
+          const containerName = buildAvailableName(templateContainer, containerNames);
+          await ContainerService.createContainer(containerName, createdSpace.id);
+          createdContainers += 1;
+        }
+      }
+
+      setShowTemplates(false);
+      Alert.alert(
+        'Template Added',
+        `Added ${createdSpaces} space${createdSpaces === 1 ? '' : 's'} and ${createdContainers} container${createdContainers === 1 ? '' : 's'}.`
+      );
+    } catch (err: any) {
+      console.error('Template error:', err);
+      Alert.alert('Template Failed', err?.message || 'Could not add this template. Please try again.');
+    } finally {
+      setTemplateLoadingId(null);
+    }
   };
 
   const renderRow = (
@@ -342,6 +493,13 @@ export default function SettingsScreen() {
           })}
         </View>
         {/* ── App ────────────────────────────────────── */}
+        <Text style={[styles.sectionLabel, { color: subtleText }]}>HELP & SETUP</Text>
+        <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+          {renderRow(faBookOpen, PRIMARY, 'Guide', () => setShowGuide(true))}
+          {renderRow(faLayerGroup, PRIMARY, 'Starter Templates', () => setShowTemplates(true), {
+            loading: templateLoadingId !== null,
+          })}
+        </View>
         <Text style={[styles.sectionLabel, { color: subtleText }]}>APP</Text>
         <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
           {renderRow(faRotateRight, PRIMARY, 'Restart Walkthrough', handleRestartWalkthrough)}
@@ -362,6 +520,68 @@ export default function SettingsScreen() {
 
         <View style={{ height: insets.bottom + 24 }} />
       </ScrollView>
+
+      <Modal visible={showGuide} transparent animationType="slide" onRequestClose={() => setShowGuide(false)}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowGuide(false)} />
+          <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+            <Text style={[styles.sheetTitle, { color: colors.text }]}>Guide</Text>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetScroll}>
+              {GUIDE_TOPICS.map((topic) => (
+                <View key={topic.title} style={[styles.guideTopic, { borderColor }]}>
+                  <Text style={[styles.guideTitle, { color: colors.text }]}>{topic.title}</Text>
+                  <Text style={[styles.guideBody, { color: subtleText }]}>{topic.body}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showTemplates} transparent animationType="slide" onRequestClose={() => setShowTemplates(false)}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowTemplates(false)} />
+          <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+            <Text style={[styles.sheetTitle, { color: colors.text }]}>Starter Templates</Text>
+            <Text style={[styles.sheetSubtitle, { color: subtleText }]}>
+              Add ready-made spaces and containers without replacing your current data.
+            </Text>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetScroll}>
+              {STARTER_TEMPLATES.map((template) => {
+                const spaceCount = template.spaces.length;
+                const containerCount = template.spaces.reduce((sum, space) => sum + space.containers.length, 0);
+                const isLoading = templateLoadingId === template.id;
+                return (
+                  <View key={template.id} style={[styles.templateCard, { borderColor, backgroundColor: inputBg }]}>
+                    <View style={styles.templateHeader}>
+                      <View style={styles.templateCopy}>
+                        <Text style={[styles.templateTitle, { color: colors.text }]}>{template.title}</Text>
+                        <Text style={[styles.templateDescription, { color: subtleText }]}>{template.description}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.templateButton, { backgroundColor: PRIMARY, opacity: templateLoadingId && !isLoading ? 0.5 : 1 }]}
+                        onPress={() => handleApplyTemplate(template)}
+                        disabled={templateLoadingId !== null}
+                      >
+                        {isLoading ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <Text style={styles.templateButtonText}>Add</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={[styles.templateMeta, { color: subtleText }]}>
+                      {spaceCount} space{spaceCount === 1 ? '' : 's'} · {containerCount} container{containerCount === 1 ? '' : 's'}
+                    </Text>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -452,5 +672,94 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 8,
     marginBottom: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  sheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    maxHeight: '82%',
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 18,
+  },
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  sheetSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 14,
+  },
+  sheetScroll: {
+    paddingBottom: 8,
+  },
+  guideTopic: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+  },
+  guideTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 5,
+  },
+  guideBody: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  templateCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+  },
+  templateHeader: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  templateCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  templateTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  templateDescription: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  templateButton: {
+    minWidth: 62,
+    minHeight: 38,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  templateButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  templateMeta: {
+    fontSize: 12,
+    marginTop: 10,
+    fontWeight: '600',
   },
 });

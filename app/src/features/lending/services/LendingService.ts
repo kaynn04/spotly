@@ -17,6 +17,7 @@ import { Lending, LendingCreateInput, LendingStatus } from '../models/Lending';
 import { LendingPhoto, LendingPhotoPhase } from '../models/LendingPhoto';
 import { ItemRepository } from '../../../repositories/ItemRepository';
 import { PhotoService } from '../../../services/PhotoService';
+import { ReminderService } from '../../../services/ReminderService';
 
 /**
  * Service Error
@@ -141,6 +142,13 @@ export class LendingService {
       throw createServiceError('ITEM_NOT_FOUND', 'Item not found');
     }
 
+    if (item.lostAt) {
+      throw createServiceError(
+        'ITEM_LOST',
+        'This item is marked as lost. Mark it as found before lending it.'
+      );
+    }
+
     // Validate no ACTIVE lending already exists (BR-001)
     let hasActive: boolean;
     try {
@@ -192,6 +200,23 @@ export class LendingService {
       );
     }
 
+    if (input.due_date) {
+      try {
+        const reminderId = await ReminderService.scheduleDueDateReminders(
+          lending.id,
+          lending.borrower_name,
+          item.name,
+          input.due_date
+        );
+        if (reminderId) {
+          await this.lendingRepository.setReminderId(lending.id, reminderId);
+          lending.reminder_id = reminderId;
+        }
+      } catch (error) {
+        console.warn('[LendingService.createLending] Failed to schedule due-date reminder:', error);
+      }
+    }
+
     return lending;
   }
 
@@ -220,7 +245,7 @@ export class LendingService {
     let lending: Lending | null;
     try {
       lending = await this.lendingRepository.getById(lendingId);
-    } catch (error) {
+    } catch {
       throw createServiceError(
         'DATABASE_ERROR',
         'Failed to find lending'
@@ -239,11 +264,19 @@ export class LendingService {
       );
     }
 
+    if (lending.reminder_id) {
+      try {
+        await ReminderService.cancelReminders(lending.reminder_id);
+      } catch (error) {
+        console.warn('[LendingService.markAsReturned] Failed to cancel due-date reminder:', error);
+      }
+    }
+
     // All validations passed, mark as returned
     let updated: Lending;
     try {
       updated = await this.lendingRepository.markAsReturned(lendingId);
-    } catch (error) {
+    } catch {
       throw createServiceError(
         'DATABASE_ERROR',
         'Failed to mark lending as returned'
@@ -251,6 +284,70 @@ export class LendingService {
     }
 
     return updated;
+  }
+
+  async updateLending(
+    lendingId: string,
+    updates: { borrower_name: string; note?: string | null; due_date?: Date | null }
+  ): Promise<Lending> {
+    if (!updates.borrower_name || !updates.borrower_name.trim()) {
+      throw createServiceError('INVALID_BORROWER_NAME', 'Borrower name is required');
+    }
+
+    let existing: Lending | null;
+    try {
+      existing = await this.lendingRepository.getById(lendingId);
+    } catch {
+      throw createServiceError('DATABASE_ERROR', 'Failed to find lending');
+    }
+
+    if (!existing) {
+      throw createServiceError('LENDING_NOT_FOUND', 'Lending not found');
+    }
+
+    if (existing.status !== LendingStatus.ACTIVE) {
+      throw createServiceError('INVALID_STATUS_TRANSITION', 'Returned lendings cannot be edited');
+    }
+
+    let updated: Lending;
+    try {
+      updated = await this.lendingRepository.update(lendingId, {
+        borrower_name: updates.borrower_name.trim(),
+        note: updates.note?.trim() || null,
+        due_date: updates.due_date ?? null,
+      });
+    } catch {
+      throw createServiceError('DATABASE_ERROR', 'Failed to update lending');
+    }
+
+    return updated;
+  }
+
+  async deleteLending(lendingId: string): Promise<void> {
+    let lending: Lending | null;
+    try {
+      lending = await this.lendingRepository.getById(lendingId);
+    } catch {
+      throw createServiceError('DATABASE_ERROR', 'Failed to find lending');
+    }
+
+    if (!lending) {
+      throw createServiceError('LENDING_NOT_FOUND', 'Lending not found');
+    }
+
+    if (lending.reminder_id) {
+      try {
+        await ReminderService.cancelReminders(lending.reminder_id);
+      } catch (error) {
+        console.warn('[LendingService.deleteLending] Failed to cancel due-date reminder:', error);
+      }
+    }
+
+    try {
+      await this.lendingRepository.delete(lendingId);
+    } catch {
+      throw createServiceError('DATABASE_ERROR', 'Failed to delete lending');
+    }
   }
 
   /**
@@ -266,7 +363,7 @@ export class LendingService {
   async getActiveLendings(): Promise<Lending[]> {
     try {
       return await this.lendingRepository.getByStatus(LendingStatus.ACTIVE);
-    } catch (error) {
+    } catch {
       throw createServiceError(
         'DATABASE_ERROR',
         'Failed to fetch active lendings'
@@ -277,7 +374,7 @@ export class LendingService {
   async getActiveLendingsWithItemNames(): Promise<(Lending & { item_name: string })[]> {
     try {
       return await this.lendingRepository.getActiveLendingsWithItemNames();
-    } catch (error) {
+    } catch {
       throw createServiceError(
         'DATABASE_ERROR',
         'Failed to fetch active lendings'
@@ -298,7 +395,7 @@ export class LendingService {
   async getAllLendings(): Promise<Lending[]> {
     try {
       return await this.lendingRepository.getAll();
-    } catch (error) {
+    } catch {
       throw createServiceError(
         'DATABASE_ERROR',
         'Failed to fetch lending history'
@@ -320,7 +417,7 @@ export class LendingService {
     try {
       const hasActive = await this.lendingRepository.hasActiveLending(itemId);
       return !hasActive;
-    } catch (error) {
+    } catch {
       throw createServiceError(
         'DATABASE_ERROR',
         'Failed to check item lend status'
@@ -341,7 +438,7 @@ export class LendingService {
   async getLendingById(lendingId: string): Promise<Lending | null> {
     try {
       return await this.lendingRepository.getById(lendingId);
-    } catch (error) {
+    } catch {
       throw createServiceError(
         'DATABASE_ERROR',
         'Failed to fetch lending'
@@ -362,7 +459,7 @@ export class LendingService {
   async getLendingsByItemId(itemId: string): Promise<Lending[]> {
     try {
       return await this.lendingRepository.getByItemId(itemId);
-    } catch (error) {
+    } catch {
       throw createServiceError(
         'DATABASE_ERROR',
         'Failed to fetch item lendings'
@@ -376,7 +473,7 @@ export class LendingService {
   async getActiveLendingForItem(itemId: string): Promise<Lending | null> {
     try {
       return await this.lendingRepository.getActiveLendingForItem(itemId);
-    } catch (error) {
+    } catch {
       throw createServiceError('DATABASE_ERROR', 'Failed to check lending status');
     }
   }
@@ -386,7 +483,7 @@ export class LendingService {
   async getPhotos(lendingId: string, phase?: LendingPhotoPhase): Promise<LendingPhoto[]> {
     try {
       return await this.lendingPhotoRepository.getByLendingId(lendingId, phase);
-    } catch (error) {
+    } catch {
       throw createServiceError('DATABASE_ERROR', 'Failed to fetch lending photos');
     }
   }
@@ -408,7 +505,7 @@ export class LendingService {
     try {
       await this.lendingPhotoRepository.delete(photoId);
       await PhotoService.deletePhoto(photoUri);
-    } catch (error) {
+    } catch {
       throw createServiceError('DATABASE_ERROR', 'Failed to delete lending photo');
     }
   }

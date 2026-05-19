@@ -12,6 +12,11 @@ import type { Container, ContainerRow, ServiceError } from '../models/Container'
 import { getDatabase } from '../db/client';
 import { generateUUID } from '../utils/uuid';
 
+function isUniqueConstraintError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.toLowerCase().includes('unique constraint');
+}
+
 /**
  * ContainerRepository handles all container-related database operations
  * Uses parameterized SQL queries for safety
@@ -51,6 +56,14 @@ export class ContainerRepository {
         photoUri: null,
       };
     } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        const serviceError: ServiceError = {
+          code: 'DUPLICATE_NAME',
+          message: 'A container with this name already exists.',
+        };
+        throw serviceError;
+      }
+
       // Convert database error to ServiceError
       const serviceError: ServiceError = {
         code: 'DB_ERROR',
@@ -174,6 +187,42 @@ export class ContainerRepository {
   }
 
   /**
+   * Get all containers across all spaces
+   *
+   * @returns Array of Container objects from all spaces
+   * @throws ServiceError if database operation fails
+   *
+   * SQL: SELECT * FROM containers
+   */
+  static async getAllContainers(): Promise<Container[]> {
+    try {
+      const db = getDatabase();
+
+      const result = await db.getAllAsync('SELECT * FROM containers');
+
+      // Map database rows (snake_case) to Container objects (camelCase)
+      return (result as any[]).map((row: ContainerRow) => ({
+        id: row.id,
+        name: row.name,
+        spaceId: row.space_id,
+        createdAt: row.created_at,
+        photoUri: row.photo_uri ?? null,
+      }));
+    } catch (error) {
+      // Convert database error to ServiceError
+      const serviceError: ServiceError = {
+        code: 'DB_ERROR',
+        message: 'Failed to retrieve containers. Try again.',
+      };
+
+      // Log error for debugging
+      console.error('[ContainerRepository.getAllContainers] Database error:', error);
+
+      throw serviceError;
+    }
+  }
+
+  /**
    * Delete a container by id
    * Items inside the container will have container_id set to NULL (ON DELETE SET NULL)
    */
@@ -230,12 +279,12 @@ export class ContainerRepository {
 
   static async getRecentlyMovedContainers(
     limit: number = 5
-  ): Promise<Array<{ id: string; name: string; spaceName: string; containerName: null; updatedAt: string }>> {
+  ): Promise<{ id: string; name: string; spaceName: string; containerName: null; updatedAt: string; photoUri: string | null }[]> {
     try {
       const db = getDatabase();
       const sanitizedLimit = Math.max(1, Math.min(1000, Math.floor(limit)));
       const result = await db.getAllAsync(
-        `SELECT c.id, c.name, c.updated_at,
+        `SELECT c.id, c.name, c.updated_at, c.photo_uri,
                 s.name as space_name
          FROM containers c
          JOIN spaces s ON c.space_id = s.id
@@ -250,6 +299,7 @@ export class ContainerRepository {
         spaceName: row.space_name,
         containerName: null,
         updatedAt: row.updated_at,
+        photoUri: row.photo_uri ?? null,
       }));
     } catch (error) {
       console.error('[ContainerRepository.getRecentlyMovedContainers] Database error:', error);
@@ -275,6 +325,14 @@ export class ContainerRepository {
       const now = new Date().toISOString();
       await db.runAsync('UPDATE containers SET name = ?, updated_at = ? WHERE id = ?', [name, now, id]);
     } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        const serviceError: ServiceError = {
+          code: 'DUPLICATE_NAME',
+          message: 'A container with this name already exists.',
+        };
+        throw serviceError;
+      }
+
       console.error('[ContainerRepository.updateName] Database error:', error);
       const serviceError: ServiceError = { code: 'DB_ERROR', message: 'Failed to update container name.' };
       throw serviceError;

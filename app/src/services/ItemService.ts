@@ -11,6 +11,7 @@ import type { Item, ServiceError } from '../models/Item';
 import { ItemRepository } from '../repositories/ItemRepository';
 import { PhotoService } from './PhotoService';
 import { WarrantyReminderService } from './WarrantyReminderService';
+import { formatDateOnly } from '../utils/dateOnly';
 
 /**
  * ItemService handles all item-related business logic
@@ -51,18 +52,17 @@ export class ItemService {
         throw error;
       }
 
-      // Check for duplicate name in the same location (space or container)
-      const existingItems = await ItemRepository.getItemsBySpaceId(spaceId);
-      const isDuplicate = existingItems.some(i => 
-        i.name.toLowerCase() === trimmedName.toLowerCase() && 
-        i.containerId === (containerId || null)
-      );
-
-      if (isDuplicate) {
-        throw { code: 'DUPLICATE_NAME', message: 'An item with this name already exists in this location.' } as unknown as ServiceError;
+      const existingItems = await new ItemRepository().getAll();
+      if (existingItems.some((item) => item.name.toLowerCase() === trimmedName.toLowerCase())) {
+        const error: ServiceError = {
+          code: 'DUPLICATE_NAME',
+          message: 'An item with this name already exists.',
+        };
+        throw error;
       }
 
       // Create item in database via repository
+      // Database enforces global UNIQUE constraint on item names
       const item = await ItemRepository.createItem(trimmedName, spaceId, containerId, description, quantity, photoUri);
 
       return item;
@@ -255,18 +255,14 @@ export class ItemService {
         throw error;
       }
 
-      // Check for duplicate name on update
-      const item = await ItemRepository.getItemById(itemId);
-      if (item) {
-        const existingItems = await ItemRepository.getItemsBySpaceId(item.spaceId);
-        const isDuplicate = existingItems.some(i => 
-          i.id !== itemId &&
-          i.name.toLowerCase() === trimmed.toLowerCase() && 
-          i.containerId === item.containerId
-        );
-        if (isDuplicate) {
-          throw { code: 'DUPLICATE_NAME', message: 'An item with this name already exists in this location.' } as unknown as ServiceError;
-        }
+      // Database enforces global UNIQUE constraint on item names
+      const existingItems = await new ItemRepository().getAll();
+      if (existingItems.some((item) => item.id !== itemId && item.name.toLowerCase() === trimmed.toLowerCase())) {
+        const error: ServiceError = {
+          code: 'DUPLICATE_NAME',
+          message: 'An item with this name already exists.',
+        };
+        throw error;
       }
 
       updates.name = trimmed;
@@ -289,8 +285,8 @@ export class ItemService {
       throw error;
     }
 
-    // Persist the expiry date (ISO date string "YYYY-MM-DD")
-    const isoDate = expiryDate.toISOString().split('T')[0];
+    // Persist as a local date-only string so timezones cannot shift the selected day.
+    const isoDate = formatDateOnly(expiryDate);
     await ItemRepository.updateWarranty(itemId, isoDate);
 
     // Schedule notifications (cancel existing first if rescheduling)

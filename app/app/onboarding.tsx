@@ -5,13 +5,13 @@
  *   1. Welcome slide
  *   2. Spaces & Containers concept
  *   3. Lending tracker concept
- *   4. Outside sessions concept
+ *   4. Tools concept
  *   5. Name input — personalises the home greeting
  *
  * On completion, sets AsyncStorage flags so it never shows again.
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,6 @@ import {
   TouchableOpacity,
   TextInput,
   Keyboard,
-  Dimensions,
   FlatList,
   Animated,
   KeyboardAvoidingView,
@@ -35,14 +34,14 @@ import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import {
   faFolder,
   faHandshake,
-  faSuitcase,
+  faWrench,
   faUser,
   faMicrophone,
+  faChevronLeft,
 } from '@fortawesome/free-solid-svg-icons';
 import { UserService } from '@/src/services/UserService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PRIMARY = '#6b7f99';
 const ONBOARDING_DONE_KEY = '@synop/onboarding_done';
 
@@ -90,10 +89,10 @@ const SLIDES: Slide[] = [
   },
   {
     key: 'outside',
-    icon: faSuitcase,
+    icon: faWrench,
     iconColor: '#c4956a',
-    title: 'Outside Sessions',
-    subtitle: 'Taking items out of the house? Create a checklist session and track when everything comes back.',
+    title: 'Tools',
+    subtitle: 'A set of utilities to help you manage your inventory — from outside session tracking to other handy features.',
   },
   {
     key: 'voice',
@@ -126,14 +125,17 @@ export default function OnboardingScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const isDark = colorScheme === 'dark';
 
-  const listRef = useRef<FlatList>(null);
+  const listRef = useRef<FlatList<Slide>>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [name, setName] = useState('');
   const [nameError, setNameError] = useState<string | null>(null);
-  const { height: SCREEN_HEIGHT } = useWindowDimensions();
+  const [layoutSize, setLayoutSize] = useState({ width: 0, height: 0 });
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
+  const pageWidth = Math.max(1, Math.round(layoutSize.width || SCREEN_WIDTH));
+  const pageHeight = Math.max(1, Math.round(layoutSize.height || SCREEN_HEIGHT));
   // Height available for each slide (full screen minus bottom bar ~130px)
-  const slideHeight = SCREEN_HEIGHT - insets.bottom - 16 - 130;
+  const slideHeight = Math.max(320, pageHeight - insets.bottom - 16 - 130);
 
   const bg = isDark ? '#000000' : '#f8f9fa';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
@@ -141,6 +143,15 @@ export default function OnboardingScreen() {
   const inputBg = isDark ? '#2c2c2e' : '#ffffff';
 
   const isLastSlide = currentIndex === SLIDES.length - 1;
+
+  useEffect(() => {
+    if (!layoutSize.width) return;
+
+    scrollX.setValue(currentIndex * pageWidth);
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToIndex({ index: currentIndex, animated: false });
+    });
+  }, [currentIndex, layoutSize.width, pageWidth, scrollX]);
 
   function goNext() {
     if (isLastSlide) {
@@ -173,7 +184,7 @@ export default function OnboardingScreen() {
 
   const renderSlide = ({ item }: { item: Slide }) => (
     <KeyboardAvoidingView
-      style={{ width: SCREEN_WIDTH, height: slideHeight }}
+      style={{ width: pageWidth, height: slideHeight }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={[styles.slide, { paddingTop: insets.top + 20, height: slideHeight }]}>
@@ -220,9 +231,21 @@ export default function OnboardingScreen() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: bg }]}>
+    <View
+      style={[styles.container, { backgroundColor: bg }]}
+      onLayout={(event) => {
+        const { width, height } = event.nativeEvent.layout;
+        const nextWidth = Math.round(width);
+        const nextHeight = Math.round(height);
+        setLayoutSize((prev) => {
+          if (prev.width === nextWidth && prev.height === nextHeight) return prev;
+          return { width: nextWidth, height: nextHeight };
+        });
+      }}
+    >
       {/* Slides */}
       <Animated.FlatList
+        key={`onboarding-${pageWidth}`}
         ref={listRef}
         data={SLIDES}
         keyExtractor={(s) => s.key}
@@ -237,6 +260,12 @@ export default function OnboardingScreen() {
         )}
         scrollEventThrottle={16}
         style={{ flex: 1 }}
+        extraData={pageWidth}
+        getItemLayout={(_, index) => ({
+          length: pageWidth,
+          offset: pageWidth * index,
+          index,
+        })}
       />
 
       {/* Bottom controls */}
@@ -245,12 +274,12 @@ export default function OnboardingScreen() {
         <View style={styles.dotsRow}>
           {SLIDES.map((_, i) => {
             const opacity = scrollX.interpolate({
-              inputRange: [(i - 1) * SCREEN_WIDTH, i * SCREEN_WIDTH, (i + 1) * SCREEN_WIDTH],
+              inputRange: [(i - 1) * pageWidth, i * pageWidth, (i + 1) * pageWidth],
               outputRange: [0.3, 1, 0.3],
               extrapolate: 'clamp',
             });
             const width = scrollX.interpolate({
-              inputRange: [(i - 1) * SCREEN_WIDTH, i * SCREEN_WIDTH, (i + 1) * SCREEN_WIDTH],
+              inputRange: [(i - 1) * pageWidth, i * pageWidth, (i + 1) * pageWidth],
               outputRange: [6, 20, 6],
               extrapolate: 'clamp',
             });
@@ -267,7 +296,7 @@ export default function OnboardingScreen() {
         <View style={styles.btnsRow}>
           {currentIndex > 0 && (
             <TouchableOpacity style={[styles.backBtn, { borderColor }]} onPress={goBack}>
-              <Text style={[styles.backBtnText, { color: subtleText }]}>Back</Text>
+              <FontAwesomeIcon icon={faChevronLeft} size={16} color={subtleText} />
             </TouchableOpacity>
           )}
 
@@ -289,7 +318,6 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
 
   slide: {
-    width: SCREEN_WIDTH,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
@@ -314,15 +342,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     textAlign: 'center',
-    maxWidth: 300,
+    maxWidth: 360,
   },
   nameInputWrapper: {
     marginTop: 28,
     width: '100%',
+    maxWidth: 420,
   },
   bulletsWrapper: {
     marginTop: 20,
     width: '100%',
+    maxWidth: 420,
     gap: 10,
   },
   bulletText: {
@@ -346,6 +376,9 @@ const styles = StyleSheet.create({
   },
 
   bottomBar: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
     paddingHorizontal: 24,
     paddingTop: 16,
     gap: 20,

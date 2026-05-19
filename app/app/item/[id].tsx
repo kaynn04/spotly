@@ -11,6 +11,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   ScrollView,
   ActivityIndicator,
   Alert,
@@ -32,13 +33,16 @@ import { LendingService } from '@/src/features/lending/services/LendingService';
 import { LendingRepository } from '@/src/features/lending/repositories/LendingRepository';
 import { ItemRepository } from '@/src/repositories/ItemRepository';
 import { PhotoService } from '@/src/services/PhotoService';
+import PhotoActionSheet from '@/components/PhotoActionSheet';
 import PhotoPickerSheet from '@/components/PhotoPickerSheet';
+import PhotoViewModal from '@/components/PhotoViewModal';
 import { Lending } from '@/src/features/lending/models/Lending';
 import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
 import { OutsideService } from '@/src/features/outside/services/OutsideService';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faBox, faHandshake, faCheck, faTrash, faMapPin, faFolder, faEllipsisVertical, faChevronLeft, faShield } from '@fortawesome/free-solid-svg-icons';
+import { faBox, faHandshake, faCheck, faTrash, faMapPin, faFolder, faEllipsisVertical, faChevronLeft, faShield, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import DatePickerSheet from '@/src/features/lending/screens/components/DatePickerSheet';
+import { parseDateOnly, startOfLocalDay } from '@/src/utils/dateOnly';
 
 const PRIMARY = '#6b7f99';
 const LENDING = '#9b72cb';
@@ -68,10 +72,13 @@ export default function ItemDetailScreen() {
   const [lendNote, setLendNote] = useState('');
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const [lendLoading, setLendLoading] = useState(false);
+  const [lendBeforePhotoUris, setLendBeforePhotoUris] = useState<string[]>([]);
 
   // Menu state
   const [showMenu, setShowMenu] = useState(false);
+  const [showPhotoActions, setShowPhotoActions] = useState(false);
   const [showPhotoPicker, setShowPhotoPicker] = useState(false);
+  const [showPhotoViewer, setShowPhotoViewer] = useState(false);
 
   // Move state
   const [showMoveModal, setShowMoveModal] = useState(false);
@@ -98,6 +105,8 @@ export default function ItemDetailScreen() {
   useFocusEffect(
     useCallback(() => {
       if (itemId) loadItem();
+      // loadItem intentionally reads the current repositories and route state.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [itemId])
   );
 
@@ -230,15 +239,29 @@ export default function ItemDetailScreen() {
     if (!borrowerName.trim() || !item) return;
     setLendLoading(true);
     try {
-      await lendingService.createLending({
+      const lending = await lendingService.createLending({
         item_id: item.id,
         borrower_name: borrowerName.trim(),
         note: lendNote.trim() || undefined,
+        due_date: dueDate ?? undefined,
       });
+      let failedPhotoCount = 0;
+      for (const uri of lendBeforePhotoUris) {
+        try {
+          await lendingService.addPhoto(lending.id, 'before', uri);
+        } catch {
+          failedPhotoCount += 1;
+        }
+      }
       setShowLendModal(false);
       setBorrowerName('');
       setLendNote('');
+      setDueDate(null);
+      setLendBeforePhotoUris([]);
       await loadItem();
+      if (failedPhotoCount > 0) {
+        Alert.alert('Photo not saved', `The lending was created, but ${failedPhotoCount} before photo${failedPhotoCount === 1 ? '' : 's'} could not be added.`);
+      }
     } catch (err: any) {
       Alert.alert('Error', err.code === 'DUPLICATE_ACTIVE_LENDING'
         ? 'This item is already lent out'
@@ -255,6 +278,16 @@ export default function ItemDetailScreen() {
       await loadItem();
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to mark as returned');
+    }
+  }
+
+  async function handleMarkFound() {
+    if (!item) return;
+    try {
+      await ItemRepository.markFound(item.id);
+      await loadItem();
+    } catch {
+      Alert.alert('Error', 'Failed to mark item as found');
     }
   }
 
@@ -283,7 +316,7 @@ export default function ItemDetailScreen() {
 
   function openWarrantyPicker() {
     setWarrantyPickerDate(
-      item?.warrantyExpiry ? new Date(item.warrantyExpiry + 'T00:00:00') : new Date()
+      item?.warrantyExpiry ? parseDateOnly(item.warrantyExpiry) : new Date()
     );
     setShowWarrantyPicker(true);
   }
@@ -326,10 +359,8 @@ export default function ItemDetailScreen() {
   }
 
   function getWarrantyStatus(expiryStr: string): { label: string; color: string } {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const expiry = new Date(expiryStr);
-    expiry.setHours(0, 0, 0, 0);
+    const today = startOfLocalDay(new Date());
+    const expiry = parseDateOnly(expiryStr);
     const days = Math.ceil((expiry.getTime() - today.getTime()) / 86400000);
     if (days < 0) return { label: 'Expired', color: '#e53e3e' };
     if (days <= 30) return { label: 'Expiring Soon', color: WARRANTY };
@@ -361,6 +392,7 @@ export default function ItemDetailScreen() {
 
   const isLent = !!activeLending;
   const isOutside = activeOutsideSession;
+  const isLost = !!item.lostAt;
   const locationText = item.container?.name
     ? `${item.space?.name ?? 'Unknown'} › ${item.container.name}`
     : item.space?.name ?? 'Unknown space';
@@ -377,6 +409,16 @@ export default function ItemDetailScreen() {
       'This item is currently lent out. Mark it as returned before moving it.'
     );
 
+  const lostGuard = () =>
+    Alert.alert(
+      'Item is Lost',
+      'Mark this item as found before moving or lending it.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Mark Found', onPress: handleMarkFound },
+      ]
+    );
+
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
       {/* Header */}
@@ -391,6 +433,25 @@ export default function ItemDetailScreen() {
       </View>
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
+        {isLost && (
+          <View style={[styles.lendingBanner, { backgroundColor: '#d32f2f15', borderColor: '#d32f2f40' }]}>
+            <FontAwesomeIcon icon={faTriangleExclamation} size={16} color="#d32f2f" />
+            <Text style={[styles.lendingBannerText, { color: '#d32f2f', flex: 1 }]}>
+              Reported lost{item.lostAt ? ` · ${new Date(item.lostAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : ''}
+            </Text>
+            <TouchableOpacity style={[styles.foundBtn, { backgroundColor: '#d32f2f18' }]} onPress={handleMarkFound}>
+              <Text style={styles.foundBtnText}>Found</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {isLost && item.lostNote && (
+          <View style={[styles.fieldCard, { backgroundColor: cardBg, borderColor: '#d32f2f40' }]}>
+            <Text style={[styles.fieldLabel, { color: '#d32f2f' }]}>Lost note</Text>
+            <Text style={[styles.fieldValue, { color: colors.text }]}>{item.lostNote}</Text>
+          </View>
+        )}
+
         {/* Lending badge */}
         {isLent && (
           <View style={[styles.lendingBanner, { backgroundColor: `${LENDING}15`, borderColor: `${LENDING}40` }]}>
@@ -416,13 +477,7 @@ export default function ItemDetailScreen() {
         {item.photoUri ? (
           <TouchableOpacity
             style={[styles.photoCard, { backgroundColor: cardBg, borderColor }]}
-            onPress={() => {
-              Alert.alert('Item Photo', '', [
-                { text: 'Replace Photo', onPress: () => setShowPhotoPicker(true) },
-                { text: 'Remove Photo', style: 'destructive', onPress: () => handleRemovePhoto() },
-                { text: 'Cancel', style: 'cancel' },
-              ]);
-            }}
+            onPress={() => setShowPhotoActions(true)}
             activeOpacity={0.8}
           >
             <Image source={{ uri: item.photoUri }} style={styles.photoFull} resizeMode="cover" />
@@ -552,7 +607,7 @@ export default function ItemDetailScreen() {
           ) : item.warrantyExpiry ? (
             <View style={styles.warrantyRow}>
               <Text style={[styles.fieldValue, { color: colors.text, flex: 1 }]}>
-                {new Date(item.warrantyExpiry + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                {parseDateOnly(item.warrantyExpiry).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
               </Text>
               <TouchableOpacity onPress={openWarrantyPicker} style={styles.warrantyEditBtn}>
                 <Text style={[styles.warrantyEditText, { color: WARRANTY }]}>Edit</Text>
@@ -576,6 +631,7 @@ export default function ItemDetailScreen() {
           onChange={setWarrantyPickerDate}
           value={warrantyPickerDate}
           minimumDate={new Date()}
+          purpose="warranty"
           textColor={colors.text}
           subtleText={subtleText}
           cardBg={cardBg}
@@ -586,15 +642,19 @@ export default function ItemDetailScreen() {
       </ScrollView>
 
       {/* Action Menu */}
-      <Modal visible={showMenu} transparent animationType="fade" onRequestClose={() => setShowMenu(false)}>
-        <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowMenu(false)}>
-          <View style={[styles.menuDropdown, { backgroundColor: cardBg, borderColor, top: insets.top + 44 }]}>  
+      <Modal visible={showMenu} transparent animationType="slide" onRequestClose={() => setShowMenu(false)}>
+        <TouchableWithoutFeedback onPress={() => setShowMenu(false)}>
+          <View style={styles.sheetOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.menuSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+                <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
+                <Text style={[styles.menuTitle, { color: colors.text }]}>Item actions</Text>
             <TouchableOpacity
               style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]}
-              onPress={() => { setShowMenu(false); if (isOutside) { outsideGuard(); } else if (isLent) { lendingGuard(); } else { openMoveModal(); } }}
+              onPress={() => { setShowMenu(false); if (isLost) { lostGuard(); } else if (isOutside) { outsideGuard(); } else if (isLent) { lendingGuard(); } else { openMoveModal(); } }}
             >
-              <FontAwesomeIcon icon={faBox} size={18} color={isOutside ? '#e67e22' : isLent ? '#e67e22' : PRIMARY} />
-              <Text style={[styles.menuItemText, { color: isOutside ? '#e67e22' : isLent ? '#e67e22' : colors.text }]}>Move to...</Text>
+              <FontAwesomeIcon icon={faBox} size={18} color={isLost ? '#d32f2f' : isOutside ? '#e67e22' : isLent ? '#e67e22' : PRIMARY} />
+              <Text style={[styles.menuItemText, { color: isLost ? '#d32f2f' : isOutside ? '#e67e22' : isLent ? '#e67e22' : colors.text }]}>Move to...</Text>
             </TouchableOpacity>
             {isLent ? (
               <TouchableOpacity style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]} onPress={() => { setShowMenu(false); handleMarkReturned(); }}>
@@ -604,18 +664,20 @@ export default function ItemDetailScreen() {
             ) : (
               <TouchableOpacity
                 style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]}
-              onPress={() => { setShowMenu(false); if (isOutside) { outsideGuard(); } else { setBorrowerName(''); setLendNote(''); setDueDate(null); setShowLendModal(true); } }}
+              onPress={() => { setShowMenu(false); if (isLost) { lostGuard(); } else if (isOutside) { outsideGuard(); } else { setBorrowerName(''); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); setShowLendModal(true); } }}
               >
-                <FontAwesomeIcon icon={faHandshake} size={18} color={isOutside ? '#e67e22' : PRIMARY} />
-                <Text style={[styles.menuItemText, { color: isOutside ? '#e67e22' : colors.text }]}>Lend item</Text>
+                <FontAwesomeIcon icon={faHandshake} size={18} color={isLost ? '#d32f2f' : isOutside ? '#e67e22' : PRIMARY} />
+                <Text style={[styles.menuItemText, { color: isLost ? '#d32f2f' : isOutside ? '#e67e22' : colors.text }]}>Lend item</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity style={styles.menuItem} onPress={() => { setShowMenu(false); handleDelete(); }}>
               <FontAwesomeIcon icon={faTrash} size={18} color="#e53e3e" />
               <Text style={[styles.menuItemText, { color: '#e53e3e' }]}>Delete item</Text>
             </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </TouchableOpacity>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Lend Modal */}
@@ -629,14 +691,18 @@ export default function ItemDetailScreen() {
         dueDate={dueDate}
         onDueDateChange={setDueDate}
         onSubmit={handleLendSubmit}
-        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setDueDate(null); }}
+        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); }}
         loading={lendLoading}
+        beforePhotoUris={lendBeforePhotoUris}
+        onBeforePhotosChange={setLendBeforePhotoUris}
       />
 
       {/* Move Modal */}
       <Modal visible={showMoveModal} transparent animationType="slide" onRequestClose={() => setShowMoveModal(false)}>
-        <View style={styles.sheetOverlay}>
-          <View style={[styles.moveSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+        <TouchableWithoutFeedback onPress={() => setShowMoveModal(false)}>
+          <View style={styles.sheetOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.moveSheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
             <View style={[styles.sheetHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
             <Text style={[styles.moveSheetTitle, { color: colors.text }]}>Move Item</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -696,11 +762,13 @@ export default function ItemDetailScreen() {
                 );
               })}
             </ScrollView>
-            <TouchableOpacity style={[styles.moveCancelBtn, { borderColor }]} onPress={() => setShowMoveModal(false)}>
-              <Text style={[styles.moveCancelText, { color: subtleText }]}>Cancel</Text>
-            </TouchableOpacity>
+                <TouchableOpacity style={[styles.moveCancelBtn, { borderColor }]} onPress={() => setShowMoveModal(false)}>
+                  <Text style={[styles.moveCancelText, { color: subtleText }]}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       <PhotoPickerSheet
@@ -708,6 +776,20 @@ export default function ItemDetailScreen() {
         onClose={() => setShowPhotoPicker(false)}
         onCamera={() => handleAddPhoto('camera')}
         onGallery={() => handleAddPhoto('gallery')}
+      />
+      <PhotoActionSheet
+        visible={showPhotoActions}
+        title={item.name}
+        onView={() => setShowPhotoViewer(true)}
+        onReplace={() => setShowPhotoPicker(true)}
+        onRemove={handleRemovePhoto}
+        onClose={() => setShowPhotoActions(false)}
+      />
+      <PhotoViewModal
+        visible={showPhotoViewer}
+        uri={item.photoUri ?? null}
+        title={item.name}
+        onClose={() => setShowPhotoViewer(false)}
       />
     </View>
   );
@@ -726,8 +808,8 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 16, paddingTop: 16 },
 
   menuBtn: { paddingLeft: 12, paddingVertical: 8 },
-  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
-  menuDropdown: { position: 'absolute', right: 16, borderRadius: 12, borderWidth: 1, minWidth: 180, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8 },
+  menuSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12 },
+  menuTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.3, marginBottom: 12 },
   menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, gap: 12 },
   menuItemText: { fontSize: 15, fontWeight: '500' },
 
@@ -742,6 +824,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   lendingBannerText: { fontSize: 14, fontWeight: '500' },
+  foundBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
+  foundBtnText: { color: '#d32f2f', fontSize: 12, fontWeight: '700' },
 
   photoCard: {
     borderRadius: 12,

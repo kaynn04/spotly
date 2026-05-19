@@ -1,9 +1,8 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import * as SystemUI from 'expo-system-ui';
@@ -12,6 +11,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { initializeDatabase } from '@/src/db/migrations';
 import { isOnboardingDone } from './onboarding';
 import { ColorSchemeProvider } from '@/src/context/ColorSchemeContext';
+import AppAlertProvider from '@/components/AppAlertProvider';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -21,7 +21,6 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const [dbReady, setDbReady] = useState(false);
-  const [navChecked, setNavChecked] = useState(false);
 
   const isDark = colorScheme === 'dark';
   const navBg = isDark ? '#000000' : '#f8f9fa';
@@ -58,26 +57,21 @@ export default function RootLayout() {
         }
       } catch (err) {
         console.error('✗ Onboarding check failed:', err);
-      } finally {
-        setNavChecked(true);
       }
     };
     checkOnboarding();
   }, [dbReady, router]);
 
-  // Effect 3: Notification deep-link — tapping a warranty/reminder notification opens the item
+  // Effect 3: Notification deep-link
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const itemId = response.notification.request.content.data?.itemId as string | undefined;
-      if (itemId) router.push(`/item/${itemId}` as any);
-    });
-    return () => sub.remove();
-  }, [router]);
-
-  // Effect 3: Notification deep-link — tapping a warranty/reminder notification opens the item
-  useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const itemId = response.notification.request.content.data?.itemId as string | undefined;
+      const data = response.notification.request.content.data;
+      const lendingId = data?.lendingId as string | undefined;
+      const itemId = data?.itemId as string | undefined;
+      if (lendingId) {
+        router.push(`/lending/${lendingId}` as any);
+        return;
+      }
       if (itemId) router.push(`/item/${itemId}` as any);
     });
     return () => sub.remove();
@@ -98,30 +92,32 @@ export default function RootLayout() {
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
     <ColorSchemeProvider>
       <ThemeProvider value={theme}>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: navBg },
-            animation: 'slide_from_right',
-            animationDuration: 250,
-            navigationBarColor: navBg,
-            gestureEnabled: true,
-          }}
-        >
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: true }} />
-          <Stack.Screen name="space/[id]" />
-          <Stack.Screen name="container/[id]" />
-          <Stack.Screen name="item/[id]" />
-          <Stack.Screen name="lending/[id]" />
-          <Stack.Screen name="lending/history" />
-          <Stack.Screen name="outside/[id]" />
-          <Stack.Screen name="outside/history" />
-          <Stack.Screen name="tools/warranty-tracker" />
-          <Stack.Screen name="settings" />
-        </Stack>
-        <StatusBar style="auto" backgroundColor={navBg} translucent={false} />
+        <AppAlertProvider>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: navBg },
+              animation: 'slide_from_right',
+              animationDuration: 250,
+              navigationBarColor: navBg,
+              gestureEnabled: true,
+            }}
+          >
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
+            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal', headerShown: true }} />
+            <Stack.Screen name="space/[id]" />
+            <Stack.Screen name="container/[id]" />
+            <Stack.Screen name="item/[id]" />
+            <Stack.Screen name="lending/[id]" />
+            <Stack.Screen name="lending/history" />
+            <Stack.Screen name="outside/[id]" />
+            <Stack.Screen name="outside/history" />
+            <Stack.Screen name="tools/warranty-tracker" />
+            <Stack.Screen name="settings" />
+          </Stack>
+          <StatusBar style="auto" backgroundColor={navBg} translucent={false} />
+        </AppAlertProvider>
       </ThemeProvider>
     </ColorSchemeProvider>
     </SafeAreaProvider>

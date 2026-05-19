@@ -54,7 +54,7 @@ export interface SpaceRow {
  * Returned from service layer operations
  */
 export interface ServiceError {
-  code: 'VALIDATION_ERROR' | 'DB_ERROR' | 'NOT_FOUND';
+  code: 'VALIDATION_ERROR' | 'DB_ERROR' | 'NOT_FOUND' | 'DUPLICATE_NAME';
   message: string;               // User-friendly error message
 }
 

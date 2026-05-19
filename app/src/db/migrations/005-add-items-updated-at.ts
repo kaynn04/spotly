@@ -9,7 +9,7 @@
 
 export async function addItemsUpdatedAt(db: any): Promise<void> {
   // ── items ──────────────────────────────────────────────────────────────
-  const itemCols = await db.getAllAsync<any>('PRAGMA table_info(items);');
+  const itemCols = await db.getAllAsync('PRAGMA table_info(items);');
   if (!itemCols.some((c: any) => c.name === 'updated_at')) {
     await db.execAsync(`ALTER TABLE items ADD COLUMN updated_at TEXT;`);
     await db.execAsync(`UPDATE items SET updated_at = created_at WHERE updated_at IS NULL;`);
@@ -20,7 +20,7 @@ export async function addItemsUpdatedAt(db: any): Promise<void> {
   }
 
   // ── containers ─────────────────────────────────────────────────────────
-  const ctnCols = await db.getAllAsync<any>('PRAGMA table_info(containers);');
+  const ctnCols = await db.getAllAsync('PRAGMA table_info(containers);');
   if (!ctnCols.some((c: any) => c.name === 'updated_at')) {
     await db.execAsync(`ALTER TABLE containers ADD COLUMN updated_at TEXT;`);
     await db.execAsync(`UPDATE containers SET updated_at = created_at WHERE updated_at IS NULL;`);

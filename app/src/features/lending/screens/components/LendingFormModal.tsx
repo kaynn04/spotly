@@ -14,18 +14,25 @@ import {
   Modal,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
+  Pressable,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   ActivityIndicator,
   Animated,
   PanResponder,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faCalendar, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faCalendar, faCamera, faTimes } from '@fortawesome/free-solid-svg-icons';
 import DatePickerSheet from './DatePickerSheet';
+import PhotoPickerSheet from '@/components/PhotoPickerSheet';
+import { PhotoService } from '@/src/services/PhotoService';
+import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
+import { MAX_PHOTOS_PER_PHASE } from '../../models/LendingPhoto';
 
 const PRIMARY = '#6b7f99';
 
@@ -41,6 +48,10 @@ interface LendingFormModalProps {
   onSubmit: () => void;
   onCancel: () => void;
   loading: boolean;
+  title?: string;
+  submitLabel?: string;
+  beforePhotoUris?: string[];
+  onBeforePhotosChange?: (uris: string[]) => void;
 }
 
 export default function LendingFormModal({
@@ -55,9 +66,14 @@ export default function LendingFormModal({
   onSubmit,
   onCancel,
   loading,
+  title = 'Lend Item',
+  submitLabel = 'Lend Item',
+  beforePhotoUris = [],
+  onBeforePhotosChange,
 }: LendingFormModalProps) {
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
   const isDark = colorScheme === 'dark';
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
@@ -71,6 +87,7 @@ export default function LendingFormModal({
   // Show inline picker on Android (shown inline), modal-style on iOS
   const [showPicker, setShowPicker] = useState(false);
   const [tempDate, setTempDate] = useState<Date>(new Date());
+  const [showBeforePhotoPicker, setShowBeforePhotoPicker] = useState(false);
 
   const sheetTranslateY = useRef(new Animated.Value(0)).current;
   const panResponder = useRef(
@@ -95,12 +112,16 @@ export default function LendingFormModal({
 
   useEffect(() => {
     if (!visible) sheetTranslateY.setValue(0);
+    // sheetTranslateY is a stable Animated.Value ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   const handleCancel = () => {
     Keyboard.dismiss();
     onCancel();
   };
+  const showBeforePhoto = Boolean(onBeforePhotosChange);
+  const canAddBeforePhoto = beforePhotoUris.length < MAX_PHOTOS_PER_PHASE;
 
   return (
     <Modal
@@ -109,23 +130,29 @@ export default function LendingFormModal({
       animationType="slide"
       onRequestClose={handleCancel}
     >
-        <TouchableWithoutFeedback onPress={handleCancel}>
-          <View style={styles.overlay}>
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <Animated.View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16, transform: [{ translateY: sheetTranslateY }] }]}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoider}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.overlay}>
+          <Pressable style={styles.backdrop} onPress={handleCancel} />
+              <Animated.View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 + keyboardHeight, transform: [{ translateY: sheetTranslateY }] }]}>
                 {/* Handle */}
                 <View style={styles.handleArea} {...panResponder.panHandlers}>
                   <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
                 </View>
 
                 {/* Title */}
-                <Text style={[styles.sheetTitle, { color: textColor }]}>Lend Item</Text>
+                <Text style={[styles.sheetTitle, { color: textColor }]}>{title}</Text>
 
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="on-drag"
+                  nestedScrollEnabled
                   showsVerticalScrollIndicator={false}
                   bounces={false}
                   style={styles.scrollContent}
+                  contentContainerStyle={{ paddingBottom: 24 }}
                 >
                   {item && (
                     <View style={[styles.itemPill, { backgroundColor: inputBg, borderColor }]}>
@@ -194,12 +221,47 @@ export default function LendingFormModal({
                     )}
                   </TouchableOpacity>
 
-                  {/* Native date picker — shown inline on Android, above buttons on iOS */}
+                  {/* Before photos */}
+                  {showBeforePhoto && (
+                    <>
+                      <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 12 }]}>Before Photo (optional)</Text>
+                      <View style={styles.photoGrid}>
+                        {beforePhotoUris.map((uri, index) => (
+                          <View key={`${uri}-${index}`} style={styles.photoPreviewRow}>
+                            <Image source={{ uri }} style={styles.photoPreview} />
+                            <TouchableOpacity
+                              style={styles.photoRemoveBtn}
+                              onPress={() => onBeforePhotosChange?.(beforePhotoUris.filter((_, i) => i !== index))}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <FontAwesomeIcon icon={faTimes} size={14} color="#fff" />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                        {canAddBeforePhoto && (
+                          <TouchableOpacity
+                            style={[styles.photoAddTile, { backgroundColor: inputBg, borderColor }]}
+                            onPress={() => setShowBeforePhotoPicker(true)}
+                            activeOpacity={0.7}
+                            disabled={loading}
+                          >
+                            <FontAwesomeIcon icon={faCamera} size={17} color={subtleText} />
+                            <Text style={[styles.photoAddTileText, { color: subtleText }]}>Add</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      <Text style={[styles.photoCountText, { color: subtleText }]}>
+                        {beforePhotoUris.length}/{MAX_PHOTOS_PER_PHASE} photos
+                      </Text>
+                    </>
+                  )}
+
                   {showPicker && (
                     <DatePickerSheet
                       visible={showPicker}
                       value={tempDate}
                       minimumDate={new Date()}
+                      purpose="due"
                       onChange={setTempDate}
                       onConfirm={() => {
                         onDueDateChange(tempDate);
@@ -237,25 +299,44 @@ export default function LendingFormModal({
                       <ActivityIndicator color="#fff" size="small" />
                     ) : (
                       <Text style={[styles.submitBtnText, { color: isValid ? '#fff' : subtleText }]}>
-                        Lend Item
+                        {submitLabel}
                       </Text>
                     )}
                   </TouchableOpacity>
                 </View>
               </Animated.View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
+        </View>
+      </KeyboardAvoidingView>
+      {showBeforePhoto && (
+        <PhotoPickerSheet
+          visible={showBeforePhotoPicker}
+          onClose={() => setShowBeforePhotoPicker(false)}
+          onCamera={async () => {
+            setShowBeforePhotoPicker(false);
+            const uri = await PhotoService.captureFromCamera();
+            if (uri) onBeforePhotosChange?.([...beforePhotoUris, uri].slice(0, MAX_PHOTOS_PER_PHASE));
+          }}
+          onGallery={async () => {
+            setShowBeforePhotoPicker(false);
+            const uri = await PhotoService.pickFromGallery();
+            if (uri) onBeforePhotosChange?.([...beforePhotoUris, uri].slice(0, MAX_PHOTOS_PER_PHASE));
+          }}
+        />
+      )}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoider: {
+    flex: 1,
+  },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
   },
+  backdrop: { flex: 1 },
   sheet: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -310,6 +391,47 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   dueDateText: { flex: 1, fontSize: 15 },
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  photoPreviewRow: {
+    width: 76,
+    height: 76,
+    borderRadius: 12,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  photoPreview: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  photoRemoveBtn: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoAddTile: {
+    width: 76,
+    height: 76,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  photoAddTileText: { fontSize: 11, fontWeight: '700' },
+  photoCountText: { fontSize: 11, marginTop: 6 },
 
   buttonRow: { flexDirection: 'row', gap: 10 },
   cancelBtn: {

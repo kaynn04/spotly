@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Lending Detail Screen
  *
  * Minimalist redesign â€” uniform with Outside feature
@@ -25,9 +25,12 @@ import { LendingService } from '../services/LendingService';
 import { LendingRepository } from '../repositories/LendingRepository';
 import { ItemRepository } from '../../../repositories/ItemRepository';
 import { Lending } from '../models/Lending';
-import { LendingPhoto, LendingPhotoPhase } from '../models/LendingPhoto';
+import { LendingPhoto, LendingPhotoPhase, MAX_PHOTOS_PER_PHASE } from '../models/LendingPhoto';
 import LendingPhotoSection from './components/LendingPhotoSection';
-import { ReminderService } from '../../../services/ReminderService';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faCamera, faChevronLeft, faTimes } from '@fortawesome/free-solid-svg-icons';
+import PhotoPickerSheet from '@/components/PhotoPickerSheet';
+import { PhotoService } from '@/src/services/PhotoService';
 
 const PRIMARY = '#6b7f99';
 const SUCCESS = '#6b9e7a';
@@ -56,6 +59,8 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
   const [showConfirm, setShowConfirm] = useState(false);
   const [beforePhotos, setBeforePhotos] = useState<LendingPhoto[]>([]);
   const [afterPhotos, setAfterPhotos] = useState<LendingPhoto[]>([]);
+  const [returnPhotoUris, setReturnPhotoUris] = useState<string[]>([]);
+  const [showReturnPhotoPicker, setShowReturnPhotoPicker] = useState(false);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
@@ -93,13 +98,18 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
     setShowConfirm(false);
     setSubmitting(true);
     try {
-      // Cancel scheduled reminders before marking returned
-      if (lending.reminder_id) {
-        try { await ReminderService.cancelReminders(lending.reminder_id); } catch { /* non-fatal */ }
-      }
-
       const updated = await lendingService.markAsReturned(lending.id);
       setLending(updated);
+      let failedPhotoCount = 0;
+      for (const uri of returnPhotoUris) {
+        try {
+          const photo = await lendingService.addPhoto(updated.id, 'after', uri);
+          setAfterPhotos((prev) => [...prev, photo]);
+        } catch {
+          failedPhotoCount += 1;
+        }
+      }
+      setReturnPhotoUris([]);
       // Show location hint before navigating back
       const spaceName = item?.space?.name;
       const containerName = item?.container?.name;
@@ -109,7 +119,11 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
         ? `It lives in the "${spaceName}" space.`
         : null;
       if (locationHint) {
-        Alert.alert('Returned ✓', `${item?.name ?? 'Item'} has been marked as returned.\n\n${locationHint}`, [
+        Alert.alert('Returned ✓', `${item?.name ?? 'Item'} has been marked as returned.\n\n${failedPhotoCount > 0 ? `${failedPhotoCount} after photo${failedPhotoCount === 1 ? '' : 's'} could not be saved.\n\n` : ''}${locationHint}`, [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      } else if (failedPhotoCount > 0) {
+        Alert.alert('Returned ✓', `The item was marked as returned, but ${failedPhotoCount} after photo${failedPhotoCount === 1 ? '' : 's'} could not be saved.`, [
           { text: 'OK', onPress: () => router.back() },
         ]);
       } else {
@@ -152,7 +166,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
   const headerBar = (
     <View style={[styles.headerBar, { borderBottomColor: borderColor }]}>
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Text style={[styles.backBtnText, { color: PRIMARY }]}>{'< Back'}</Text>
+        <FontAwesomeIcon icon={faChevronLeft} size={18} color={PRIMARY} />
       </TouchableOpacity>
       <Text style={[styles.headerTitle, { color: colors.text }]}>Lending Details</Text>
       <View style={styles.headerSpacer} />
@@ -331,10 +345,38 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
             <Text style={[styles.dialogMessage, { color: subtleText }]}>
               Confirm that {lending.borrower_name} has returned the item.
             </Text>
+            <Text style={[styles.dialogPhotoLabel, { color: subtleText }]}>After Photo (optional)</Text>
+            <View style={styles.returnPhotoGrid}>
+              {returnPhotoUris.map((uri, index) => (
+                <View key={`${uri}-${index}`} style={styles.returnPhotoPreviewWrap}>
+                  <Image source={{ uri }} style={styles.returnPhotoPreview} />
+                  <TouchableOpacity
+                    style={styles.returnPhotoRemoveBtn}
+                    onPress={() => setReturnPhotoUris((prev) => prev.filter((_, i) => i !== index))}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <FontAwesomeIcon icon={faTimes} size={14} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {returnPhotoUris.length < MAX_PHOTOS_PER_PHASE && (
+                <TouchableOpacity
+                  style={[styles.dialogPhotoTile, { backgroundColor: isDark ? '#2c2c2e' : '#f8f9fa', borderColor }]}
+                  onPress={() => setShowReturnPhotoPicker(true)}
+                  activeOpacity={0.7}
+                >
+                  <FontAwesomeIcon icon={faCamera} size={17} color={subtleText} />
+                  <Text style={[styles.dialogPhotoTileText, { color: subtleText }]}>Add</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <Text style={[styles.dialogPhotoCountText, { color: subtleText }]}>
+              {returnPhotoUris.length}/{MAX_PHOTOS_PER_PHASE} photos
+            </Text>
             <View style={styles.dialogButtons}>
               <TouchableOpacity
                 style={[styles.dialogCancelBtn, { borderColor }]}
-                onPress={() => setShowConfirm(false)}
+                onPress={() => { setShowConfirm(false); setReturnPhotoUris([]); }}
               >
                 <Text style={[styles.dialogCancelText, { color: subtleText }]}>Cancel</Text>
               </TouchableOpacity>
@@ -348,6 +390,20 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
           </View>
         </View>
       )}
+      <PhotoPickerSheet
+        visible={showReturnPhotoPicker}
+        onClose={() => setShowReturnPhotoPicker(false)}
+        onCamera={async () => {
+          setShowReturnPhotoPicker(false);
+          const uri = await PhotoService.captureFromCamera();
+          if (uri) setReturnPhotoUris((prev) => [...prev, uri].slice(0, MAX_PHOTOS_PER_PHASE));
+        }}
+        onGallery={async () => {
+          setShowReturnPhotoPicker(false);
+          const uri = await PhotoService.pickFromGallery();
+          if (uri) setReturnPhotoUris((prev) => [...prev, uri].slice(0, MAX_PHOTOS_PER_PHASE));
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -426,7 +482,49 @@ const styles = StyleSheet.create({
   },
   dialogHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   dialogTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  dialogMessage: { fontSize: 14, lineHeight: 20, marginBottom: 24 },
+  dialogMessage: { fontSize: 14, lineHeight: 20, marginBottom: 18 },
+  dialogPhotoLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3, marginBottom: 8 },
+  dialogPhotoCountText: { fontSize: 11, marginBottom: 18 },
+  returnPhotoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  dialogPhotoTile: {
+    width: 76,
+    height: 76,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  dialogPhotoTileText: { fontSize: 11, fontWeight: '700' },
+  returnPhotoPreviewWrap: {
+    width: 76,
+    height: 76,
+    borderRadius: 12,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  returnPhotoPreview: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  returnPhotoRemoveBtn: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   dialogButtons: { flexDirection: 'row', gap: 10 },
   dialogCancelBtn: {
     flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, alignItems: 'center',

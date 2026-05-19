@@ -17,7 +17,7 @@
 
 export async function addItemsForeignKeys(db: any): Promise<void> {
   // Check if items table already has foreign keys
-  const fkList = await db.getAllAsync<any>('PRAGMA foreign_key_list(items);');
+  const fkList = await db.getAllAsync('PRAGMA foreign_key_list(items);');
   const hasSpaceFk = fkList.some((fk: any) => fk.table === 'spaces');
   const hasContainerFk = fkList.some((fk: any) => fk.table === 'containers');
 

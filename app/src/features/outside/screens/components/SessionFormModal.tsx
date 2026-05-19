@@ -6,7 +6,7 @@
  * Implementation: T010
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -18,11 +18,14 @@ import {
   ScrollView,
   ActivityIndicator,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useOutsideService } from '../../services/OutsideService';
+import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 
 interface SessionFormModalProps {
   visible: boolean;
@@ -36,11 +39,23 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
   const colorScheme = useColorScheme();
   const outsideService = useOutsideService();
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
   const isDark = colorScheme === 'dark';
+  const titleInputRef = useRef<TextInput>(null);
 
   const [title, setTitle] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    const focusTimer = setTimeout(() => {
+      titleInputRef.current?.focus();
+    }, 250);
+
+    return () => clearTimeout(focusTimer);
+  }, [visible]);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const inputBg = isDark ? '#2c2c2e' : '#f8f9fa';
@@ -50,7 +65,7 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
 
   const handleCreateSession = async () => {
     if (!title.trim()) {
-      setError('Please enter a session title');
+      setError('Please enter a checklist title');
       return;
     }
     if (title.length > 100) {
@@ -83,29 +98,36 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={() => { Keyboard.dismiss(); handleCancel(); }}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoider}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); handleCancel(); }}>
           <View style={styles.overlay}>
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+              <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 + keyboardHeight }]}>
                 {/* Handle */}
                 <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
                 {/* Title */}
-                <Text style={[styles.sheetTitle, { color: textColor }]}>New Session</Text>
+                <Text style={[styles.sheetTitle, { color: textColor }]}>New Checklist</Text>
 
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="on-drag"
+                  nestedScrollEnabled
                   showsVerticalScrollIndicator={false}
                   bounces={false}
                   style={styles.scrollContent}
                 >
                   <Text style={[styles.sheetSubtitle, { color: subtleText }]}>
-                    Name this tracking session
+                    Name this temporary outside checklist
                   </Text>
 
                   {/* Input */}
                   <View style={[styles.inputWrapper, { backgroundColor: inputBg, borderColor: error ? '#d32f2f' : borderColor }]}>
                     <TextInput
+                      ref={titleInputRef}
                       style={[styles.input, { color: textColor }]}
                       placeholder="e.g., Grocery run, Airport trip"
                       placeholderTextColor={subtleText}
@@ -113,7 +135,6 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
                       onChangeText={(t) => { setTitle(t); setError(null); }}
                       maxLength={100}
                       editable={!loading}
-                      autoFocus
                       returnKeyType="done"
                       onSubmitEditing={handleCreateSession}
                     />
@@ -123,7 +144,7 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
                     {error ? (
                       <Text style={styles.errorText}>{error}</Text>
                     ) : (
-                      <Text style={[styles.hint, { color: subtleText }]}>Press Create to start tracking</Text>
+                      <Text style={[styles.hint, { color: subtleText }]}>Press Create to start checking items</Text>
                     )}
                     <Text style={[styles.charCount, { color: subtleText }]}>{title.length}/100</Text>
                   </View>
@@ -160,11 +181,15 @@ export default function SessionFormModal({ visible, onClose }: SessionFormModalP
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoider: {
+    flex: 1,
+  },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',

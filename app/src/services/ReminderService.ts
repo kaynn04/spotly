@@ -13,6 +13,15 @@ import * as Device from 'expo-device';
 import { Alert, Linking, Platform } from 'react-native';
 
 const CHANNEL_ID = 'synop-lending-reminders';
+const NOTIFICATION_HOUR = 9;
+
+function isSameLocalDate(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
 
 // Register the Android notification channel (must be done before scheduling)
 if (Platform.OS === 'android') {
@@ -121,14 +130,17 @@ export class ReminderService {
     const ids: string[] = [];
     const now = new Date();
 
-    // Due-day trigger: 09:00 on due date
+    // Due-day trigger: 09:00 on due date, or shortly after creation if due today
     const dueDayTrigger = new Date(dueDate);
-    dueDayTrigger.setHours(9, 0, 0, 0);
+    dueDayTrigger.setHours(NOTIFICATION_HOUR, 0, 0, 0);
+    if (isSameLocalDate(dueDate, now) && dueDayTrigger <= now) {
+      dueDayTrigger.setTime(now.getTime() + 5000);
+    }
 
     // 1-day-before trigger: 09:00 the day before
     const dayBeforeTrigger = new Date(dueDate);
     dayBeforeTrigger.setDate(dayBeforeTrigger.getDate() - 1);
-    dayBeforeTrigger.setHours(9, 0, 0, 0);
+    dayBeforeTrigger.setHours(NOTIFICATION_HOUR, 0, 0, 0);
 
     if (dayBeforeTrigger > now) {
       const id = await Notifications.scheduleNotificationAsync({

@@ -12,22 +12,32 @@
     "ios": {
       "supportsTablet": true,
       "backgroundColor": "#f8f9fa",
-      "bundleIdentifier": "com.kaynn04.synop",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+      "bundleIdentifier": "com.kaynn.synop",
+      "buildNumber": "1"
     },
     "android": {
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.VIBRATE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#E6F4FE"
       },
-      "backgroundColor": "#f8f9fa",
-      "edgeToEdgeEnabled": false,
+      "backgroundColor": "#000000",
+      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.kaynn04.synop"
+      "allowBackup": false,
+      "package": "com.kaynn.synop",
+      "versionCode": 1
     },
     "web": {
       "output": "static",
@@ -35,6 +45,9 @@
     },
     "plugins": [
       "expo-router",
+      "expo-notifications",
+      "expo-speech-recognition",
+      "./plugins/withAndroidCompatibility",
       [
         "expo-splash-screen",
         {
@@ -46,22 +59,11 @@
             "backgroundColor": "#000000"
           }
         }
-      ],
-      "expo-sqlite",
-      "expo-notifications",
-      "expo-speech-recognition"
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    },
-    "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "07662434-d2e3-4e2a-88e9-99e819911e89"
-      }
     }
   }
 }
-
-

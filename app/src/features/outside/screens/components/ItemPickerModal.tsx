@@ -6,7 +6,7 @@
  * Implementation: T011
  */
 
-import React, { useCallback, useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -53,6 +53,8 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
 
   useEffect(() => {
     loadItems();
+    // Load once when the picker opens for this session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadItems = async () => {
@@ -73,8 +75,8 @@ export default function ItemPickerModal({ sessionId, onItemsSelected, onClose }:
       const existingSessionItems = await outsideService.getSessionItems(sessionId);
       const existingItemIds = new Set(existingSessionItems.map(i => i.item_id));
       
-      // Filter out lent items AND already-added items
-      const availableItems = items.filter(item => !lentIds.has(item.id) && !existingItemIds.has(item.id));
+      // Filter out lost, lent, and already-added items
+      const availableItems = items.filter(item => !item.lostAt && !lentIds.has(item.id) && !existingItemIds.has(item.id));
       const pickerItems: PickerItem[] = availableItems.map(item => ({
         id: item.id,
         name: item.name,

@@ -14,6 +14,8 @@ import {
   TouchableOpacity,
   Pressable,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   ActivityIndicator,
   Image,
@@ -26,7 +28,7 @@ import { faShield, faCalendarAlt, faTimes } from '@fortawesome/free-solid-svg-ic
 import PhotoPickerSheet from '@/components/PhotoPickerSheet';
 import DatePickerSheet from '@/src/features/lending/screens/components/DatePickerSheet';
 import { PhotoService } from '@/src/services/PhotoService';
-import { Colors } from '@/constants/theme';
+import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 
 const PRIMARY = '#6b7f99';
 
@@ -45,6 +47,7 @@ interface ItemFormModalProps {
 export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel, editMode, initialName, initialDescription, initialQuantity, initialPhotoUri }: ItemFormModalProps) {
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
   const isDark = colorScheme === 'dark';
 
   const [name, setName] = useState('');
@@ -71,6 +74,8 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
       setPhotoUri(null);
       setWarrantyDate(null);
     }
+  // The form resets from initial values only when the sheet opens/closes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
@@ -119,12 +124,16 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
       animationType="slide"
       onRequestClose={handleCancel}
     >
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoider}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       {/* Overlay with backdrop */}
       <View style={styles.overlay}>
         {/* Backdrop tap area */}
         <Pressable style={{ flex: 1 }} onPress={handleCancel} />
         {/* Sheet — let touches through for scrolling */}
-        <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 }]}>
+        <View style={[styles.sheet, { backgroundColor: cardBg, paddingBottom: insets.bottom + 16 + keyboardHeight }]}>
                 {/* Handle */}
                 <View style={[styles.handle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
 
@@ -133,10 +142,12 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
 
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="on-drag"
+                  nestedScrollEnabled
                   showsVerticalScrollIndicator={false}
                   bounces={false}
                   style={styles.scrollContent}
-                  contentContainerStyle={{ paddingBottom: 16 }}
+                  contentContainerStyle={{ paddingBottom: 24 }}
                   onScrollBeginDrag={Keyboard.dismiss}
                 >
                   {contextLabel && (
@@ -284,6 +295,7 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
                 </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
       <DatePickerSheet
         visible={showWarrantyPicker}
         onClose={() => setShowWarrantyPicker(false)}
@@ -294,6 +306,7 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
         onChange={setWarrantyPickerDate}
         value={warrantyPickerDate}
         minimumDate={new Date()}
+        purpose="warranty"
         textColor={textColor}
         subtleText={subtleText}
         cardBg={cardBg}
@@ -319,6 +332,7 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoider: { flex: 1 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, maxHeight: '85%' },
   scrollContent: { flexGrow: 0 },

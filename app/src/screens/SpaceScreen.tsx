@@ -9,7 +9,7 @@
  * Implementation: UI for Create Space feature
  */
 
-import React, { useState, useEffect, useRef, useCallback} from 'react';
+import React, { useState, useRef} from 'react';
 import {
   View,
   TextInput,
