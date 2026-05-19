@@ -58,9 +58,11 @@ import { WALKTHROUGH_STEPS, type SpotlightRect } from '@/src/features/walkthroug
 import { useWalkthroughContext } from '@/src/features/walkthrough/context/WalkthroughContext';
 import WalkthroughOverlay from '@/src/features/walkthrough/components/WalkthroughOverlay';
 import VoiceModal from '@/src/features/voice/screens/components/VoiceModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PRIMARY = '#6b7f99';
 const SUCCESS = '#6b9e7a';
+const TEMPLATE_PROMPT_DISMISSED_KEY = '@synop/dashboard_template_prompt_dismissed';
 
 function getGreeting(): string {
   const h = new Date().getHours();
@@ -254,6 +256,7 @@ export default function HomePage() {
     if (nextIndex >= WALKTHROUGH_STEPS.length) {
       await WalkthroughService.markDone();
       setWalkthroughVisible(false);
+      promptStarterTemplatesAfterWalkthrough();
       return;
     }
     const rect = await measureStep(nextIndex);
@@ -264,6 +267,37 @@ export default function HomePage() {
   const handleWalkthroughSkip = async () => {
     await WalkthroughService.markDone();
     setWalkthroughVisible(false);
+    promptStarterTemplatesAfterWalkthrough();
+  };
+
+  const promptStarterTemplatesAfterWalkthrough = async () => {
+    if (!data?.isEmpty) return;
+
+    const dismissed = await AsyncStorage.getItem(TEMPLATE_PROMPT_DISMISSED_KEY);
+    if (dismissed) return;
+
+    setTimeout(() => {
+      Alert.alert(
+        'Start faster with templates?',
+        'Your inventory is empty. You can add starter spaces and containers so you do not have to begin from scratch.',
+        [
+          {
+            text: 'Not now',
+            style: 'cancel',
+            onPress: () => {
+              AsyncStorage.setItem(TEMPLATE_PROMPT_DISMISSED_KEY, 'true').catch(() => {});
+            },
+          },
+          {
+            text: 'View Templates',
+            onPress: () => {
+              AsyncStorage.setItem(TEMPLATE_PROMPT_DISMISSED_KEY, 'true').catch(() => {});
+              router.push({ pathname: '/settings' as any, params: { openTemplates: '1' } });
+            },
+          },
+        ]
+      );
+    }, 350);
   };
 
   const loadAll = async () => {
