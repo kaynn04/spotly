@@ -113,6 +113,7 @@ export default function ContainerDetailScreen() {
   const [lendNote, setLendNote] = useState('');
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const [lendLoading, setLendLoading] = useState(false);
+  const [lendBeforePhotoUris, setLendBeforePhotoUris] = useState<string[]>([]);
   const [activeLendingMap, setActiveLendingMap] = useState<Record<string, Lending>>({});
   const [activeOutsideItemIds, setActiveOutsideItemIds] = useState<Set<string>>(new Set());
 
@@ -223,18 +224,30 @@ export default function ContainerDetailScreen() {
     if (!borrowerName.trim() || !selectedLendItem) return;
     setLendLoading(true);
     try {
-      await lendingService.createLending({
+      const lending = await lendingService.createLending({
         item_id: selectedLendItem.id,
         borrower_name: borrowerName.trim(),
         note: lendNote.trim() || undefined,
         due_date: dueDate ?? undefined,
       });
+      let failedPhotoCount = 0;
+      for (const uri of lendBeforePhotoUris) {
+        try {
+          await lendingService.addPhoto(lending.id, 'before', uri);
+        } catch {
+          failedPhotoCount += 1;
+        }
+      }
       setShowLendModal(false);
       setBorrowerName('');
       setLendNote('');
       setDueDate(null);
+      setLendBeforePhotoUris([]);
       setSelectedLendItem(null);
       await loadActiveLendings();
+      if (failedPhotoCount > 0) {
+        Alert.alert('Photo not saved', `The lending was created, but ${failedPhotoCount} before photo${failedPhotoCount === 1 ? '' : 's'} could not be added.`);
+      }
     } catch (err: any) {
       Alert.alert('Error', err.code === 'DUPLICATE_ACTIVE_LENDING'
         ? 'This item is already lent out'
@@ -395,6 +408,7 @@ export default function ContainerDetailScreen() {
     setBorrowerName('');
     setLendNote('');
     setDueDate(null);
+    setLendBeforePhotoUris([]);
     setShowLendModal(true);
   };
 
@@ -1023,8 +1037,10 @@ export default function ContainerDetailScreen() {
         dueDate={dueDate}
         onDueDateChange={setDueDate}
         onSubmit={handleLendSubmit}
-        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setDueDate(null); setSelectedLendItem(null); }}
+        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); setSelectedLendItem(null); }}
         loading={lendLoading}
+        beforePhotoUris={lendBeforePhotoUris}
+        onBeforePhotosChange={setLendBeforePhotoUris}
       />
       <ItemActionSheet
         visible={actionSheetItem !== null}
@@ -1072,7 +1088,7 @@ export default function ContainerDetailScreen() {
                   icon: faHandshake,
                   label: 'Lend',
                   description: isLost ? 'Item is marked lost' : isOutside ? 'In active outside session' : 'Track who you lent this item to',
-                  onPress: isLost ? lostGuard : isOutside ? outsideGuard : () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setDueDate(null); setShowLendModal(true); },
+                  onPress: isLost ? lostGuard : isOutside ? outsideGuard : () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); setShowLendModal(true); },
                 },
             {
               icon: faTrash,

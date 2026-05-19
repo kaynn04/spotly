@@ -11,7 +11,7 @@
  * On completion, sets AsyncStorage flags so it never shows again.
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -130,9 +130,12 @@ export default function OnboardingScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [name, setName] = useState('');
   const [nameError, setNameError] = useState<string | null>(null);
+  const [layoutSize, setLayoutSize] = useState({ width: 0, height: 0 });
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
+  const pageWidth = Math.max(1, Math.round(layoutSize.width || SCREEN_WIDTH));
+  const pageHeight = Math.max(1, Math.round(layoutSize.height || SCREEN_HEIGHT));
   // Height available for each slide (full screen minus bottom bar ~130px)
-  const slideHeight = SCREEN_HEIGHT - insets.bottom - 16 - 130;
+  const slideHeight = Math.max(320, pageHeight - insets.bottom - 16 - 130);
 
   const bg = isDark ? '#000000' : '#f8f9fa';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
@@ -140,6 +143,15 @@ export default function OnboardingScreen() {
   const inputBg = isDark ? '#2c2c2e' : '#ffffff';
 
   const isLastSlide = currentIndex === SLIDES.length - 1;
+
+  useEffect(() => {
+    if (!layoutSize.width) return;
+
+    scrollX.setValue(currentIndex * pageWidth);
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToIndex({ index: currentIndex, animated: false });
+    });
+  }, [currentIndex, layoutSize.width, pageWidth, scrollX]);
 
   function goNext() {
     if (isLastSlide) {
@@ -172,7 +184,7 @@ export default function OnboardingScreen() {
 
   const renderSlide = ({ item }: { item: Slide }) => (
     <KeyboardAvoidingView
-      style={{ width: SCREEN_WIDTH, height: slideHeight }}
+      style={{ width: pageWidth, height: slideHeight }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={[styles.slide, { paddingTop: insets.top + 20, height: slideHeight }]}>
@@ -219,9 +231,21 @@ export default function OnboardingScreen() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: bg }]}>
+    <View
+      style={[styles.container, { backgroundColor: bg }]}
+      onLayout={(event) => {
+        const { width, height } = event.nativeEvent.layout;
+        const nextWidth = Math.round(width);
+        const nextHeight = Math.round(height);
+        setLayoutSize((prev) => {
+          if (prev.width === nextWidth && prev.height === nextHeight) return prev;
+          return { width: nextWidth, height: nextHeight };
+        });
+      }}
+    >
       {/* Slides */}
       <Animated.FlatList
+        key={`onboarding-${pageWidth}`}
         ref={listRef}
         data={SLIDES}
         keyExtractor={(s) => s.key}
@@ -236,10 +260,10 @@ export default function OnboardingScreen() {
         )}
         scrollEventThrottle={16}
         style={{ flex: 1 }}
-        extraData={SCREEN_WIDTH}
+        extraData={pageWidth}
         getItemLayout={(_, index) => ({
-          length: SCREEN_WIDTH,
-          offset: SCREEN_WIDTH * index,
+          length: pageWidth,
+          offset: pageWidth * index,
           index,
         })}
       />
@@ -250,12 +274,12 @@ export default function OnboardingScreen() {
         <View style={styles.dotsRow}>
           {SLIDES.map((_, i) => {
             const opacity = scrollX.interpolate({
-              inputRange: [(i - 1) * SCREEN_WIDTH, i * SCREEN_WIDTH, (i + 1) * SCREEN_WIDTH],
+              inputRange: [(i - 1) * pageWidth, i * pageWidth, (i + 1) * pageWidth],
               outputRange: [0.3, 1, 0.3],
               extrapolate: 'clamp',
             });
             const width = scrollX.interpolate({
-              inputRange: [(i - 1) * SCREEN_WIDTH, i * SCREEN_WIDTH, (i + 1) * SCREEN_WIDTH],
+              inputRange: [(i - 1) * pageWidth, i * pageWidth, (i + 1) * pageWidth],
               outputRange: [6, 20, 6],
               extrapolate: 'clamp',
             });
