@@ -105,6 +105,7 @@ export default function SpaceDetailScreen() {
   const [showLendModal, setShowLendModal] = useState(false);
   const [selectedLendItem, setSelectedLendItem] = useState<Item | null>(null);
   const [borrowerName, setBorrowerName] = useState('');
+  const [lendQuantity, setLendQuantity] = useState('1');
   const [lendNote, setLendNote] = useState('');
   const [lendLoading, setLendLoading] = useState(false);
   const [lendBeforePhotoUris, setLendBeforePhotoUris] = useState<string[]>([]);
@@ -379,11 +380,13 @@ export default function SpaceDetailScreen() {
 
   async function handleLendSubmit() {
     if (!borrowerName.trim() || !selectedLendItem) return;
+    const quantity = Math.max(1, Math.floor(Number(lendQuantity) || 1));
     setLendLoading(true);
     try {
       const lending = await lendingService.createLending({
         item_id: selectedLendItem.id,
         borrower_name: borrowerName.trim(),
+        quantity,
         note: lendNote.trim() || undefined,
         due_date: dueDate ?? undefined,
       });
@@ -397,6 +400,7 @@ export default function SpaceDetailScreen() {
       }
       setShowLendModal(false);
       setBorrowerName('');
+      setLendQuantity('1');
       setLendNote('');
       setDueDate(null);
       setLendBeforePhotoUris([]);
@@ -590,6 +594,7 @@ export default function SpaceDetailScreen() {
     exitSelectMode();
     setSelectedLendItem(item);
     setBorrowerName('');
+    setLendQuantity('1');
     setLendNote('');
     setDueDate(null);
     setLendBeforePhotoUris([]);
@@ -611,10 +616,10 @@ export default function SpaceDetailScreen() {
     await loadItems();
   };
 
-  const handleEditContainerSubmit = async (name: string, photoUri?: string | null) => {
+  const handleEditContainerSubmit = async (name: string, description?: string | null, photoUri?: string | null) => {
     if (!editingContainer) return;
 
-    await ContainerService.updateContainer(editingContainer.id, { name });
+    await ContainerService.updateContainer(editingContainer.id, { name, description: description ?? null });
 
     if (photoUri && photoUri !== editingContainer.photoUri) {
       const savedUri = await PhotoService.savePhoto(photoUri, `container_${editingContainer.id}`);
@@ -629,9 +634,9 @@ export default function SpaceDetailScreen() {
     await loadContainers();
   };
 
-  const handleEditSpaceSubmit = async (name: string, photoUri?: string | null) => {
+  const handleEditSpaceSubmit = async (name: string, description?: string | null, photoUri?: string | null) => {
     if (!space) return;
-    await SpaceRepository.updateName(space.id, name);
+    await SpaceRepository.updateDetails(space.id, { name, description: description ?? null });
     if (photoUri && photoUri !== space.photoUri) {
       const savedUri = await PhotoService.savePhoto(photoUri, `space_${space.id}`);
       await SpaceRepository.updatePhotoUri(space.id, savedUri);
@@ -660,8 +665,8 @@ export default function SpaceDetailScreen() {
     await loadItems();
   }
 
-  async function handleAddContainer(name: string, photoUri?: string | null) {
-    const container = await ContainerService.createContainer(name, id!);
+  async function handleAddContainer(name: string, description?: string | null, photoUri?: string | null) {
+    const container = await ContainerService.createContainer(name, id!, description);
     if (photoUri && container) {
       const savedUri = await PhotoService.savePhoto(photoUri, `container_${container.id}`);
       await ContainerRepository.updatePhotoUri(container.id, savedUri);
@@ -1192,12 +1197,14 @@ export default function SpaceDetailScreen() {
         item={selectedLendItem}
         borrowerName={borrowerName}
         onBorrowerNameChange={setBorrowerName}
+        quantity={lendQuantity}
+        onQuantityChange={setLendQuantity}
         note={lendNote}
         onNoteChange={setLendNote}
         dueDate={dueDate}
         onDueDateChange={setDueDate}
         onSubmit={handleLendSubmit}
-        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); setSelectedLendItem(null); }}
+        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendQuantity('1'); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); setSelectedLendItem(null); }}
         loading={lendLoading}
         beforePhotoUris={lendBeforePhotoUris}
         onBeforePhotosChange={setLendBeforePhotoUris}
@@ -1248,7 +1255,7 @@ export default function SpaceDetailScreen() {
                   icon: faHandshake,
                   label: 'Lend',
                   description: isLost ? 'Item is marked lost' : isOutside ? 'In active outside session' : 'Track who you lent this item to',
-                  onPress: isLost ? lostGuard : isOutside ? outsideGuard : () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); setShowLendModal(true); },
+                  onPress: isLost ? lostGuard : isOutside ? outsideGuard : () => { setSelectedLendItem(item); setBorrowerName(''); setLendQuantity('1'); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); setShowLendModal(true); },
                 },
             {
               icon: faTrash,
@@ -1537,6 +1544,7 @@ export default function SpaceDetailScreen() {
         onSubmit={handleEditContainerSubmit}
         editMode
         initialName={editingContainer?.name}
+        initialDescription={editingContainer?.description}
         initialPhotoUri={editingContainer?.photoUri}
       />
       <SpaceFormModal
@@ -1545,6 +1553,7 @@ export default function SpaceDetailScreen() {
         onSubmit={handleEditSpaceSubmit}
         editMode
         initialName={editingSpace?.name}
+        initialDescription={editingSpace?.description}
         initialPhotoUri={editingSpace?.photoUri}
       />
     </View>

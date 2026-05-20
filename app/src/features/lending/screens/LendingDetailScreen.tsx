@@ -247,6 +247,11 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
 
             <View style={[styles.divider, { backgroundColor: borderColor }]} />
 
+            <Text style={[styles.sectionLabel, { color: subtleText }]}>QUANTITY</Text>
+            <Text style={[styles.sectionValue, { color: colors.text }]}>{lending.quantity}</Text>
+
+            <View style={[styles.divider, { backgroundColor: borderColor }]} />
+
             <Text style={[styles.sectionLabel, { color: subtleText }]}>LENT ON</Text>
             <Text style={[styles.sectionValue, { color: colors.text }]}>{formatDate(lending.lent_at)}</Text>
 
@@ -343,7 +348,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
             <View style={[styles.dialogHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
             <Text style={[styles.dialogTitle, { color: colors.text }]}>Mark as Returned?</Text>
             <Text style={[styles.dialogMessage, { color: subtleText }]}>
-              Confirm that {lending.borrower_name} has returned the item.
+              Confirm that {lending.borrower_name} has returned {lending.quantity} unit{lending.quantity === 1 ? '' : 's'}.
             </Text>
             <Text style={[styles.dialogPhotoLabel, { color: subtleText }]}>After Photo (optional)</Text>
             <View style={styles.returnPhotoGrid}>

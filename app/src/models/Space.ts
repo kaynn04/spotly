@@ -14,6 +14,7 @@
 export interface Space {
   id: string;                    // UUID, unique identifier
   name: string;                  // User-provided name (1-100 chars, trimmed)
+  description?: string | null;   // Optional description/notes
   createdAt: string;             // ISO 8601 timestamp, immutable
   updatedAt: string;             // ISO 8601 timestamp, updated when modified
   photoUri?: string | null;      // Optional: local file path to space photo
@@ -44,6 +45,7 @@ export interface CreateSpaceInput {
 export interface SpaceRow {
   id: string;
   name: string;
+  description?: string | null;
   created_at: string;
   updated_at: string;
   photo_uri?: string | null;
