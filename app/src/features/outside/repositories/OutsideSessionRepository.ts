@@ -8,10 +8,24 @@
  */
 
 import { getDatabase } from '../../../db/client';
+import { createOutsideSessionsTables } from '../../../db/migrations/004-create-outside-tables';
 import { OutsideSession, OutsideSessionStatus, OutsideSessionError, OutsideSessionErrorCode } from '../models/OutsideSession';
 import { generateUUID } from '../../../utils/uuid';
 
 export class OutsideSessionRepository {
+  private static ensureTablesPromise: Promise<void> | null = null;
+
+  static async ensureTables(): Promise<void> {
+    if (!OutsideSessionRepository.ensureTablesPromise) {
+      OutsideSessionRepository.ensureTablesPromise = createOutsideSessionsTables(getDatabase())
+        .finally(() => {
+          OutsideSessionRepository.ensureTablesPromise = null;
+        });
+    }
+
+    await OutsideSessionRepository.ensureTablesPromise;
+  }
+
   /**
    * Create a new outside session
    */
@@ -21,6 +35,7 @@ export class OutsideSessionRepository {
     const now = new Date().toISOString();
 
     try {
+      await OutsideSessionRepository.ensureTables();
       await db.runAsync(
         'INSERT INTO outside_sessions (id, title, status, created_at, completed_at) VALUES (?, ?, ?, ?, ?)',
         [id, title, OutsideSessionStatus.ACTIVE, now, null]
@@ -53,6 +68,7 @@ export class OutsideSessionRepository {
     const db = getDatabase();
 
     try {
+      await OutsideSessionRepository.ensureTables();
       const result = await db.getFirstAsync<OutsideSession>(
         'SELECT id, title, status, created_at, completed_at FROM outside_sessions WHERE status = ? ORDER BY created_at DESC LIMIT 1',
         [OutsideSessionStatus.ACTIVE]
@@ -72,6 +88,7 @@ export class OutsideSessionRepository {
     const db = getDatabase();
 
     try {
+      await OutsideSessionRepository.ensureTables();
       const result = await db.getFirstAsync<OutsideSession>(
         'SELECT id, title, status, created_at, completed_at FROM outside_sessions WHERE id = ?',
         [id]
@@ -91,6 +108,7 @@ export class OutsideSessionRepository {
     const db = getDatabase();
 
     try {
+      await OutsideSessionRepository.ensureTables();
       const results = await db.getAllAsync<OutsideSession>(
         'SELECT id, title, status, created_at, completed_at FROM outside_sessions WHERE status = ? ORDER BY completed_at DESC',
         [OutsideSessionStatus.COMPLETED]
@@ -111,6 +129,7 @@ export class OutsideSessionRepository {
     const now = new Date().toISOString();
 
     try {
+      await OutsideSessionRepository.ensureTables();
       const existing = await this.getById(id);
       if (!existing) {
         throw new OutsideSessionError(
@@ -147,6 +166,7 @@ export class OutsideSessionRepository {
     const db = getDatabase();
 
     try {
+      await OutsideSessionRepository.ensureTables();
       const existing = await this.getById(id);
       if (!existing) {
         throw new OutsideSessionError(

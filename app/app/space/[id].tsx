@@ -58,6 +58,7 @@ import ContainerFormModal from '@/src/features/spaces/screens/components/Contain
 import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
 import SpaceFormModal from '@/src/features/spaces/screens/components/SpaceFormModal';
 import ItemActionSheet from '@/src/features/spaces/screens/components/ItemActionSheet';
+import { BarcodeScannerService, type ScannedBarcode } from '@/src/features/tools/services/BarcodeScannerService';
 
 const PRIMARY = '#6b7f99';
 const LENDING = '#9b72cb';
@@ -642,9 +643,12 @@ export default function SpaceDetailScreen() {
     await loadSpace();
   };
 
-  async function handleAddItem(name: string, description?: string, quantity?: number, photoUri?: string | null, warrantyExpiry?: Date | null) {
+  async function handleAddItem(name: string, description?: string, quantity?: number, photoUri?: string | null, warrantyExpiry?: Date | null, barcode?: ScannedBarcode | null) {
     // Create item first to get the ID, then save photo if provided
     const item = await ItemService.createItem(id!, name, null, description, quantity);
+    if (barcode) {
+      await BarcodeScannerService.linkItemToBarcode(item.id, barcode);
+    }
     if (photoUri) {
       const savedUri = await PhotoService.savePhoto(photoUri, item.id);
       await ItemRepository.updatePhotoUri(item.id, savedUri);

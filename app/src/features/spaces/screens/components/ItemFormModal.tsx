@@ -29,22 +29,25 @@ import PhotoPickerSheet from '@/components/PhotoPickerSheet';
 import DatePickerSheet from '@/src/features/lending/screens/components/DatePickerSheet';
 import { PhotoService } from '@/src/services/PhotoService';
 import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
+import BarcodeScannerModal from '@/src/features/tools/components/BarcodeScannerModal';
+import type { ScannedBarcode } from '@/src/features/tools/services/BarcodeScannerService';
 
 const PRIMARY = '#6b7f99';
 
 interface ItemFormModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (name: string, description?: string, quantity?: number, photoUri?: string | null, warrantyExpiry?: Date | null) => Promise<void>;
+  onSubmit: (name: string, description?: string, quantity?: number, photoUri?: string | null, warrantyExpiry?: Date | null, barcode?: ScannedBarcode | null) => Promise<void>;
   contextLabel?: string;
   editMode?: boolean;
   initialName?: string;
   initialDescription?: string;
   initialQuantity?: number;
   initialPhotoUri?: string | null;
+  initialBarcode?: ScannedBarcode | null;
 }
 
-export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel, editMode, initialName, initialDescription, initialQuantity, initialPhotoUri }: ItemFormModalProps) {
+export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel, editMode, initialName, initialDescription, initialQuantity, initialPhotoUri, initialBarcode }: ItemFormModalProps) {
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();
@@ -60,23 +63,19 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
   const [warrantyDate, setWarrantyDate] = useState<Date | null>(null);
   const [showWarrantyPicker, setShowWarrantyPicker] = useState(false);
   const [warrantyPickerDate, setWarrantyPickerDate] = useState<Date>(new Date());
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [scannedBarcode, setScannedBarcode] = useState<ScannedBarcode | null>(null);
 
   useEffect(() => {
-    if (visible && editMode) {
+    if (visible) {
       setName(initialName ?? '');
       setDescription(initialDescription ?? '');
       setQuantity(String(initialQuantity ?? 1));
       setPhotoUri(initialPhotoUri ?? null);
-    } else if (visible && !editMode) {
-      setName('');
-      setDescription('');
-      setQuantity('1');
-      setPhotoUri(null);
-      setWarrantyDate(null);
+      setScannedBarcode(initialBarcode ?? null);
+      if (!editMode) setWarrantyDate(null);
     }
-  // The form resets from initial values only when the sheet opens/closes.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
+  }, [editMode, initialBarcode, initialDescription, initialName, initialPhotoUri, initialQuantity, visible]);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const inputBg = isDark ? '#2c2c2e' : '#f8f9fa';
@@ -94,6 +93,7 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
     setError(null);
     setPhotoUri(null);
     setWarrantyDate(null);
+    setScannedBarcode(null);
     onClose();
   };
 
@@ -103,18 +103,24 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
     setError(null);
     try {
       const qty = Math.max(1, parseInt(quantity) || 1);
-      await onSubmit(name.trim(), description.trim() || undefined, qty, photoUri, warrantyDate);
+      await onSubmit(name.trim(), description.trim() || undefined, qty, photoUri, warrantyDate, scannedBarcode);
       setName('');
       setDescription('');
       setQuantity('1');
       setPhotoUri(null);
       setWarrantyDate(null);
+      setScannedBarcode(null);
       onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to add item');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBarcodeScanned = (barcode: { type: string; data: string }) => {
+    setShowBarcodeScanner(false);
+    setScannedBarcode(barcode);
   };
 
   return (
@@ -194,6 +200,19 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
                       textAlignVertical="top"
                     />
                   </View>
+
+                  {!editMode && (
+                    <TouchableOpacity
+                      style={[styles.barcodeBtn, { backgroundColor: inputBg, borderColor }]}
+                      onPress={() => setShowBarcodeScanner(true)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="barcode-outline" size={20} color={subtleText} />
+                      <Text style={[styles.barcodeBtnText, { color: subtleText }]} numberOfLines={1}>
+                        {scannedBarcode ? `Barcode: ${scannedBarcode.data}` : 'Scan Barcode'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
 
                   {/* Quantity */}
                   <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 14 }]}>Quantity</Text>
@@ -327,6 +346,11 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
           if (uri) setPhotoUri(uri);
         }}
       />
+      <BarcodeScannerModal
+        visible={showBarcodeScanner}
+        onClose={() => setShowBarcodeScanner(false)}
+        onScanned={handleBarcodeScanned}
+      />
     </Modal>
   );
 }
@@ -352,6 +376,8 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3, marginBottom: 6 },
   inputWrapper: { borderRadius: 12, borderWidth: 1.5, paddingHorizontal: 14, paddingVertical: 2 },
   input: { fontSize: 16, paddingVertical: 12 },
+  barcodeBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1.5, marginTop: 10 },
+  barcodeBtnText: { flex: 1, fontSize: 15, fontWeight: '500' },
   inputMeta: {
     flexDirection: 'row',
     justifyContent: 'space-between',

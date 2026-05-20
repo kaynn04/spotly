@@ -46,6 +46,19 @@
     "plugins": [
       "expo-router",
       "expo-notifications",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Synop needs camera access to scan QR labels and product barcodes."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Synop needs photo library access to save printable QR labels.",
+          "savePhotosPermission": "Synop needs permission to save printable QR labels to your photos."
+        }
+      ],
       "expo-speech-recognition",
       "./plugins/withAndroidCompatibility",
       [
