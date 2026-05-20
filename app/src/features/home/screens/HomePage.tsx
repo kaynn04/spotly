@@ -1099,6 +1099,7 @@ export default function HomePage() {
         step={WALKTHROUGH_STEPS[walkthroughIndex] ?? null}
         spotlightRect={spotlightRect}
         currentIndex={walkthroughIndex}
+        totalSteps={WALKTHROUGH_STEPS.length}
         onNext={handleWalkthroughNext}
         onSkip={handleWalkthroughSkip}
       />
