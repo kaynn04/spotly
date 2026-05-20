@@ -30,6 +30,7 @@ import LendingPhotoSection from './components/LendingPhotoSection';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faCamera, faChevronLeft, faTimes } from '@fortawesome/free-solid-svg-icons';
 import PhotoPickerSheet from '@/components/PhotoPickerSheet';
+import PhotoViewModal from '@/components/PhotoViewModal';
 import { PhotoService } from '@/src/services/PhotoService';
 
 const PRIMARY = '#6b7f99';
@@ -61,6 +62,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
   const [afterPhotos, setAfterPhotos] = useState<LendingPhoto[]>([]);
   const [returnPhotoUris, setReturnPhotoUris] = useState<string[]>([]);
   const [showReturnPhotoPicker, setShowReturnPhotoPicker] = useState(false);
+  const [showItemPhotoViewer, setShowItemPhotoViewer] = useState(false);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
@@ -217,7 +219,14 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
           {/* Item Card */}
           <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
             {item?.photoUri && (
-              <Image source={{ uri: item.photoUri }} style={styles.itemPhoto} />
+              <TouchableOpacity
+                activeOpacity={0.86}
+                onPress={() => setShowItemPhotoViewer(true)}
+                accessibilityRole="imagebutton"
+                accessibilityLabel={`View ${item.name ?? 'item'} photo full screen`}
+              >
+                <Image source={{ uri: item.photoUri }} style={styles.itemPhoto} />
+              </TouchableOpacity>
             )}
             <Text style={[styles.sectionLabel, { color: subtleText }]}>ITEM</Text>
             {item ? (
@@ -408,6 +417,12 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
           const uri = await PhotoService.pickFromGallery();
           if (uri) setReturnPhotoUris((prev) => [...prev, uri].slice(0, MAX_PHOTOS_PER_PHASE));
         }}
+      />
+      <PhotoViewModal
+        visible={showItemPhotoViewer}
+        uri={item?.photoUri ?? null}
+        title={item?.name ?? 'Item photo'}
+        onClose={() => setShowItemPhotoViewer(false)}
       />
     </SafeAreaView>
   );

@@ -145,31 +145,10 @@ export default function BarcodeScannerScreen() {
     return { label: 'Warranty active', color: '#6b9e7a' };
   };
 
-  const handleQuantityChange = async (delta: number) => {
+  const persistMatchedQuantity = useCallback(async (quantity: number, rollbackOnError = true) => {
     if (!matchedItem || updatingQuantity) return;
 
-    const currentQuantity = Math.max(1, parseInt(quantityDraft, 10) || matchedItem.quantity);
-    const nextQuantity = Math.max(1, currentQuantity + delta);
-    if (nextQuantity === matchedItem.quantity) return;
-
-    setUpdatingQuantity(true);
-    try {
-      await ItemService.updateItem(matchedItem.id, { quantity: nextQuantity });
-      setMatchedItem((current) => current ? { ...current, quantity: nextQuantity } : current);
-      setQuantityDraft(String(nextQuantity));
-      DeviceEventEmitter.emit('synop:refresh-home');
-    } catch (error) {
-      console.error('[BarcodeScannerScreen] quantity update error', error);
-      Alert.alert('Could not update quantity', 'Please try again.');
-    } finally {
-      setUpdatingQuantity(false);
-    }
-  };
-
-  const handleQuantitySubmit = async () => {
-    if (!matchedItem || updatingQuantity) return;
-
-    const nextQuantity = Math.max(1, parseInt(quantityDraft, 10) || 1);
+    const nextQuantity = Math.max(1, Math.floor(quantity) || 1);
     setQuantityDraft(String(nextQuantity));
     if (nextQuantity === matchedItem.quantity) return;
 
@@ -180,11 +159,41 @@ export default function BarcodeScannerScreen() {
       DeviceEventEmitter.emit('synop:refresh-home');
     } catch (error) {
       console.error('[BarcodeScannerScreen] quantity update error', error);
-      setQuantityDraft(String(matchedItem.quantity));
+      if (rollbackOnError) setQuantityDraft(String(matchedItem.quantity));
       Alert.alert('Could not update quantity', 'Please try again.');
     } finally {
       setUpdatingQuantity(false);
     }
+  }, [matchedItem, updatingQuantity]);
+
+  useEffect(() => {
+    if (!matchedItem || updatingQuantity) return;
+
+    const trimmedDraft = quantityDraft.trim();
+    if (!trimmedDraft) return;
+
+    const nextQuantity = Math.max(1, Math.floor(parseInt(trimmedDraft, 10)) || 1);
+    if (nextQuantity === matchedItem.quantity && trimmedDraft === String(matchedItem.quantity)) return;
+
+    const timeout = setTimeout(() => {
+      persistMatchedQuantity(nextQuantity);
+    }, 650);
+
+    return () => clearTimeout(timeout);
+  }, [matchedItem, persistMatchedQuantity, quantityDraft, updatingQuantity]);
+
+  const handleQuantityChange = (delta: number) => {
+    if (!matchedItem || updatingQuantity) return;
+
+    const currentQuantity = Math.max(1, parseInt(quantityDraft, 10) || matchedItem.quantity);
+    persistMatchedQuantity(currentQuantity + delta);
+  };
+
+  const handleQuantitySubmit = () => {
+    if (!matchedItem || updatingQuantity) return;
+
+    const nextQuantity = Math.max(1, parseInt(quantityDraft, 10) || 1);
+    persistMatchedQuantity(nextQuantity);
   };
 
   const handleMoveMatchedItem = async (destination: BarcodeDestination) => {
@@ -268,6 +277,18 @@ export default function BarcodeScannerScreen() {
       return;
     }
 
+    const barcodeToSave = barcode ?? scannedBarcode;
+    if (barcodeToSave) {
+      const existingMatch = await BarcodeScannerService.findItemByBarcode(barcodeToSave);
+      if (existingMatch) {
+        setShowItemForm(false);
+        setMatchedItem(existingMatch);
+        setQuantityDraft(String(existingMatch.quantity));
+        setChoosingMoveLocation(false);
+        return;
+      }
+    }
+
     const item = await ItemService.createItem(
       selectedDestination.spaceId,
       name,
@@ -276,7 +297,6 @@ export default function BarcodeScannerScreen() {
       quantity
     );
 
-    const barcodeToSave = barcode ?? scannedBarcode;
     if (barcodeToSave) {
       await BarcodeScannerService.linkItemToBarcode(item.id, barcodeToSave);
     }

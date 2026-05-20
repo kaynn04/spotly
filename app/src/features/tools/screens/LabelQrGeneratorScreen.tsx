@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
@@ -215,31 +214,10 @@ export default function LabelQrGeneratorScreen() {
       const uri = await capturePrintableLabel();
       if (!uri) return;
 
-      const permission = await MediaLibrary.requestPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert(
-          'Photo access needed',
-          'Allow photo library access to save printable labels to your device.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Share Instead', onPress: () => sharePrintableLabel(uri) },
-          ]
-        );
-        return;
-      }
-
-      await MediaLibrary.saveToLibraryAsync(uri);
-      Alert.alert(
-        'Label saved',
-        'The printable QR label was saved to your photos.',
-        [
-          { text: 'OK' },
-          { text: 'Share', onPress: () => sharePrintableLabel(uri) },
-        ]
-      );
+      await sharePrintableLabel(uri);
     } catch (error) {
       console.error('[LabelQrGeneratorScreen] export error', error);
-      Alert.alert('Could not save label', 'Please try again.');
+      Alert.alert('Could not export label', 'Please try again.');
     } finally {
       setExporting(false);
     }

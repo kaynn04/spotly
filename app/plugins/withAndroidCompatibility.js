@@ -4,10 +4,8 @@ const PERMISSIONS = {
   camera: 'android.permission.CAMERA',
   internet: 'android.permission.INTERNET',
   notifications: 'android.permission.POST_NOTIFICATIONS',
-  readStorage: 'android.permission.READ_EXTERNAL_STORAGE',
   recordAudio: 'android.permission.RECORD_AUDIO',
   vibrate: 'android.permission.VIBRATE',
-  writeStorage: 'android.permission.WRITE_EXTERNAL_STORAGE',
   systemAlertWindow: 'android.permission.SYSTEM_ALERT_WINDOW',
 };
 
@@ -57,14 +55,6 @@ function withAndroidCompatibility(config) {
     ensurePermission(manifest, PERMISSIONS.notifications);
     ensurePermission(manifest, PERMISSIONS.recordAudio);
     ensurePermission(manifest, PERMISSIONS.vibrate);
-    ensurePermission(manifest, PERMISSIONS.readStorage, {
-      'android:maxSdkVersion': '32',
-      'tools:node': 'replace',
-    });
-    ensurePermission(manifest, PERMISSIONS.writeStorage, {
-      'android:maxSdkVersion': '32',
-      'tools:node': 'replace',
-    });
 
     return config;
   });
