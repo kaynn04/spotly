@@ -157,6 +157,7 @@ export default function HomePage() {
   // Walkthrough
   const { tabBarRef, measureScreenRef } = useWalkthroughContext();
   const dashboardRef = useRef<View>(null);
+  const scannerRef = useRef<View>(null);
   const voiceInputRef = useRef<View>(null);
   const appearanceToggleHomeRef = useRef<View>(null);
   const settingsRef = useRef<View>(null);
@@ -216,6 +217,13 @@ export default function HomePage() {
       if (step.targetRef === 'voice-input-header') {
         return await new Promise<SpotlightRect>((resolve, reject) => {
           voiceInputRef.current?.measure((_, __, width, height, pageX, pageY) => {
+            resolve({ x: pageX, y: pageY, width, height });
+          }) ?? reject(new Error('no ref'));
+        });
+      }
+      if (step.targetRef === 'dashboard-scanner') {
+        return await new Promise<SpotlightRect>((resolve, reject) => {
+          scannerRef.current?.measure((_, __, width, height, pageX, pageY) => {
             resolve({ x: pageX, y: pageY, width, height });
           }) ?? reject(new Error('no ref'));
         });
@@ -403,6 +411,7 @@ export default function HomePage() {
           </View>
           <View style={styles.headerRight}>
             <TouchableOpacity
+              ref={scannerRef}
               onPress={() => setShowQrScanner(true)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={[styles.themeToggle, { backgroundColor: isDark ? '#2c2c2e' : '#e8eaed' }]}

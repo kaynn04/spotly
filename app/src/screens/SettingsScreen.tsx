@@ -176,28 +176,28 @@ const STARTER_TEMPLATES: StarterTemplate[] = [
 
 const GUIDE_TOPICS = [
   {
-    title: 'Spaces, containers, and items',
-    body: 'Use spaces for locations, containers for boxes or drawers, and items for the things you want to track.',
+    title: 'Start with places',
+    body: 'Create a space first, like Bedroom, Garage, Office, or Travel Bag. Add containers only when they help, like Drawer, Toolbox, or Documents.',
   },
   {
-    title: 'Lending',
-    body: 'Track who borrowed an item, add due dates, and keep before/after photos when condition matters.',
+    title: 'Add items with useful details',
+    body: 'Name the item, set quantity, add a photo if helpful, and use description for notes like size, color, serial number, or where it fits.',
   },
   {
-    title: 'Outside sessions',
-    body: 'Build a temporary checklist before leaving, then confirm what came back when you are going home.',
+    title: 'Use the scanner to skip searching',
+    body: 'Generate QR labels for spaces, containers, or items. Product barcodes can remember item details after the first scan.',
   },
   {
-    title: 'Lost items',
-    body: 'Mark an item lost from an outside session or item details, then clear the note when it is found.',
+    title: 'Track borrowed quantity',
+    body: 'When lending, choose how many units leave your inventory. When they come back, Synop adds the quantity back automatically.',
   },
   {
-    title: 'Import and export',
-    body: 'Export a JSON backup, then import it later by merging or replacing your current data.',
+    title: 'Use outside sessions for trips',
+    body: 'Before leaving, choose the items you are bringing. When you return, check them off, mark missing items, or move items to a new location.',
   },
   {
-    title: 'Offline first',
-    body: 'Synop keeps your inventory on your device, so core organizing tools work even without Wi-Fi or mobile data.',
+    title: 'Back up when you make progress',
+    body: 'Export a backup after big organizing sessions. Import later by merging with current data or replacing it when you need a clean restore.',
   },
 ];
 
@@ -404,7 +404,13 @@ export default function SettingsScreen() {
       setShowTemplates(false);
       Alert.alert(
         'Template Added',
-        `Added ${createdSpaces} space${createdSpaces === 1 ? '' : 's'} and ${createdContainers} container${createdContainers === 1 ? '' : 's'}.`
+        `Added ${createdSpaces} space${createdSpaces === 1 ? '' : 's'} and ${createdContainers} container${createdContainers === 1 ? '' : 's'}.`,
+        [
+          {
+            text: 'View Dashboard',
+            onPress: () => router.replace('/(tabs)' as any),
+          },
+        ]
       );
     } catch (err: any) {
       console.error('Template error:', err);
@@ -570,7 +576,7 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
           {renderRow(faInfoCircle, PRIMARY, 'Version', () => {}, {
             rightElement: (
-              <Text style={[styles.versionText, { color: subtleText }]}>1.0.0</Text>
+              <Text style={[styles.versionText, { color: subtleText }]}>1.0.1</Text>
             ),
           })}
         </View>
