@@ -46,25 +46,6 @@ async function requestCameraPermission(): Promise<boolean> {
 }
 
 /**
- * Request media library permission, handling denial gracefully
- */
-async function requestMediaLibraryPermission(): Promise<boolean> {
-  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (status !== 'granted') {
-    Alert.alert(
-      'Photo Library Permission Required',
-      'Please enable photo library access in your device settings to select photos.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Open Settings', onPress: () => Linking.openSettings() },
-      ]
-    );
-    return false;
-  }
-  return true;
-}
-
-/**
  * Compress and resize an image to meet storage targets
  */
 async function compressImage(uri: string): Promise<string> {
@@ -103,9 +84,6 @@ export class PhotoService {
    */
   static async pickFromGallery(): Promise<string | null> {
     if (Platform.OS === 'web') return null;
-    const hasPermission = await requestMediaLibraryPermission();
-    if (!hasPermission) return null;
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 1,

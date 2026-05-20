@@ -40,6 +40,7 @@ export class BarcodeScannerService {
   private static getDataVariants(data: string) {
     const normalized = BarcodeScannerService.normalizeData(data);
     const variants = new Set([normalized]);
+    const digitsOnly = normalized.replace(/\D/g, '');
 
     if (/^\d{13}$/.test(normalized) && normalized.startsWith('0')) {
       variants.add(normalized.slice(1));
@@ -47,6 +48,16 @@ export class BarcodeScannerService {
 
     if (/^\d{12}$/.test(normalized)) {
       variants.add(`0${normalized}`);
+    }
+
+    if (digitsOnly && digitsOnly !== normalized) {
+      variants.add(digitsOnly);
+      if (/^\d{13}$/.test(digitsOnly) && digitsOnly.startsWith('0')) {
+        variants.add(digitsOnly.slice(1));
+      }
+      if (/^\d{12}$/.test(digitsOnly)) {
+        variants.add(`0${digitsOnly}`);
+      }
     }
 
     return [...variants];
@@ -106,7 +117,6 @@ export class BarcodeScannerService {
     const dataVariants = BarcodeScannerService.getDataVariants(barcode.data);
     const placeholders = dataVariants.map(() => '?').join(', ');
     const normalizedData = dataVariants[0];
-    const normalizedType = BarcodeScannerService.normalizeType(barcode.type);
     const legacyDescription = BarcodeScannerService.buildDescription(barcode);
 
     const row = await db.getFirstAsync<any>(
@@ -129,12 +139,11 @@ export class BarcodeScannerService {
         LEFT JOIN containers c ON c.id = i.container_id
         WHERE
           i.barcode_data IN (${placeholders})
-          OR (i.barcode_data IN (${placeholders}) AND LOWER(IFNULL(i.barcode_type, '')) = ?)
           OR i.description LIKE ?
         ORDER BY i.updated_at DESC, i.created_at DESC
         LIMIT 1
       `,
-      [...dataVariants, ...dataVariants, normalizedType, `%${legacyDescription}%`]
+      [...dataVariants, `%${legacyDescription}%`]
     );
 
     if (!row) return null;

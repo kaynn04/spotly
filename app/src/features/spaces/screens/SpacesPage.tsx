@@ -263,19 +263,32 @@ export default function SpacesPage() {
   const handleSearch = useCallback((text: string) => {
     setSearchText(text);
     const trimmed = text.trim();
-    if (!trimmed) { setSearchResults([]); return; }
-
-    // Debounce: cancel previous pending search
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    searchTimerRef.current = setTimeout(() => performSearch(trimmed), 300);
+    if (!trimmed) {
+      searchRequestRef.current += 1;
+      setSearchLoading(false);
+      setSearchResults([]);
+      return;
+    }
+
+    setSearchLoading(true);
+    const requestId = searchRequestRef.current + 1;
+    searchRequestRef.current = requestId;
+    searchTimerRef.current = setTimeout(() => performSearch(trimmed, requestId), 180);
     // performSearch is intentionally captured for the debounce callback.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRequestRef = useRef(0);
 
-  const performSearch = useCallback(async (trimmed: string) => {
-    setSearchLoading(true);
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, []);
+
+  const performSearch = useCallback(async (trimmed: string, requestId: number) => {
     try {
       const itemRepo = new ItemRepository();
       const [allItems, allSpaces] = await Promise.all([
@@ -336,12 +349,14 @@ export default function SpacesPage() {
         sections.push({ kind: 'section', title: 'Items' });
         itemMatches.forEach((i) => sections.push({ kind: 'result', data: i }));
       }
+      if (requestId !== searchRequestRef.current) return;
       setSearchResults(sections);
     } catch (err) {
+      if (requestId !== searchRequestRef.current) return;
       console.error('[SpacesPage] Search error:', err);
       setSearchResults([]);
     } finally {
-      setSearchLoading(false);
+      if (requestId === searchRequestRef.current) setSearchLoading(false);
     }
   }, []);
 
@@ -700,7 +715,14 @@ export default function SpacesPage() {
           />
           {isSearching && (
             <TouchableOpacity 
-              onPress={() => { setSearchText(''); setSearchResults([]); searchInputRef.current?.focus(); }} 
+              onPress={() => {
+                if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+                searchRequestRef.current += 1;
+                setSearchText('');
+                setSearchLoading(false);
+                setSearchResults([]);
+                searchInputRef.current?.focus();
+              }} 
               style={styles.clearBtn}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               activeOpacity={0.6}
