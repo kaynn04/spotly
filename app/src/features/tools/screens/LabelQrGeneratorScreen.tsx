@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
+import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
@@ -56,6 +57,11 @@ function getKindLabel(kind: LabelTargetKind) {
   return 'Item';
 }
 
+function getContextLabel(target: LabelTarget) {
+  if (target.kind === 'space') return null;
+  return target.location.replace(/^In\s+/i, '');
+}
+
 export default function LabelQrGeneratorScreen() {
   const router = useRouter();
   const printableLabelRef = useRef<View>(null);
@@ -71,6 +77,7 @@ export default function LabelQrGeneratorScreen() {
   const [targets, setTargets] = useState<LabelTarget[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<LabelTargetKind | 'all'>('all');
+  const [spaceFilter, setSpaceFilter] = useState<string | 'all'>('all');
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -87,7 +94,7 @@ export default function LabelQrGeneratorScreen() {
           setTargets(nextTargets);
           setSelectedId((current) => {
             if (current && nextTargets.some((target) => target.id === current)) return current;
-            return nextTargets[0]?.id ?? null;
+            return null;
           });
         } catch (error) {
           console.error('[LabelQrGeneratorScreen] load error', error);
@@ -102,19 +109,32 @@ export default function LabelQrGeneratorScreen() {
     }, [])
   );
 
+  const spaceOptions = useMemo(() => {
+    const byId = new Map<string, string>();
+    targets.forEach((target) => {
+      if (target.spaceId && target.spaceName) byId.set(target.spaceId, target.spaceName);
+    });
+    return [...byId.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [targets]);
+
+  const showSpaceFilter = filter === 'container' || filter === 'item';
+
   const filteredTargets = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return targets.filter((target) => {
       const matchesFilter = filter === 'all' || target.kind === filter;
+      const matchesSpace = !showSpaceFilter || spaceFilter === 'all' || target.spaceId === spaceFilter;
       const haystack = `${target.name} ${target.location} ${target.subtitle}`.toLowerCase();
       const matchesQuery = normalizedQuery.length === 0 || haystack.includes(normalizedQuery);
-      return matchesFilter && matchesQuery;
+      return matchesFilter && matchesSpace && matchesQuery;
     });
-  }, [filter, query, targets]);
+  }, [filter, query, showSpaceFilter, spaceFilter, targets]);
 
   const selectedTarget = useMemo(
-    () => filteredTargets.find((target) => target.id === selectedId) ?? filteredTargets[0] ?? null,
-    [filteredTargets, selectedId]
+    () => targets.find((target) => target.id === selectedId) ?? null,
+    [selectedId, targets]
   );
 
   const payload = selectedTarget ? LabelQrService.buildPayload(selectedTarget) : '';
@@ -133,20 +153,23 @@ export default function LabelQrGeneratorScreen() {
     router.push(`/item/${selectedTarget.id}` as any);
   };
 
-  const exportPrintableLabel = async () => {
-    if (!printableLabelRef.current || !selectedTarget || exporting) return;
+  const capturePrintableLabel = async () => {
+    if (!printableLabelRef.current || !selectedTarget) return;
 
-    setExporting(true);
+    return captureRef(printableLabelRef, {
+      format: 'png',
+      quality: 1,
+      result: 'tmpfile',
+    });
+  };
+
+  const sharePrintableLabel = async (uri: string) => {
+    if (!selectedTarget) return;
+
     try {
-      const uri = await captureRef(printableLabelRef, {
-        format: 'png',
-        quality: 1,
-        result: 'tmpfile',
-      });
-
       const available = await Sharing.isAvailableAsync();
       if (!available) {
-        Alert.alert('Sharing unavailable', 'This device cannot share or save the label right now.');
+        Alert.alert('Sharing unavailable', 'This device cannot share the label right now.');
         return;
       }
 
@@ -155,8 +178,44 @@ export default function LabelQrGeneratorScreen() {
         dialogTitle: `Print ${selectedTarget.name} label`,
       });
     } catch (error) {
+      console.error('[LabelQrGeneratorScreen] share error', error);
+      Alert.alert('Could not share label', 'Please try again.');
+    }
+  };
+
+  const exportPrintableLabel = async () => {
+    if (!selectedTarget || exporting) return;
+
+    setExporting(true);
+    try {
+      const uri = await capturePrintableLabel();
+      if (!uri) return;
+
+      const permission = await MediaLibrary.requestPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Photo access needed',
+          'Allow photo library access to save printable labels to your device.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Share Instead', onPress: () => sharePrintableLabel(uri) },
+          ]
+        );
+        return;
+      }
+
+      await MediaLibrary.saveToLibraryAsync(uri);
+      Alert.alert(
+        'Label saved',
+        'The printable QR label was saved to your photos.',
+        [
+          { text: 'OK' },
+          { text: 'Share', onPress: () => sharePrintableLabel(uri) },
+        ]
+      );
+    } catch (error) {
       console.error('[LabelQrGeneratorScreen] export error', error);
-      Alert.alert('Could not create label', 'Please try again.');
+      Alert.alert('Could not save label', 'Please try again.');
     } finally {
       setExporting(false);
     }
@@ -185,6 +244,13 @@ export default function LabelQrGeneratorScreen() {
           <Text style={[styles.targetMeta, { color: subtleText }]} numberOfLines={1}>
             {getKindLabel(target.kind)} - {target.location}
           </Text>
+          {getContextLabel(target) && (
+            <View style={[styles.contextPill, { backgroundColor: inputBg }]}>
+              <Text style={[styles.contextPillText, { color: subtleText }]} numberOfLines={1}>
+                {getContextLabel(target)}
+              </Text>
+            </View>
+          )}
         </View>
         {selected && (
           <View style={[styles.selectedBadge, { backgroundColor: PRIMARY }]}>
@@ -197,15 +263,28 @@ export default function LabelQrGeneratorScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      <View style={[styles.header, { backgroundColor: cardBg, borderBottomColor: borderColor }]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}>
-          <FontAwesomeIcon icon={faChevronLeft} size={16} color={PRIMARY} />
-        </TouchableOpacity>
-        <View style={styles.headerTitleWrap}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Label & QR Generator</Text>
-          <Text style={[styles.headerSubtitle, { color: subtleText }]}>Create scannable Synop labels</Text>
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel="Back"
+          >
+            <FontAwesomeIcon icon={faChevronLeft} size={16} color={QR_PURPLE} />
+          </TouchableOpacity>
+          <View style={styles.titleBlock}>
+            <Text style={[styles.title, { color: colors.text }]}>Labels, QR & Barcode</Text>
+            <Text style={[styles.subtitle, { color: subtleText }]}>Create labels and scan QR or product barcodes</Text>
+          </View>
         </View>
-        <TouchableOpacity style={styles.scanButton} onPress={() => setShowScanner(true)} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={[styles.scanButton, { backgroundColor: cardBg, borderColor }]}
+          onPress={() => setShowScanner(true)}
+          activeOpacity={0.7}
+          accessibilityLabel="Scan code"
+        >
           <FontAwesomeIcon icon={faCamera} size={16} color={PRIMARY} />
         </TouchableOpacity>
       </View>
@@ -224,6 +303,16 @@ export default function LabelQrGeneratorScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          {!selectedTarget && (
+            <View style={[styles.pickCard, { backgroundColor: cardBg, borderColor }]}>
+              <FontAwesomeIcon icon={faQrcode} size={28} color={QR_PURPLE} />
+              <Text style={[styles.pickTitle, { color: colors.text }]}>Choose what to label</Text>
+              <Text style={[styles.pickText, { color: subtleText }]}>
+                Search or filter below, then select a space, container, or item to generate its QR label.
+              </Text>
+            </View>
+          )}
+
           {selectedTarget && (
             <View style={[styles.previewCard, { backgroundColor: cardBg, borderColor }]}>
               <View ref={printableLabelRef} collapsable={false} style={styles.printableLabel}>
@@ -313,7 +402,10 @@ export default function LabelQrGeneratorScreen() {
                       styles.filterChip,
                       { backgroundColor: active ? PRIMARY : cardBg, borderColor },
                     ]}
-                    onPress={() => setFilter(option.key)}
+                    onPress={() => {
+                      setFilter(option.key);
+                      if (option.key !== 'container' && option.key !== 'item') setSpaceFilter('all');
+                    }}
                     activeOpacity={0.75}
                   >
                     <Text style={[styles.filterText, { color: active ? '#ffffff' : colors.text }]}>
@@ -323,6 +415,33 @@ export default function LabelQrGeneratorScreen() {
                 );
               })}
             </ScrollView>
+
+            {showSpaceFilter && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterRow}
+              >
+                {[{ id: 'all', name: 'All Spaces' }, ...spaceOptions].map((option) => {
+                  const active = spaceFilter === option.id;
+                  return (
+                    <TouchableOpacity
+                      key={option.id}
+                      style={[
+                        styles.filterChip,
+                        { backgroundColor: active ? QR_PURPLE : cardBg, borderColor },
+                      ]}
+                      onPress={() => setSpaceFilter(option.id)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[styles.filterText, { color: active ? '#ffffff' : colors.text }]}>
+                        {option.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
           </View>
 
           <View style={styles.listSection}>
@@ -351,27 +470,32 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingTop: 4,
+    paddingBottom: 20,
   },
-  backButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  headerLeft: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, flex: 1, minWidth: 0 },
+  backBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
-  headerTitleWrap: { flex: 1 },
-  headerTitle: { fontSize: 17, fontWeight: '700' },
-  headerSubtitle: { fontSize: 12, marginTop: 1 },
+  titleBlock: { flex: 1, minWidth: 0 },
+  title: { fontSize: 29, fontWeight: '700', letterSpacing: 0, lineHeight: 34 },
+  subtitle: { fontSize: 13, lineHeight: 18, marginTop: 1 },
   scanButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   centered: {
     flex: 1,
@@ -383,6 +507,15 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center' },
   emptyText: { fontSize: 14, lineHeight: 20, textAlign: 'center' },
   scroll: { padding: 16, paddingBottom: 32, gap: 18 },
+  pickCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 18,
+    alignItems: 'center',
+    gap: 10,
+  },
+  pickTitle: { fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  pickText: { fontSize: 13, lineHeight: 19, textAlign: 'center' },
   previewCard: {
     borderRadius: 16,
     borderWidth: 1,
@@ -501,6 +634,15 @@ const styles = StyleSheet.create({
   targetBody: { flex: 1 },
   targetName: { fontSize: 15, fontWeight: '700' },
   targetMeta: { fontSize: 12, marginTop: 2 },
+  contextPill: {
+    alignSelf: 'flex-start',
+    marginTop: 7,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    maxWidth: '100%',
+  },
+  contextPillText: { fontSize: 11, fontWeight: '700' },
   selectedBadge: {
     width: 22,
     height: 22,

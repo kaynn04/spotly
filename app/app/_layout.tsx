@@ -113,6 +113,7 @@ export default function RootLayout() {
             <Stack.Screen name="lending/history" />
             <Stack.Screen name="outside/[id]" />
             <Stack.Screen name="outside/history" />
+            <Stack.Screen name="tools/barcode-scanner" />
             <Stack.Screen name="tools/label-qr" />
             <Stack.Screen name="tools/warranty-tracker" />
             <Stack.Screen name="settings" />

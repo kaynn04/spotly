@@ -236,6 +236,26 @@ export async function initializeDatabase() {
       console.error('Lost item columns migration failed:', err);
     }
 
+    // Add barcode lookup columns for scanner-assisted item recall
+    try {
+      const itemCols = await db.getAllAsync<any>("PRAGMA table_info(items);");
+      if (!itemCols.some((col: any) => col.name === 'barcode_type')) {
+        await db.execAsync(`ALTER TABLE items ADD COLUMN barcode_type TEXT;`);
+        console.log('✓ Added barcode_type column to items');
+      }
+      const refreshedItemCols = await db.getAllAsync<any>("PRAGMA table_info(items);");
+      if (!refreshedItemCols.some((col: any) => col.name === 'barcode_data')) {
+        await db.execAsync(`ALTER TABLE items ADD COLUMN barcode_data TEXT;`);
+        console.log('✓ Added barcode_data column to items');
+      }
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_items_barcode_data
+        ON items(barcode_data);
+      `);
+    } catch (err) {
+      console.error('Barcode columns migration failed:', err);
+    }
+
     // Add global unique constraints for items and containers (Migration 013)
     try {
       await addGlobalUniqueConstraints(db);

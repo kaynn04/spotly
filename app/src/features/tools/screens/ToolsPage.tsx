@@ -54,8 +54,8 @@ const TOOLS: Tool[] = [
   },
   {
     id: 'qrcode',
-    title: 'Label & QR Generator',
-    description: 'Generate a scannable label for any space, box, or item.',
+    title: 'Labels, QR & Barcode',
+    description: 'Create printable QR labels and scan QR or product barcodes.',
     icon: faQrcode,
     iconColor: '#9b7fd4',
     route: '/tools/label-qr',
@@ -64,10 +64,11 @@ const TOOLS: Tool[] = [
   {
     id: 'barcode',
     title: 'Barcode Scanner',
-    description: 'Scan a product barcode to auto-fill item details when adding.',
+    description: 'Save item details once, then scan the barcode again to find them instantly.',
     icon: faBarcode,
     iconColor: '#e07b54',
-    available: false,
+    route: '/tools/barcode-scanner',
+    available: true,
   },
   {
     id: 'packinglist',

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   StyleSheet,
   Text,
@@ -9,17 +8,16 @@ import {
   View,
 } from 'react-native';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult, type BarcodeType } from 'expo-camera';
-import { useRouter } from 'expo-router';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faBarcode, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { LabelQrService, type LabelTarget } from '../services/LabelQrService';
 
 const PRIMARY = '#6b7f99';
+const BARCODE_ORANGE = '#e07b54';
+
 const BARCODE_TYPES: BarcodeType[] = [
-  'qr',
   'ean13',
   'ean8',
   'upc_a',
@@ -31,96 +29,49 @@ const BARCODE_TYPES: BarcodeType[] = [
   'itf14',
 ];
 
-interface QrScannerModalProps {
+interface BarcodeScannerModalProps {
   visible: boolean;
   onClose: () => void;
+  onScanned: (result: { type: string; data: string }) => void;
 }
 
-function routeForTarget(target: LabelTarget) {
-  if (target.kind === 'space') return `/space/${target.id}`;
-  if (target.kind === 'container') return `/container/${target.id}`;
-  return `/item/${target.id}`;
-}
-
-export default function QrScannerModal({ visible, onClose }: QrScannerModalProps) {
-  const router = useRouter();
+export default function BarcodeScannerModal({ visible, onClose, onScanned }: BarcodeScannerModalProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
-  const [resolving, setResolving] = useState(false);
 
   useEffect(() => {
     if (!visible) {
       setScanned(false);
-      setResolving(false);
       return;
     }
     if (!permission?.granted) {
       requestPermission().catch((error) => {
-        console.error('[QrScannerModal] camera permission error', error);
+        console.error('[BarcodeScannerModal] camera permission error', error);
       });
     }
   }, [permission?.granted, requestPermission, visible]);
 
-  const handleScan = async (result: BarcodeScanningResult) => {
-    if (scanned || resolving) return;
+  const handleScan = (result: BarcodeScanningResult) => {
+    if (scanned) return;
     setScanned(true);
-    setResolving(true);
-
-    try {
-      if (result.type !== 'qr') {
-        onClose();
-        setTimeout(() => {
-          router.push({
-            pathname: '/tools/barcode-scanner' as any,
-            params: {
-              barcodeType: result.type,
-              barcodeData: result.data,
-            },
-          });
-        }, 150);
-        return;
-      }
-
-      const target = await LabelQrService.resolveScannedData(result.data);
-      if (!target) {
-        Alert.alert(
-          'QR not recognized',
-          'This does not look like a Synop label, or the linked item no longer exists.',
-          [{ text: 'Scan again', onPress: () => setScanned(false) }]
-        );
-        return;
-      }
-
-      onClose();
-      setTimeout(() => {
-        router.push(routeForTarget(target) as any);
-      }, 150);
-    } catch (error) {
-      console.error('[QrScannerModal] scan error', error);
-      Alert.alert('Could not scan label', 'Please try again.', [
-        { text: 'Scan again', onPress: () => setScanned(false) },
-      ]);
-    } finally {
-      setResolving(false);
-    }
+    onScanned({ type: result.type, data: result.data });
   };
 
   const hasPermission = permission?.granted;
   const surfaceBg = isDark ? '#111111' : '#ffffff';
   const overlayBg = isDark ? '#000000' : '#f8f9fa';
+  const textColor = isDark ? '#ffffff' : '#11181c';
   const mutedText = isDark ? '#a1a1aa' : '#687076';
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <SafeAreaView style={[styles.container, { backgroundColor: overlayBg }]} edges={['top', 'bottom']}>
-          <View style={[styles.header, { backgroundColor: surfaceBg }]}>
+        <View style={[styles.header, { backgroundColor: surfaceBg }]}>
           <View style={styles.headerTitleWrap}>
-            <FontAwesomeIcon icon={faBarcode} size={18} color={PRIMARY} />
-            <Text style={[styles.headerTitle, { color: isDark ? '#ffffff' : '#11181c' }]}>
-              Scan Code
-            </Text>
+            <FontAwesomeIcon icon={faBarcode} size={18} color={BARCODE_ORANGE} />
+            <Text style={[styles.headerTitle, { color: textColor }]}>Scan Barcode</Text>
           </View>
           <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
             <FontAwesomeIcon icon={faTimes} size={17} color={PRIMARY} />
@@ -129,16 +80,14 @@ export default function QrScannerModal({ visible, onClose }: QrScannerModalProps
 
         {!permission ? (
           <View style={styles.centered}>
-            <ActivityIndicator color={PRIMARY} />
+            <ActivityIndicator color={BARCODE_ORANGE} />
           </View>
         ) : !hasPermission ? (
           <View style={styles.centered}>
-            <FontAwesomeIcon icon={faBarcode} size={48} color={PRIMARY} />
-            <Text style={[styles.permissionTitle, { color: isDark ? '#ffffff' : '#11181c' }]}>
-              Camera access needed
-            </Text>
+            <FontAwesomeIcon icon={faBarcode} size={48} color={BARCODE_ORANGE} />
+            <Text style={[styles.permissionTitle, { color: textColor }]}>Camera access needed</Text>
             <Text style={[styles.permissionText, { color: mutedText }]}>
-              Synop needs camera access to scan QR labels and product barcodes.
+              Synop needs camera access to scan product barcodes for item details.
             </Text>
             <TouchableOpacity style={styles.permissionButton} onPress={requestPermission} activeOpacity={0.8}>
               <Text style={styles.permissionButtonText}>Allow Camera</Text>
@@ -154,13 +103,7 @@ export default function QrScannerModal({ visible, onClose }: QrScannerModalProps
             >
               <View style={styles.cameraOverlay}>
                 <View style={styles.scanFrame} />
-                <Text style={styles.scanHint}>Place a Synop QR label or product barcode inside the frame</Text>
-                {resolving && (
-                  <View style={styles.resolvingPill}>
-                    <ActivityIndicator color="#ffffff" size="small" />
-                    <Text style={styles.resolvingText}>Reading code</Text>
-                  </View>
-                )}
+                <Text style={styles.scanHint}>Align the product barcode inside the frame</Text>
               </View>
             </CameraView>
           </View>
@@ -217,9 +160,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.18)',
   },
   scanFrame: {
-    width: 240,
-    height: 240,
-    borderRadius: 24,
+    width: 280,
+    height: 130,
+    borderRadius: 18,
     borderWidth: 3,
     borderColor: '#ffffff',
     backgroundColor: 'rgba(255,255,255,0.05)',
@@ -231,15 +174,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
-  resolvingPill: {
-    marginTop: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
-  resolvingText: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
 });
