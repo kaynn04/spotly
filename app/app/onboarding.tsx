@@ -127,6 +127,7 @@ export default function OnboardingScreen() {
 
   const listRef = useRef<FlatList<Slide>>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
+  const currentIndexRef = useRef(0);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [name, setName] = useState('');
   const [nameError, setNameError] = useState<string | null>(null);
@@ -145,13 +146,17 @@ export default function OnboardingScreen() {
   const isLastSlide = currentIndex === SLIDES.length - 1;
 
   useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
+
+  useEffect(() => {
     if (!layoutSize.width) return;
 
-    scrollX.setValue(currentIndex * pageWidth);
+    scrollX.setValue(currentIndexRef.current * pageWidth);
     requestAnimationFrame(() => {
-      listRef.current?.scrollToIndex({ index: currentIndex, animated: false });
+      listRef.current?.scrollToIndex({ index: currentIndexRef.current, animated: false });
     });
-  }, [currentIndex, layoutSize.width, pageWidth, scrollX]);
+  }, [layoutSize.width, pageWidth, scrollX]);
 
   function goNext() {
     if (isLastSlide) {
@@ -245,7 +250,6 @@ export default function OnboardingScreen() {
     >
       {/* Slides */}
       <Animated.FlatList
-        key={`onboarding-${pageWidth}`}
         ref={listRef}
         data={SLIDES}
         keyExtractor={(s) => s.key}

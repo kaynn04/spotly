@@ -43,6 +43,9 @@ interface LendingFormModalProps {
   onBorrowerNameChange: (text: string) => void;
   note: string;
   onNoteChange: (text: string) => void;
+  quantity?: string;
+  onQuantityChange?: (text: string) => void;
+  showQuantity?: boolean;
   dueDate: Date | null;
   onDueDateChange: (date: Date | null) => void;
   onSubmit: () => void;
@@ -61,6 +64,9 @@ export default function LendingFormModal({
   onBorrowerNameChange,
   note,
   onNoteChange,
+  quantity = '1',
+  onQuantityChange,
+  showQuantity = true,
   dueDate,
   onDueDateChange,
   onSubmit,
@@ -82,7 +88,9 @@ export default function LendingFormModal({
   const subtleText = isDark ? '#8e8e93' : '#a0aec0';
   const borderColor = isDark ? '#3a3a3c' : '#e2e6ea';
 
-  const isValid = borrowerName.trim().length > 0;
+  const maxQuantity = Math.max(1, Number(item?.quantity ?? 1));
+  const parsedQuantity = Math.max(0, Math.floor(Number(quantity) || 0));
+  const isValid = borrowerName.trim().length > 0 && (!showQuantity || (parsedQuantity >= 1 && parsedQuantity <= maxQuantity));
 
   // Show inline picker on Android (shown inline), modal-style on iOS
   const [showPicker, setShowPicker] = useState(false);
@@ -120,6 +128,16 @@ export default function LendingFormModal({
     Keyboard.dismiss();
     onCancel();
   };
+  const handleQuantityChange = (text: string) => {
+    const digitsOnly = text.replace(/\D/g, '');
+    onQuantityChange?.(digitsOnly);
+  };
+
+  const stepQuantity = (delta: number) => {
+    const next = Math.min(maxQuantity, Math.max(1, parsedQuantity + delta));
+    onQuantityChange?.(String(next));
+  };
+
   const showBeforePhoto = Boolean(onBeforePhotosChange);
   const canAddBeforePhoto = beforePhotoUris.length < MAX_PHOTOS_PER_PHASE;
 
@@ -158,6 +176,9 @@ export default function LendingFormModal({
                     <View style={[styles.itemPill, { backgroundColor: inputBg, borderColor }]}>
                       <Text style={[styles.itemPillText, { color: subtleText }]}>Item: </Text>
                       <Text style={[styles.itemPillName, { color: textColor }]} numberOfLines={1}>{item.name}</Text>
+                      {showQuantity && (
+                        <Text style={[styles.itemPillText, { color: subtleText }]}>  Available: {maxQuantity}</Text>
+                      )}
                     </View>
                   )}
 
@@ -176,6 +197,42 @@ export default function LendingFormModal({
                       returnKeyType="next"
                     />
                   </View>
+
+                  {showQuantity && (
+                    <>
+                      <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 12 }]}>Quantity *</Text>
+                      <View style={styles.quantityRow}>
+                        <TouchableOpacity
+                          style={[styles.quantityButton, { borderColor, backgroundColor: inputBg }]}
+                          onPress={() => stepQuantity(-1)}
+                          disabled={loading || parsedQuantity <= 1}
+                        >
+                          <Text style={[styles.quantityButtonText, { color: parsedQuantity <= 1 ? subtleText : textColor }]}>-</Text>
+                        </TouchableOpacity>
+                        <View style={[styles.quantityInputWrapper, { backgroundColor: inputBg, borderColor }]}>
+                          <TextInput
+                            style={[styles.quantityInput, { color: textColor }]}
+                            value={quantity}
+                            onChangeText={handleQuantityChange}
+                            keyboardType="number-pad"
+                            placeholder="1"
+                            placeholderTextColor={subtleText}
+                            editable={!loading}
+                            maxLength={6}
+                            textAlign="center"
+                          />
+                        </View>
+                        <TouchableOpacity
+                          style={[styles.quantityButton, { borderColor, backgroundColor: inputBg }]}
+                          onPress={() => stepQuantity(1)}
+                          disabled={loading || parsedQuantity >= maxQuantity}
+                        >
+                          <Text style={[styles.quantityButtonText, { color: parsedQuantity >= maxQuantity ? subtleText : textColor }]}>+</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <Text style={[styles.quantityHint, { color: subtleText }]}>1-{maxQuantity} available</Text>
+                    </>
+                  )}
 
                   {/* Note */}
                   <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 12 }]}>Note (optional)</Text>
@@ -380,6 +437,29 @@ const styles = StyleSheet.create({
   input: { fontSize: 15, paddingVertical: 10 },
   noteInput: { minHeight: 72, paddingTop: 2 },
   charCount: { fontSize: 12, textAlign: 'right', marginTop: 4, marginBottom: 8 },
+  quantityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  quantityButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quantityButtonText: { fontSize: 22, fontWeight: '700', lineHeight: 24 },
+  quantityInputWrapper: {
+    flex: 1,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+  },
+  quantityInput: { fontSize: 16, fontWeight: '700', paddingVertical: 8 },
+  quantityHint: { fontSize: 12, marginTop: 6 },
 
   dueDateRow: {
     flexDirection: 'row',

@@ -113,7 +113,7 @@ export default function LendingHistoryScreen() {
             {item.itemName || 'Unknown Item'}
           </Text>
           <Text style={[styles.borrowerName, { color: subtleText }]} numberOfLines={1}>
-            Lent to {item.borrower_name}
+            Qty {item.quantity} lent to {item.borrower_name}
           </Text>
           <View style={styles.metaRow}>
             <View style={[styles.statusPill, { backgroundColor: isActive ? `${LENDING}18` : `${SUCCESS}18` }]}>

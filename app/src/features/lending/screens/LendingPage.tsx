@@ -107,6 +107,7 @@ export default function LendingPage() {
   const [selectedLendItem, setSelectedLendItem] = useState<Item | null>(null);
   const [showLendForm, setShowLendForm] = useState(false);
   const [borrowerName, setBorrowerName] = useState('');
+  const [lendQuantity, setLendQuantity] = useState('1');
   const [lendNote, setLendNote] = useState('');
   const [lendDueDate, setLendDueDate] = useState<Date | null>(null);
   const [lendBeforePhotoUris, setLendBeforePhotoUris] = useState<string[]>([]);
@@ -204,7 +205,7 @@ export default function LendingPage() {
       ]);
       const activeLentIds = new Set(activeLendings.map((l) => l.item_id));
       const activeOutsideIds = new Set(activeSessionItemIds);
-      setAllItems(items.filter((i) => !i.lostAt && !activeLentIds.has(i.id) && !activeOutsideIds.has(i.id)));
+      setAllItems(items.filter((i) => !i.lostAt && (i.quantity ?? 0) > 0 && !activeLentIds.has(i.id) && !activeOutsideIds.has(i.id)));
     } catch {
       Alert.alert('Error', 'Failed to load items');
       setShowItemPicker(false);
@@ -217,6 +218,7 @@ export default function LendingPage() {
     setSelectedLendItem(item);
     setShowItemPicker(false);
     setBorrowerName('');
+    setLendQuantity('1');
     setLendNote('');
     setLendDueDate(null);
     setLendBeforePhotoUris([]);
@@ -225,11 +227,13 @@ export default function LendingPage() {
 
   const handleLendSubmit = async () => {
     if (!selectedLendItem || !borrowerName.trim()) return;
+    const quantity = Math.max(1, Math.floor(Number(lendQuantity) || 1));
     setLendLoading(true);
     try {
       const lending = await lendingService.createLending({
         item_id: selectedLendItem.id,
         borrower_name: borrowerName.trim(),
+        quantity,
         note: lendNote.trim() || undefined,
         due_date: lendDueDate ?? undefined,
       });
@@ -245,6 +249,7 @@ export default function LendingPage() {
       setShowLendForm(false);
       setSelectedLendItem(null);
       setBorrowerName('');
+      setLendQuantity('1');
       setLendNote('');
       setLendDueDate(null);
       setLendBeforePhotoUris([]);
@@ -420,7 +425,7 @@ export default function LendingPage() {
     const count = ids.length;
     Alert.alert(
       `Delete ${count} lending${count !== 1 ? 's' : ''}?`,
-      'This removes the lending record. It does not delete the item.',
+      'This removes the lending record. Active lending quantities will be restored to inventory.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -491,7 +496,9 @@ export default function LendingPage() {
           <View style={styles.gridContent}>
             <Text style={[styles.gridBadge, { color: PRIMARY }]}>Lent</Text>
             <Text style={[styles.gridName, { color: colors.text }]} numberOfLines={1}>{item.itemName || 'Unknown Item'}</Text>
-            <Text style={[styles.gridMeta, { color: subtleText }]} numberOfLines={1}>To {item.borrower_name}</Text>
+            <Text style={[styles.gridMeta, { color: subtleText }]} numberOfLines={1}>
+              Qty {item.quantity} to {item.borrower_name}
+            </Text>
             <Text style={[styles.gridDate, { color: subtleText }]}>{formatDate(item.lent_at)}</Text>
           </View>
         </TouchableOpacity>
@@ -522,7 +529,7 @@ export default function LendingPage() {
           {item.itemName || 'Unknown Item'}
         </Text>
         <Text style={[styles.lendingBorrower, { color: subtleText }]} numberOfLines={1}>
-          Lent to {item.borrower_name}
+          Qty {item.quantity} lent to {item.borrower_name}
         </Text>
         <Text style={[styles.lendingDate, { color: subtleText }]}>
           {formatDate(item.lent_at)}
@@ -797,7 +804,12 @@ export default function LendingPage() {
                         </Text>
                         {locationLine && (
                           <Text style={[styles.pickerItemLocation, { color: subtleText }]} numberOfLines={1}>
-                            {locationLine}
+                            {locationLine} - Qty {item.quantity}
+                          </Text>
+                        )}
+                        {!locationLine && (
+                          <Text style={[styles.pickerItemLocation, { color: subtleText }]} numberOfLines={1}>
+                            Qty {item.quantity}
                           </Text>
                         )}
                       </View>
@@ -869,6 +881,9 @@ export default function LendingPage() {
         item={selectedLendItem}
         borrowerName={borrowerName}
         onBorrowerNameChange={setBorrowerName}
+        quantity={lendQuantity}
+        onQuantityChange={setLendQuantity}
+        showQuantity
         note={lendNote}
         onNoteChange={setLendNote}
         dueDate={lendDueDate}
@@ -876,7 +891,7 @@ export default function LendingPage() {
         beforePhotoUris={lendBeforePhotoUris}
         onBeforePhotosChange={setLendBeforePhotoUris}
         onSubmit={handleLendSubmit}
-        onCancel={() => { setShowLendForm(false); setSelectedLendItem(null); setBorrowerName(''); setLendNote(''); setLendDueDate(null); setLendBeforePhotoUris([]); }}
+        onCancel={() => { setShowLendForm(false); setSelectedLendItem(null); setBorrowerName(''); setLendQuantity('1'); setLendNote(''); setLendDueDate(null); setLendBeforePhotoUris([]); }}
         loading={lendLoading}
       />
 
@@ -885,6 +900,7 @@ export default function LendingPage() {
         item={editingLending ? { name: editingLending.itemName ?? 'Unknown Item' } : null}
         borrowerName={borrowerName}
         onBorrowerNameChange={setBorrowerName}
+        showQuantity={false}
         note={lendNote}
         onNoteChange={setLendNote}
         dueDate={lendDueDate}

@@ -22,6 +22,29 @@ function isUniqueConstraintError(error: unknown): boolean {
  * Uses parameterized SQL queries for safety
  */
 export class ContainerRepository {
+  private static ensureDescriptionColumnPromise: Promise<void> | null = null;
+
+  private static async ensureDescriptionColumn(): Promise<void> {
+    if (!ContainerRepository.ensureDescriptionColumnPromise) {
+      ContainerRepository.ensureDescriptionColumnPromise = (async () => {
+        const db = getDatabase();
+        const columns = await db.getAllAsync<any>('PRAGMA table_info(containers);');
+        if (columns.some((column: any) => column.name === 'description')) return;
+
+        try {
+          await db.execAsync('ALTER TABLE containers ADD COLUMN description TEXT;');
+        } catch (error: any) {
+          const message = String(error?.message ?? error).toLowerCase();
+          if (!message.includes('duplicate column')) throw error;
+        }
+      })().finally(() => {
+        ContainerRepository.ensureDescriptionColumnPromise = null;
+      });
+    }
+
+    await ContainerRepository.ensureDescriptionColumnPromise;
+  }
+
   /**
    * Create a new container in the database
    *
@@ -33,9 +56,10 @@ export class ContainerRepository {
    * SQL: INSERT INTO containers (id, name, space_id, created_at) VALUES (?, ?, ?, ?)
    * Parameterized query prevents SQL injection
    */
-  static async createContainer(name: string, spaceId: string): Promise<Container> {
+  static async createContainer(name: string, spaceId: string, description?: string | null): Promise<Container> {
     try {
       const db = getDatabase();
+      await ContainerRepository.ensureDescriptionColumn();
 
       // Generate UUID and current ISO 8601 timestamp
       const id = generateUUID();
@@ -43,14 +67,15 @@ export class ContainerRepository {
 
       // Execute parameterized INSERT query
       await db.runAsync(
-        'INSERT INTO containers (id, name, space_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-        [id, name, spaceId, now, now]
+        'INSERT INTO containers (id, name, description, space_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [id, name, description ?? null, spaceId, now, now]
       );
 
       // Return the created Container object
       return {
         id,
         name,
+        description: description ?? null,
         spaceId,
         createdAt: now,
         photoUri: null,
@@ -89,6 +114,7 @@ export class ContainerRepository {
   static async getContainersBySpaceId(spaceId: string): Promise<Container[]> {
     try {
       const db = getDatabase();
+      await ContainerRepository.ensureDescriptionColumn();
 
       const result = await db.getAllAsync(
         'SELECT * FROM containers WHERE space_id = ? ORDER BY created_at DESC',
@@ -99,6 +125,7 @@ export class ContainerRepository {
       return (result as any[]).map((row: ContainerRow) => ({
         id: row.id,
         name: row.name,
+        description: row.description ?? null,
         spaceId: row.space_id,
         createdAt: row.created_at,
         photoUri: row.photo_uri ?? null,
@@ -129,6 +156,7 @@ export class ContainerRepository {
   static async getContainerById(containerId: string): Promise<Container | null> {
     try {
       const db = getDatabase();
+      await ContainerRepository.ensureDescriptionColumn();
 
       const result = await db.getFirstAsync(
         'SELECT * FROM containers WHERE id = ? LIMIT 1',
@@ -144,6 +172,7 @@ export class ContainerRepository {
       return {
         id: row.id,
         name: row.name,
+        description: row.description ?? null,
         spaceId: row.space_id,
         createdAt: row.created_at,
         photoUri: row.photo_uri ?? null,
@@ -197,6 +226,7 @@ export class ContainerRepository {
   static async getAllContainers(): Promise<Container[]> {
     try {
       const db = getDatabase();
+      await ContainerRepository.ensureDescriptionColumn();
 
       const result = await db.getAllAsync('SELECT * FROM containers');
 
@@ -204,6 +234,7 @@ export class ContainerRepository {
       return (result as any[]).map((row: ContainerRow) => ({
         id: row.id,
         name: row.name,
+        description: row.description ?? null,
         spaceId: row.space_id,
         createdAt: row.created_at,
         photoUri: row.photo_uri ?? null,
@@ -335,6 +366,43 @@ export class ContainerRepository {
 
       console.error('[ContainerRepository.updateName] Database error:', error);
       const serviceError: ServiceError = { code: 'DB_ERROR', message: 'Failed to update container name.' };
+      throw serviceError;
+    }
+  }
+
+  static async updateDetails(id: string, updates: { name?: string; description?: string | null }): Promise<void> {
+    try {
+      const db = getDatabase();
+      await ContainerRepository.ensureDescriptionColumn();
+      const fields: string[] = [];
+      const values: any[] = [];
+
+      if (updates.name !== undefined) {
+        fields.push('name = ?');
+        values.push(updates.name);
+      }
+      if (updates.description !== undefined) {
+        fields.push('description = ?');
+        values.push(updates.description);
+      }
+
+      if (fields.length === 0) return;
+      fields.push('updated_at = ?');
+      values.push(new Date().toISOString());
+      values.push(id);
+
+      await db.runAsync(`UPDATE containers SET ${fields.join(', ')} WHERE id = ?`, values);
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        const serviceError: ServiceError = {
+          code: 'DUPLICATE_NAME',
+          message: 'A container with this name already exists.',
+        };
+        throw serviceError;
+      }
+
+      console.error('[ContainerRepository.updateDetails] Database error:', error);
+      const serviceError: ServiceError = { code: 'DB_ERROR', message: 'Failed to update container.' };
       throw serviceError;
     }
   }

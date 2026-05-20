@@ -59,10 +59,13 @@ function getKindLabel(kind: LabelTargetKind) {
 
 function getContextLabel(target: LabelTarget) {
   if (target.kind === 'space') return target.countLabel ?? 'Space label';
-  if (target.kind === 'container') return target.spaceName ?? 'No space';
+  if (target.kind === 'container') {
+    return `${target.spaceName ?? 'No space'} - Container - ${target.countLabel ?? '0 items'}`;
+  }
+
   return target.containerName
-    ? `${target.spaceName ?? 'No space'} / ${target.containerName}`
-    : target.spaceName ?? 'No space';
+    ? `${target.spaceName ?? 'No space'} - ${target.containerName} - Item`
+    : `${target.spaceName ?? 'No space'} - No container - Item`;
 }
 
 export default function LabelQrGeneratorScreen() {
@@ -249,7 +252,7 @@ export default function LabelQrGeneratorScreen() {
         key={`${target.kind}-${target.id}`}
         style={[
           styles.targetRow,
-          { backgroundColor: cardBg, borderColor: selected ? PRIMARY : borderColor },
+          { backgroundColor: cardBg, borderColor: selected ? QR_PURPLE : borderColor },
           selected && styles.targetRowSelected,
         ]}
         onPress={() => setSelectedId(target.id)}
@@ -263,11 +266,11 @@ export default function LabelQrGeneratorScreen() {
             {target.name}
           </Text>
           <Text style={[styles.targetMeta, { color: subtleText }]} numberOfLines={1}>
-            {getKindLabel(target.kind)} - {getContextLabel(target)}
+            {target.kind === 'space' ? `${getKindLabel(target.kind)} - ` : ''}{getContextLabel(target)}
           </Text>
         </View>
         {selected && (
-          <View style={[styles.selectedBadge, { backgroundColor: PRIMARY }]}>
+          <View style={[styles.selectedBadge, { backgroundColor: QR_PURPLE }]}>
             <FontAwesomeIcon icon={faCheck} size={10} color="#ffffff" />
           </View>
         )}
@@ -289,7 +292,7 @@ export default function LabelQrGeneratorScreen() {
             <FontAwesomeIcon icon={faChevronLeft} size={16} color={QR_PURPLE} />
           </TouchableOpacity>
           <View style={styles.titleBlock}>
-            <Text style={[styles.title, { color: colors.text }]}>Labels, QR & Barcode</Text>
+            <Text style={[styles.title, { color: colors.text }]}>QR scanner</Text>
             <Text style={[styles.subtitle, { color: subtleText }]}>Create labels and scan QR or product barcodes</Text>
           </View>
         </View>
@@ -414,7 +417,7 @@ export default function LabelQrGeneratorScreen() {
                     key={option.key}
                     style={[
                       styles.filterChip,
-                      { backgroundColor: active ? PRIMARY : cardBg, borderColor },
+                      { backgroundColor: active ? QR_PURPLE : cardBg, borderColor },
                     ]}
                     onPress={() => {
                       setFilter(option.key);

@@ -149,6 +149,16 @@ export class LendingService {
       );
     }
 
+    const lendQuantity = Math.max(1, Math.floor(input.quantity ?? 1));
+    const availableQuantity = Math.max(0, Number(item.quantity ?? 0));
+
+    if (lendQuantity > availableQuantity) {
+      throw createServiceError(
+        'INSUFFICIENT_QUANTITY',
+        `Only ${availableQuantity} available to lend`
+      );
+    }
+
     // Validate no ACTIVE lending already exists (BR-001)
     let hasActive: boolean;
     try {
@@ -171,18 +181,25 @@ export class LendingService {
       );
     }
 
-    // All validations passed, create lending
+    // All validations passed, reserve inventory and create lending.
     let lending: Lending;
     try {
+      await ItemRepository.updateItem(item.id, { quantity: availableQuantity - lendQuantity });
       console.log('[LendingService.createLending] All validations passed, calling repository.create()');
       lending = await this.lendingRepository.create({
         item_id: input.item_id,
         borrower_name: input.borrower_name.trim(),
+        quantity: lendQuantity,
         note: input.note ? input.note.trim() : undefined,
         due_date: input.due_date ?? null,
       });
       console.log('[LendingService.createLending] Lending created successfully:', lending);
     } catch (error: any) {
+      try {
+        await ItemRepository.updateItem(item.id, { quantity: availableQuantity });
+      } catch (rollbackError) {
+        console.warn('[LendingService.createLending] Failed to restore quantity after create error:', rollbackError);
+      }
       console.error('LendingService.createLending repository.create error:', error);
       // Handle unique constraint violation from repository
       if (
@@ -276,6 +293,12 @@ export class LendingService {
     let updated: Lending;
     try {
       updated = await this.lendingRepository.markAsReturned(lendingId);
+      const item = await this.itemRepository.getById(lending.item_id);
+      if (item) {
+        await ItemRepository.updateItem(item.id, {
+          quantity: Math.max(0, Number(item.quantity ?? 0)) + lending.quantity,
+        });
+      }
     } catch {
       throw createServiceError(
         'DATABASE_ERROR',
@@ -345,6 +368,14 @@ export class LendingService {
 
     try {
       await this.lendingRepository.delete(lendingId);
+      if (lending.status === LendingStatus.ACTIVE) {
+        const item = await this.itemRepository.getById(lending.item_id);
+        if (item) {
+          await ItemRepository.updateItem(item.id, {
+            quantity: Math.max(0, Number(item.quantity ?? 0)) + lending.quantity,
+          });
+        }
+      }
     } catch {
       throw createServiceError('DATABASE_ERROR', 'Failed to delete lending');
     }
@@ -415,8 +446,11 @@ export class LendingService {
    */
   async canLendItem(itemId: string): Promise<boolean> {
     try {
-      const hasActive = await this.lendingRepository.hasActiveLending(itemId);
-      return !hasActive;
+      const [hasActive, item] = await Promise.all([
+        this.lendingRepository.hasActiveLending(itemId),
+        this.itemRepository.getById(itemId),
+      ]);
+      return !hasActive && Boolean(item) && Math.max(0, Number(item?.quantity ?? 0)) > 0;
     } catch {
       throw createServiceError(
         'DATABASE_ERROR',

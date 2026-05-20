@@ -110,7 +110,7 @@ export class LabelQrService {
       spaceName: row.name,
       containerId: null,
       containerName: null,
-      countLabel: `${formatCount(row.container_count ?? 0, 'container', 'containers')} / ${formatCount(row.item_count ?? 0, 'item', 'items')}`,
+      countLabel: `${formatCount(row.container_count ?? 0, 'container', 'containers')} - ${formatCount(row.item_count ?? 0, 'item', 'items')}`,
     }));
 
     const containers: LabelTarget[] = containerRows.map((row) => ({

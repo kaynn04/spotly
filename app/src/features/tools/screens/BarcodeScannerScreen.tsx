@@ -321,7 +321,7 @@ export default function BarcodeScannerScreen() {
         key={destination.key}
         style={[
           styles.destinationRow,
-          { backgroundColor: cardBg, borderColor: selected ? PRIMARY : borderColor },
+          { backgroundColor: cardBg, borderColor: selected ? BARCODE_ORANGE : borderColor },
           selected && styles.destinationRowSelected,
         ]}
         onPress={() => {
@@ -348,7 +348,7 @@ export default function BarcodeScannerScreen() {
           </Text>
         </View>
         {selected && (
-          <View style={[styles.selectedBadge, { backgroundColor: PRIMARY }]}>
+          <View style={[styles.selectedBadge, { backgroundColor: BARCODE_ORANGE }]}>
             <FontAwesomeIcon icon={faCheck} size={10} color="#ffffff" />
           </View>
         )}
@@ -377,7 +377,7 @@ export default function BarcodeScannerScreen() {
                 key={option.key}
                 style={[
                   styles.filterChip,
-                  { backgroundColor: active ? PRIMARY : cardBg, borderColor },
+                  { backgroundColor: active ? BARCODE_ORANGE : cardBg, borderColor },
                 ]}
                 onPress={() => {
                   setDestinationFilter(option.key);

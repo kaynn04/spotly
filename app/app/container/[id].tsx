@@ -111,6 +111,7 @@ export default function ContainerDetailScreen() {
   const [showLendModal, setShowLendModal] = useState(false);
   const [selectedLendItem, setSelectedLendItem] = useState<Item | null>(null);
   const [borrowerName, setBorrowerName] = useState('');
+  const [lendQuantity, setLendQuantity] = useState('1');
   const [lendNote, setLendNote] = useState('');
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const [lendLoading, setLendLoading] = useState(false);
@@ -223,11 +224,13 @@ export default function ContainerDetailScreen() {
 
   async function handleLendSubmit() {
     if (!borrowerName.trim() || !selectedLendItem) return;
+    const quantity = Math.max(1, Math.floor(Number(lendQuantity) || 1));
     setLendLoading(true);
     try {
       const lending = await lendingService.createLending({
         item_id: selectedLendItem.id,
         borrower_name: borrowerName.trim(),
+        quantity,
         note: lendNote.trim() || undefined,
         due_date: dueDate ?? undefined,
       });
@@ -241,6 +244,7 @@ export default function ContainerDetailScreen() {
       }
       setShowLendModal(false);
       setBorrowerName('');
+      setLendQuantity('1');
       setLendNote('');
       setDueDate(null);
       setLendBeforePhotoUris([]);
@@ -407,6 +411,7 @@ export default function ContainerDetailScreen() {
     exitSelectMode();
     setSelectedLendItem(item);
     setBorrowerName('');
+    setLendQuantity('1');
     setLendNote('');
     setDueDate(null);
     setLendBeforePhotoUris([]);
@@ -428,9 +433,9 @@ export default function ContainerDetailScreen() {
     await loadItems();
   };
 
-  const handleEditContainerSubmit = async (name: string, photoUri?: string | null) => {
+  const handleEditContainerSubmit = async (name: string, description?: string | null, photoUri?: string | null) => {
     if (!container) return;
-    await ContainerService.updateContainer(container.id, { name });
+    await ContainerService.updateContainer(container.id, { name, description: description ?? null });
     if (photoUri && photoUri !== container.photoUri) {
       const savedUri = await PhotoService.savePhoto(photoUri, `container_${container.id}`);
       await ContainerRepository.updatePhotoUri(container.id, savedUri);
@@ -1036,12 +1041,14 @@ export default function ContainerDetailScreen() {
         item={selectedLendItem}
         borrowerName={borrowerName}
         onBorrowerNameChange={setBorrowerName}
+        quantity={lendQuantity}
+        onQuantityChange={setLendQuantity}
         note={lendNote}
         onNoteChange={setLendNote}
         dueDate={dueDate}
         onDueDateChange={setDueDate}
         onSubmit={handleLendSubmit}
-        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); setSelectedLendItem(null); }}
+        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendQuantity('1'); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); setSelectedLendItem(null); }}
         loading={lendLoading}
         beforePhotoUris={lendBeforePhotoUris}
         onBeforePhotosChange={setLendBeforePhotoUris}
@@ -1092,7 +1099,7 @@ export default function ContainerDetailScreen() {
                   icon: faHandshake,
                   label: 'Lend',
                   description: isLost ? 'Item is marked lost' : isOutside ? 'In active outside session' : 'Track who you lent this item to',
-                  onPress: isLost ? lostGuard : isOutside ? outsideGuard : () => { setSelectedLendItem(item); setBorrowerName(''); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); setShowLendModal(true); },
+                  onPress: isLost ? lostGuard : isOutside ? outsideGuard : () => { setSelectedLendItem(item); setBorrowerName(''); setLendQuantity('1'); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); setShowLendModal(true); },
                 },
             {
               icon: faTrash,
@@ -1231,6 +1238,7 @@ export default function ContainerDetailScreen() {
         onSubmit={handleEditContainerSubmit}
         editMode
         initialName={editingContainer?.name}
+        initialDescription={editingContainer?.description}
         initialPhotoUri={editingContainer?.photoUri}
       />
     </View>

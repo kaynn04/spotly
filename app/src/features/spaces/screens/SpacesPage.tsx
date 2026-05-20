@@ -395,9 +395,9 @@ export default function SpacesPage() {
     );
   };
 
-  const handleCreateSpace = async (name: string, photoUri?: string | null) => {
+  const handleCreateSpace = async (name: string, description?: string | null, photoUri?: string | null) => {
     const shouldShowSpacesGuide = spaces.length === 0 && !(await WalkthroughService.isSpacesDone());
-    const space = await SpaceService.createSpace(name);
+    const space = await SpaceService.createSpace(name, description);
     if (photoUri && space) {
       const savedUri = await PhotoService.savePhoto(photoUri, `space_${space.id}`);
       await SpaceRepository.updatePhotoUri(space.id, savedUri);
@@ -410,10 +410,10 @@ export default function SpacesPage() {
     }
   };
 
-  const handleEditSpace = async (name: string, photoUri?: string | null) => {
+  const handleEditSpace = async (name: string, description?: string | null, photoUri?: string | null) => {
     if (!editingSpace) return;
     const id = editingSpace.id;
-    await SpaceRepository.updateName(id, name);
+    await SpaceRepository.updateDetails(id, { name, description: description ?? null });
     if (photoUri && photoUri !== editingSpace.photoUri) {
       const savedUri = await PhotoService.savePhoto(photoUri, `space_${id}`);
       await SpaceRepository.updatePhotoUri(id, savedUri);
@@ -880,6 +880,7 @@ export default function SpacesPage() {
         onSubmit={handleEditSpace}
         editMode
         initialName={editingSpace?.name}
+        initialDescription={editingSpace?.description}
         initialPhotoUri={editingSpace?.photoUri}
       />
 

@@ -17,6 +17,29 @@ import { generateUUID } from '../utils/uuid';
  * Uses parameterized SQL queries for safety
  */
 export class SpaceRepository {
+  private static ensureDescriptionColumnPromise: Promise<void> | null = null;
+
+  private static async ensureDescriptionColumn(): Promise<void> {
+    if (!SpaceRepository.ensureDescriptionColumnPromise) {
+      SpaceRepository.ensureDescriptionColumnPromise = (async () => {
+        const db = getDatabase();
+        const columns = await db.getAllAsync<any>('PRAGMA table_info(spaces);');
+        if (columns.some((column: any) => column.name === 'description')) return;
+
+        try {
+          await db.execAsync('ALTER TABLE spaces ADD COLUMN description TEXT;');
+        } catch (error: any) {
+          const message = String(error?.message ?? error).toLowerCase();
+          if (!message.includes('duplicate column')) throw error;
+        }
+      })().finally(() => {
+        SpaceRepository.ensureDescriptionColumnPromise = null;
+      });
+    }
+
+    await SpaceRepository.ensureDescriptionColumnPromise;
+  }
+
   /**
    * Create a new space in the database
    *
@@ -27,9 +50,10 @@ export class SpaceRepository {
    * SQL: INSERT INTO spaces (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)
    * Parameterized query prevents SQL injection
    */
-  static async createSpace(name: string): Promise<Space> {
+  static async createSpace(name: string, description?: string | null): Promise<Space> {
     try {
       const db = getDatabase();
+      await SpaceRepository.ensureDescriptionColumn();
 
       // Generate UUID and current ISO 8601 timestamp
       const id = generateUUID();
@@ -37,14 +61,15 @@ export class SpaceRepository {
 
       // Execute parameterized INSERT query
       await db.runAsync(
-        'INSERT INTO spaces (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)',
-        [id, name, now, now]
+        'INSERT INTO spaces (id, name, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+        [id, name, description ?? null, now, now]
       );
 
       // Return the created Space object
       return {
         id,
         name,
+        description: description ?? null,
         createdAt: now,
         updatedAt: now,
         photoUri: null,
@@ -73,6 +98,7 @@ export class SpaceRepository {
   static async getAllSpaces(): Promise<Space[]> {
     try {
       const db = getDatabase();
+      await SpaceRepository.ensureDescriptionColumn();
 
       const result = await db.getAllAsync(
         'SELECT * FROM spaces ORDER BY created_at DESC'
@@ -81,6 +107,7 @@ export class SpaceRepository {
 return (result as any[]).map((row: SpaceRow) => ({
         id: String(row.id),
         name: row.name,
+        description: row.description ?? null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         photoUri: row.photo_uri ?? null,
@@ -95,6 +122,7 @@ return (result as any[]).map((row: SpaceRow) => ({
   static async getAllSpacesWithCounts(): Promise<SpaceWithCount[]> {
     try {
       const db = getDatabase();
+      await SpaceRepository.ensureDescriptionColumn();
       const result = await db.getAllAsync(`
         SELECT
           s.*,
@@ -106,6 +134,7 @@ return (result as any[]).map((row: SpaceRow) => ({
       return (result as any[]).map((row: any) => ({
         id: String(row.id),
         name: row.name,
+        description: row.description ?? null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         photoUri: row.photo_uri ?? null,
@@ -131,6 +160,7 @@ return (result as any[]).map((row: SpaceRow) => ({
   static async getSpaceById(id: string): Promise<Space | null> {
     try {
       const db = getDatabase();
+      await SpaceRepository.ensureDescriptionColumn();
 
       const row = await db.getFirstAsync(
         'SELECT * FROM spaces WHERE id = ?',
@@ -144,6 +174,7 @@ return (result as any[]).map((row: SpaceRow) => ({
       return {
         id: row.id,
         name: row.name,
+        description: row.description ?? null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         photoUri: row.photo_uri ?? null,
@@ -237,6 +268,35 @@ return (result as any[]).map((row: SpaceRow) => ({
     } catch (error) {
       console.error('[SpaceRepository.updateName] Database error:', error);
       const serviceError: ServiceError = { code: 'DB_ERROR', message: 'Failed to update space name.' };
+      throw serviceError;
+    }
+  }
+
+  static async updateDetails(id: string, updates: { name?: string; description?: string | null }): Promise<void> {
+    try {
+      const db = getDatabase();
+      await SpaceRepository.ensureDescriptionColumn();
+      const fields: string[] = [];
+      const values: any[] = [];
+
+      if (updates.name !== undefined) {
+        fields.push('name = ?');
+        values.push(updates.name);
+      }
+      if (updates.description !== undefined) {
+        fields.push('description = ?');
+        values.push(updates.description);
+      }
+
+      if (fields.length === 0) return;
+      fields.push('updated_at = ?');
+      values.push(new Date().toISOString());
+      values.push(id);
+
+      await db.runAsync(`UPDATE spaces SET ${fields.join(', ')} WHERE id = ?`, values);
+    } catch (error) {
+      console.error('[SpaceRepository.updateDetails] Database error:', error);
+      const serviceError: ServiceError = { code: 'DB_ERROR', message: 'Failed to update space.' };
       throw serviceError;
     }
   }
