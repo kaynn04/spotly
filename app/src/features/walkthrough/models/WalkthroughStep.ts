@@ -37,24 +37,24 @@ export const WALKTHROUGH_STEPS: WalkthroughStep[] = [
     spotlightPadding: 10,
   },
   {
-    id: 'scanner-button',
-    index: 4,
-    description: 'Scanner: scan QR labels or product barcodes from the dashboard to jump straight to the right item or location.',
-    targetRef: 'dashboard-scanner',
-    spotlightPadding: 10,
-  },
-  {
     id: 'lending-tab',
-    index: 5,
+    index: 4,
     description: 'Lending: choose an item, set the quantity, and Synop restores it when it comes back.',
     targetRef: 'tab-lending',
     spotlightPadding: 10,
   },
   {
     id: 'tools-tab',
-    index: 6,
+    index: 5,
     description: 'Tools: generate QR labels, scan barcodes, track warranties, and manage outside sessions.',
     targetRef: 'tab-tools',
+    spotlightPadding: 10,
+  },
+  {
+    id: 'scanner-button',
+    index: 6,
+    description: 'Scanner: scan QR labels or product barcodes from the dashboard to jump straight to the right item or location.',
+    targetRef: 'dashboard-scanner',
     spotlightPadding: 10,
   },
   {
