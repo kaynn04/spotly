@@ -10,6 +10,8 @@ export interface LabelTarget {
   location: string;
   spaceId: string | null;
   spaceName: string | null;
+  containerId: string | null;
+  containerName: string | null;
   countLabel?: string;
 }
 
@@ -88,6 +90,7 @@ export class LabelQrService {
           i.name,
           i.quantity,
           i.space_id,
+          i.container_id,
           s.name AS space_name,
           c.name AS container_name
         FROM items i
@@ -105,6 +108,8 @@ export class LabelQrService {
       location: 'Root location',
       spaceId: String(row.id),
       spaceName: row.name,
+      containerId: null,
+      containerName: null,
       countLabel: `${formatCount(row.container_count ?? 0, 'container', 'containers')} / ${formatCount(row.item_count ?? 0, 'item', 'items')}`,
     }));
 
@@ -116,6 +121,8 @@ export class LabelQrService {
       location: row.space_name ? `In ${row.space_name}` : 'No space',
       spaceId: row.space_id ? String(row.space_id) : null,
       spaceName: row.space_name ?? null,
+      containerId: String(row.id),
+      containerName: row.name,
       countLabel: formatCount(row.item_count ?? 0, 'item', 'items'),
     }));
 
@@ -129,6 +136,8 @@ export class LabelQrService {
         : row.space_name ?? 'No space',
       spaceId: row.space_id ? String(row.space_id) : null,
       spaceName: row.space_name ?? null,
+      containerId: row.container_id ? String(row.container_id) : null,
+      containerName: row.container_name ?? null,
       countLabel: formatCount(row.quantity ?? 1, 'unit', 'units'),
     }));
 

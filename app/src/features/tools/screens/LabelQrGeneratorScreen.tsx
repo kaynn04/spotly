@@ -58,8 +58,11 @@ function getKindLabel(kind: LabelTargetKind) {
 }
 
 function getContextLabel(target: LabelTarget) {
-  if (target.kind === 'space') return null;
-  return target.location.replace(/^In\s+/i, '');
+  if (target.kind === 'space') return target.countLabel ?? 'Space label';
+  if (target.kind === 'container') return target.spaceName ?? 'No space';
+  return target.containerName
+    ? `${target.spaceName ?? 'No space'} / ${target.containerName}`
+    : target.spaceName ?? 'No space';
 }
 
 export default function LabelQrGeneratorScreen() {
@@ -78,6 +81,7 @@ export default function LabelQrGeneratorScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<LabelTargetKind | 'all'>('all');
   const [spaceFilter, setSpaceFilter] = useState<string | 'all'>('all');
+  const [containerFilter, setContainerFilter] = useState<string | 'all'>('all');
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -120,17 +124,34 @@ export default function LabelQrGeneratorScreen() {
   }, [targets]);
 
   const showSpaceFilter = filter === 'container' || filter === 'item';
+  const showContainerFilter = filter === 'item' && spaceFilter !== 'all';
+
+  const containerOptions = useMemo(() => {
+    if (!showContainerFilter) return [];
+
+    const byId = new Map<string, string>();
+    targets.forEach((target) => {
+      if (target.kind === 'container' && target.spaceId === spaceFilter) {
+        byId.set(target.id, target.name);
+      }
+    });
+
+    return [...byId.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [showContainerFilter, spaceFilter, targets]);
 
   const filteredTargets = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return targets.filter((target) => {
       const matchesFilter = filter === 'all' || target.kind === filter;
       const matchesSpace = !showSpaceFilter || spaceFilter === 'all' || target.spaceId === spaceFilter;
+      const matchesContainer = !showContainerFilter || containerFilter === 'all' || target.containerId === containerFilter;
       const haystack = `${target.name} ${target.location} ${target.subtitle}`.toLowerCase();
       const matchesQuery = normalizedQuery.length === 0 || haystack.includes(normalizedQuery);
-      return matchesFilter && matchesSpace && matchesQuery;
+      return matchesFilter && matchesSpace && matchesContainer && matchesQuery;
     });
-  }, [filter, query, showSpaceFilter, spaceFilter, targets]);
+  }, [containerFilter, filter, query, showContainerFilter, showSpaceFilter, spaceFilter, targets]);
 
   const selectedTarget = useMemo(
     () => targets.find((target) => target.id === selectedId) ?? null,
@@ -242,15 +263,8 @@ export default function LabelQrGeneratorScreen() {
             {target.name}
           </Text>
           <Text style={[styles.targetMeta, { color: subtleText }]} numberOfLines={1}>
-            {getKindLabel(target.kind)} - {target.location}
+            {getKindLabel(target.kind)} - {getContextLabel(target)}
           </Text>
-          {getContextLabel(target) && (
-            <View style={[styles.contextPill, { backgroundColor: inputBg }]}>
-              <Text style={[styles.contextPillText, { color: subtleText }]} numberOfLines={1}>
-                {getContextLabel(target)}
-              </Text>
-            </View>
-          )}
         </View>
         {selected && (
           <View style={[styles.selectedBadge, { backgroundColor: PRIMARY }]}>
@@ -404,6 +418,7 @@ export default function LabelQrGeneratorScreen() {
                     ]}
                     onPress={() => {
                       setFilter(option.key);
+                      setContainerFilter('all');
                       if (option.key !== 'container' && option.key !== 'item') setSpaceFilter('all');
                     }}
                     activeOpacity={0.75}
@@ -431,7 +446,37 @@ export default function LabelQrGeneratorScreen() {
                         styles.filterChip,
                         { backgroundColor: active ? QR_PURPLE : cardBg, borderColor },
                       ]}
-                      onPress={() => setSpaceFilter(option.id)}
+                      onPress={() => {
+                        setSpaceFilter(option.id);
+                        setContainerFilter('all');
+                      }}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[styles.filterText, { color: active ? '#ffffff' : colors.text }]}>
+                        {option.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
+
+            {showContainerFilter && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterRow}
+              >
+                {[{ id: 'all', name: 'All Containers' }, ...containerOptions].map((option) => {
+                  const active = containerFilter === option.id;
+                  return (
+                    <TouchableOpacity
+                      key={option.id}
+                      style={[
+                        styles.filterChip,
+                        { backgroundColor: active ? QR_PURPLE : cardBg, borderColor },
+                      ]}
+                      onPress={() => setContainerFilter(option.id)}
                       activeOpacity={0.75}
                     >
                       <Text style={[styles.filterText, { color: active ? '#ffffff' : colors.text }]}>
@@ -634,15 +679,6 @@ const styles = StyleSheet.create({
   targetBody: { flex: 1 },
   targetName: { fontSize: 15, fontWeight: '700' },
   targetMeta: { fontSize: 12, marginTop: 2 },
-  contextPill: {
-    alignSelf: 'flex-start',
-    marginTop: 7,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    maxWidth: '100%',
-  },
-  contextPillText: { fontSize: 11, fontWeight: '700' },
   selectedBadge: {
     width: 22,
     height: 22,

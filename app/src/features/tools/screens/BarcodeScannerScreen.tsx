@@ -342,15 +342,10 @@ export default function BarcodeScannerScreen() {
             {destination.name}
           </Text>
           <Text style={[styles.destinationMeta, { color: subtleText }]} numberOfLines={1}>
-            {destination.subtitle}
+            {destination.kind === 'container'
+              ? destination.subtitle.replace(/^Container in\s+/i, '')
+              : 'Space'}
           </Text>
-          {destination.kind === 'container' && (
-            <View style={[styles.contextPill, { backgroundColor: inputBg }]}>
-              <Text style={[styles.contextPillText, { color: subtleText }]} numberOfLines={1}>
-                {destination.subtitle.replace(/^Container in\s+/i, '')}
-              </Text>
-            </View>
-          )}
         </View>
         {selected && (
           <View style={[styles.selectedBadge, { backgroundColor: PRIMARY }]}>
@@ -843,15 +838,6 @@ const styles = StyleSheet.create({
   destinationBody: { flex: 1 },
   destinationName: { fontSize: 15, fontWeight: '700' },
   destinationMeta: { fontSize: 12, marginTop: 2 },
-  contextPill: {
-    alignSelf: 'flex-start',
-    marginTop: 7,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    maxWidth: '100%',
-  },
-  contextPillText: { fontSize: 11, fontWeight: '700' },
   selectedBadge: {
     width: 22,
     height: 22,

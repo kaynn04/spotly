@@ -111,6 +111,67 @@ const STARTER_TEMPLATES: StarterTemplate[] = [
       { name: 'Shed', containers: ['Garden Tools', 'Safety Gear'] },
     ],
   },
+  {
+    id: 'family',
+    title: 'Family Home',
+    description: 'Separate shared household storage, kids items, medicine, and school supplies.',
+    spaces: [
+      { name: 'Entryway', containers: ['Keys Tray', 'Shoe Rack', 'Go Bag'] },
+      { name: 'Kids Room', containers: ['School Supplies', 'Toys Bin', 'Clothes Drawer'] },
+      { name: 'Medicine Cabinet', containers: ['First Aid', 'Daily Medicine', 'Thermometers'] },
+      { name: 'Laundry Area', containers: ['Cleaning Supplies', 'Spare Linens'] },
+    ],
+  },
+  {
+    id: 'electronics',
+    title: 'Electronics & Gadgets',
+    description: 'Track devices, cables, accessories, warranties, and manuals.',
+    spaces: [
+      { name: 'Tech Shelf', containers: ['Phones & Tablets', 'Adapters', 'Manuals'] },
+      { name: 'Computer Desk', containers: ['Peripherals', 'Storage Drives', 'Cables'] },
+      { name: 'Camera Kit', containers: ['Batteries', 'Memory Cards', 'Lenses'] },
+    ],
+  },
+  {
+    id: 'kitchen',
+    title: 'Kitchen & Pantry',
+    description: 'Structure pantry goods, cookware, appliances, and party supplies.',
+    spaces: [
+      { name: 'Pantry', containers: ['Canned Goods', 'Baking Supplies', 'Snacks'] },
+      { name: 'Kitchen Cabinets', containers: ['Cookware', 'Food Containers', 'Small Appliances'] },
+      { name: 'Dining Storage', containers: ['Serveware', 'Party Supplies'] },
+    ],
+  },
+  {
+    id: 'hobby',
+    title: 'Hobbies & Crafts',
+    description: 'Group creative supplies, sports gear, collectibles, and project materials.',
+    spaces: [
+      { name: 'Craft Station', containers: ['Paints', 'Paper', 'Tools'] },
+      { name: 'Sports Gear', containers: ['Outdoor Gear', 'Protective Gear', 'Accessories'] },
+      { name: 'Collections', containers: ['Display Items', 'Storage Boxes'] },
+    ],
+  },
+  {
+    id: 'emergency',
+    title: 'Emergency Preparedness',
+    description: 'Create a quick structure for safety kits, documents, and backup supplies.',
+    spaces: [
+      { name: 'Emergency Kit', containers: ['First Aid', 'Flashlights', 'Batteries'] },
+      { name: 'Important Documents', containers: ['IDs', 'Insurance', 'Medical Records'] },
+      { name: 'Backup Supplies', containers: ['Water', 'Food', 'Power Bank'] },
+    ],
+  },
+  {
+    id: 'moving',
+    title: 'Moving Boxes',
+    description: 'Prepare spaces and box groups for packing, moving, or storage units.',
+    spaces: [
+      { name: 'Packed Boxes', containers: ['Kitchen Box', 'Bedroom Box', 'Bathroom Box'] },
+      { name: 'Fragile Items', containers: ['Glassware', 'Electronics', 'Decor'] },
+      { name: 'Storage Unit', containers: ['Seasonal Box', 'Archive Box', 'Tools Box'] },
+    ],
+  },
 ];
 
 const GUIDE_TOPICS = [
