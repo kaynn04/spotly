@@ -54,8 +54,8 @@ const TOOLS: Tool[] = [
   },
   {
     id: 'qrcode',
-    title: 'QR scanner',
-    description: 'Create printable QR labels and scan QR or product barcodes.',
+    title: 'QR Labels',
+    description: 'Create printable item labels and scan QR or product barcodes.',
     icon: faQrcode,
     iconColor: '#9b7fd4',
     route: '/tools/label-qr',

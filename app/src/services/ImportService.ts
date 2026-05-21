@@ -125,8 +125,8 @@ export const ImportService = {
             try { photoUri = await restorePhoto(i.photo_base64, `${i.id}.jpg`); } catch {}
           }
           await db.runAsync(
-            `${insertOrIgnore} INTO items (id, name, space_id, container_id, description, quantity, photo_uri, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [i.id, i.name, i.space_id, i.container_id || null, i.description || null, i.quantity ?? 1, photoUri, i.created_at || new Date().toISOString()]
+            `${insertOrIgnore} INTO items (id, name, space_id, container_id, description, quantity, photo_uri, units_per_pack, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [i.id, i.name, i.space_id, i.container_id || null, i.description || null, i.quantity ?? 1, photoUri, i.units_per_pack ?? null, i.created_at || new Date().toISOString()]
           );
           counts.items++;
         }

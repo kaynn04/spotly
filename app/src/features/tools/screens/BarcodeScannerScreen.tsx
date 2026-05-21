@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import {
@@ -35,13 +35,13 @@ import {
   type BarcodeDestination,
   type ScannedBarcode,
 } from '../services/BarcodeScannerService';
+import { LabelQrService, type LabelTarget } from '../services/LabelQrService';
 import ItemFormModal from '@/src/features/spaces/screens/components/ItemFormModal';
 import { ItemService } from '@/src/services/ItemService';
 import { PhotoService } from '@/src/services/PhotoService';
 import { ItemRepository } from '@/src/repositories/ItemRepository';
 import { formatDateOnly, parseDateOnly, startOfLocalDay } from '@/src/utils/dateOnly';
 
-const PRIMARY = '#6b7f99';
 const BARCODE_ORANGE = '#e07b54';
 const DESTINATION_FILTERS: { key: BarcodeDestination['kind'] | 'all'; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -49,10 +49,29 @@ const DESTINATION_FILTERS: { key: BarcodeDestination['kind'] | 'all'; label: str
   { key: 'container', label: 'Containers' },
 ];
 
+function getItemCount(quantity: number, contentsPerItem?: number | null) {
+  const safeQuantity = Math.max(0, Math.floor(quantity) || 0);
+  const safeContents = contentsPerItem ? Math.max(1, Math.floor(contentsPerItem) || 1) : null;
+  return safeContents ? Math.ceil(safeQuantity / safeContents) : safeQuantity;
+}
+
+function getStoredQuantity(itemCount: number, contentsPerItem?: number | null) {
+  const safeItemCount = Math.max(0, Math.floor(itemCount) || 0);
+  const safeContents = contentsPerItem ? Math.max(1, Math.floor(contentsPerItem) || 1) : null;
+  return safeContents ? safeItemCount * safeContents : safeItemCount;
+}
+
+function routeForLabelTarget(target: LabelTarget) {
+  if (target.kind === 'space') return `/space/${target.id}`;
+  if (target.kind === 'container') return `/container/${target.id}`;
+  return `/item/${target.id}`;
+}
+
 export default function BarcodeScannerScreen() {
   const router = useRouter();
   const { barcodeType, barcodeData } = useLocalSearchParams<{ barcodeType?: string; barcodeData?: string }>();
   const handledRouteBarcodeRef = useRef<string | null>(null);
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const colors = isDark ? Colors.dark : Colors.light;
@@ -75,8 +94,13 @@ export default function BarcodeScannerScreen() {
   const [resolvingScan, setResolvingScan] = useState(false);
   const [updatingQuantity, setUpdatingQuantity] = useState(false);
   const [quantityDraft, setQuantityDraft] = useState('');
+  const [itemCountDraft, setItemCountDraft] = useState('');
+  const [updatingUnitsPerPack, setUpdatingUnitsPerPack] = useState(false);
+  const [unitsPerPackDraft, setUnitsPerPackDraft] = useState('');
+  const [editingMatchedContents, setEditingMatchedContents] = useState(false);
   const [choosingMoveLocation, setChoosingMoveLocation] = useState(false);
   const [movingLocation, setMovingLocation] = useState(false);
+  const matchedItemId = matchedItem?.id ?? null;
 
   useFocusEffect(
     useCallback(() => {
@@ -148,7 +172,31 @@ export default function BarcodeScannerScreen() {
   const persistMatchedQuantity = useCallback(async (quantity: number, rollbackOnError = true) => {
     if (!matchedItem || updatingQuantity) return;
 
-    const nextQuantity = Math.max(1, Math.floor(quantity) || 1);
+    const nextQuantity = Math.max(0, Math.floor(quantity) || 0);
+    setQuantityDraft(String(nextQuantity));
+    if (nextQuantity === matchedItem.quantity) return;
+
+    setUpdatingQuantity(true);
+    try {
+      await ItemService.updateItem(matchedItem.id, { quantity: nextQuantity });
+      setMatchedItem((current) => current ? { ...current, quantity: nextQuantity } : current);
+      setItemCountDraft(String(getItemCount(nextQuantity, matchedItem.unitsPerPack)));
+      DeviceEventEmitter.emit('synop:refresh-home');
+    } catch (error) {
+      console.error('[BarcodeScannerScreen] quantity update error', error);
+      if (rollbackOnError) setQuantityDraft(String(matchedItem.quantity));
+      Alert.alert('Could not update quantity', 'Please try again.');
+    } finally {
+      setUpdatingQuantity(false);
+    }
+  }, [matchedItem, updatingQuantity]);
+
+  const persistMatchedItemCount = useCallback(async (itemCount: number, rollbackOnError = true) => {
+    if (!matchedItem || updatingQuantity) return;
+
+    const nextItemCount = Math.max(0, Math.floor(itemCount) || 0);
+    const nextQuantity = getStoredQuantity(nextItemCount, matchedItem.unitsPerPack);
+    setItemCountDraft(String(nextItemCount));
     setQuantityDraft(String(nextQuantity));
     if (nextQuantity === matchedItem.quantity) return;
 
@@ -158,9 +206,12 @@ export default function BarcodeScannerScreen() {
       setMatchedItem((current) => current ? { ...current, quantity: nextQuantity } : current);
       DeviceEventEmitter.emit('synop:refresh-home');
     } catch (error) {
-      console.error('[BarcodeScannerScreen] quantity update error', error);
-      if (rollbackOnError) setQuantityDraft(String(matchedItem.quantity));
-      Alert.alert('Could not update quantity', 'Please try again.');
+      console.error('[BarcodeScannerScreen] item count update error', error);
+      if (rollbackOnError) {
+        setItemCountDraft(String(getItemCount(matchedItem.quantity, matchedItem.unitsPerPack)));
+        setQuantityDraft(String(matchedItem.quantity));
+      }
+      Alert.alert('Could not update item count', 'Please try again.');
     } finally {
       setUpdatingQuantity(false);
     }
@@ -172,7 +223,7 @@ export default function BarcodeScannerScreen() {
     const trimmedDraft = quantityDraft.trim();
     if (!trimmedDraft) return;
 
-    const nextQuantity = Math.max(1, Math.floor(parseInt(trimmedDraft, 10)) || 1);
+    const nextQuantity = Math.max(0, Math.floor(parseInt(trimmedDraft, 10)) || 0);
     if (nextQuantity === matchedItem.quantity && trimmedDraft === String(matchedItem.quantity)) return;
 
     const timeout = setTimeout(() => {
@@ -182,18 +233,103 @@ export default function BarcodeScannerScreen() {
     return () => clearTimeout(timeout);
   }, [matchedItem, persistMatchedQuantity, quantityDraft, updatingQuantity]);
 
+  useEffect(() => {
+    if (!matchedItem || updatingQuantity) return;
+
+    const trimmedDraft = itemCountDraft.trim();
+    if (!trimmedDraft) return;
+
+    const nextItemCount = Math.max(0, Math.floor(parseInt(trimmedDraft, 10)) || 0);
+    const currentItemCount = getItemCount(matchedItem.quantity, matchedItem.unitsPerPack);
+    if (nextItemCount === currentItemCount && trimmedDraft === String(currentItemCount)) return;
+
+    const timeout = setTimeout(() => {
+      persistMatchedItemCount(nextItemCount);
+    }, 650);
+
+    return () => clearTimeout(timeout);
+  }, [itemCountDraft, matchedItem, persistMatchedItemCount, updatingQuantity]);
+
   const handleQuantityChange = (delta: number) => {
     if (!matchedItem || updatingQuantity) return;
 
-    const currentQuantity = Math.max(1, parseInt(quantityDraft, 10) || matchedItem.quantity);
+    const currentQuantity = Math.max(0, parseInt(quantityDraft, 10) || matchedItem.quantity);
     persistMatchedQuantity(currentQuantity + delta);
+  };
+
+  const handleItemCountChange = (delta: number) => {
+    if (!matchedItem || updatingQuantity) return;
+
+    const currentItemCount = Math.max(0, parseInt(itemCountDraft, 10) || getItemCount(matchedItem.quantity, matchedItem.unitsPerPack));
+    persistMatchedItemCount(currentItemCount + delta);
+  };
+
+  const handleItemCountSubmit = () => {
+    if (!matchedItem || updatingQuantity) return;
+
+    const nextItemCount = Math.max(0, parseInt(itemCountDraft, 10) || 0);
+    persistMatchedItemCount(nextItemCount);
   };
 
   const handleQuantitySubmit = () => {
     if (!matchedItem || updatingQuantity) return;
 
-    const nextQuantity = Math.max(1, parseInt(quantityDraft, 10) || 1);
+    const nextQuantity = Math.max(0, parseInt(quantityDraft, 10) || 0);
     persistMatchedQuantity(nextQuantity);
+  };
+
+  const persistMatchedUnitsPerPack = useCallback(async (unitsPerPack: number | null, rollbackOnError = true) => {
+    if (!matchedItem || updatingUnitsPerPack) return;
+
+    const nextUnitsPerPack = unitsPerPack == null ? null : Math.max(1, Math.floor(unitsPerPack) || 1);
+    setUnitsPerPackDraft(nextUnitsPerPack ? String(nextUnitsPerPack) : '');
+    if ((nextUnitsPerPack ?? null) === (matchedItem.unitsPerPack ?? null)) return;
+
+    setUpdatingUnitsPerPack(true);
+    try {
+      const currentItemCount = getItemCount(matchedItem.quantity, matchedItem.unitsPerPack);
+      const nextQuantity = nextUnitsPerPack ? getStoredQuantity(currentItemCount, nextUnitsPerPack) : currentItemCount;
+      await ItemService.updateItem(matchedItem.id, { unitsPerPack: nextUnitsPerPack, quantity: nextQuantity });
+      setMatchedItem((current) => current ? { ...current, unitsPerPack: nextUnitsPerPack, quantity: nextQuantity } : current);
+      setQuantityDraft(String(nextQuantity));
+      setItemCountDraft(String(getItemCount(nextQuantity, nextUnitsPerPack)));
+      DeviceEventEmitter.emit('synop:refresh-home');
+    } catch (error) {
+      console.error('[BarcodeScannerScreen] units-per-pack update error', error);
+      if (rollbackOnError) setUnitsPerPackDraft(matchedItem.unitsPerPack ? String(matchedItem.unitsPerPack) : '');
+      Alert.alert('Could not update contents per item', 'Please try again.');
+    } finally {
+      setUpdatingUnitsPerPack(false);
+    }
+  }, [matchedItem, updatingUnitsPerPack]);
+
+  useEffect(() => {
+    if (!matchedItem || updatingUnitsPerPack || !editingMatchedContents) return;
+
+    const trimmedDraft = unitsPerPackDraft.trim();
+    const nextUnitsPerPack = trimmedDraft ? Math.max(1, Math.floor(parseInt(trimmedDraft, 10)) || 1) : null;
+    if ((nextUnitsPerPack ?? null) === (matchedItem.unitsPerPack ?? null)) return;
+
+    const timeout = setTimeout(() => {
+      persistMatchedUnitsPerPack(nextUnitsPerPack);
+    }, 650);
+
+    return () => clearTimeout(timeout);
+  }, [editingMatchedContents, matchedItem, persistMatchedUnitsPerPack, unitsPerPackDraft, updatingUnitsPerPack]);
+
+  const handleUnitsPerPackChange = (delta: number) => {
+    if (!matchedItem || updatingUnitsPerPack) return;
+
+    const currentUnits = Math.max(0, parseInt(unitsPerPackDraft, 10) || matchedItem.unitsPerPack || 0);
+    const nextUnits = Math.max(0, currentUnits + delta);
+    persistMatchedUnitsPerPack(nextUnits > 0 ? nextUnits : null);
+  };
+
+  const handleUnitsPerPackSubmit = () => {
+    if (!matchedItem || updatingUnitsPerPack) return;
+
+    const nextUnits = unitsPerPackDraft.trim() ? Math.max(1, parseInt(unitsPerPackDraft, 10) || 1) : null;
+    persistMatchedUnitsPerPack(nextUnits);
   };
 
   const handleMoveMatchedItem = async (destination: BarcodeDestination) => {
@@ -232,13 +368,32 @@ export default function BarcodeScannerScreen() {
     setShowScanner(false);
     setScannedBarcode(barcode);
     setMatchedItem(null);
+    setEditingMatchedContents(false);
     setChoosingMoveLocation(false);
     setResolvingScan(true);
 
     try {
+      if (barcode.type === 'qr') {
+        const target = await LabelQrService.resolveScannedData(barcode.data);
+        if (target) {
+          router.push(routeForLabelTarget(target) as any);
+          return;
+        }
+
+        Alert.alert(
+          'QR not recognized',
+          'This QR code is not a Synop label. Try scanning a printed Synop label or a product barcode.'
+        );
+        setScannedBarcode(null);
+        return;
+      }
+
       const match = await BarcodeScannerService.findItemByBarcode(barcode);
       setMatchedItem(match);
+      setEditingMatchedContents(false);
       setQuantityDraft(match ? String(match.quantity) : '');
+      setItemCountDraft(match ? String(getItemCount(match.quantity, match.unitsPerPack)) : '');
+      setUnitsPerPackDraft(match?.unitsPerPack ? String(match.unitsPerPack) : '');
       if (!match && selectedDestination) setShowItemForm(true);
     } catch (error) {
       console.error('[BarcodeScannerScreen] barcode lookup error', error);
@@ -264,13 +419,54 @@ export default function BarcodeScannerScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [barcodeData, barcodeType, loading]);
 
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      const refreshMatchedItem = async () => {
+        if (!matchedItemId) return;
+
+        try {
+          const latestItem = await ItemService.getItemById(matchedItemId);
+          if (!active || !latestItem) return;
+
+          setMatchedItem((current) => current ? {
+            ...current,
+            name: latestItem.name,
+            description: latestItem.description ?? null,
+            quantity: latestItem.quantity,
+            unitsPerPack: latestItem.unitsPerPack ?? null,
+            photoUri: latestItem.photoUri ?? null,
+            warrantyExpiry: latestItem.warrantyExpiry ?? null,
+            spaceId: latestItem.spaceId,
+            containerId: latestItem.containerId ?? null,
+            spaceName: latestItem.space?.name ?? current.spaceName,
+            containerName: latestItem.container?.name ?? null,
+          } : current);
+          setQuantityDraft(String(latestItem.quantity));
+          setItemCountDraft(String(getItemCount(latestItem.quantity, latestItem.unitsPerPack)));
+          setUnitsPerPackDraft(latestItem.unitsPerPack ? String(latestItem.unitsPerPack) : '');
+        } catch (error) {
+          console.error('[BarcodeScannerScreen] matched item refresh error', error);
+        }
+      };
+
+      refreshMatchedItem();
+
+      return () => {
+        active = false;
+      };
+    }, [matchedItemId])
+  );
+
   const handleSubmit = async (
     name: string,
     description?: string,
     quantity?: number,
     photoUri?: string | null,
     warrantyExpiry?: Date | null,
-    barcode?: ScannedBarcode | null
+    barcode?: ScannedBarcode | null,
+    unitsPerPack?: number | null
   ) => {
     if (!selectedDestination) {
       Alert.alert('Choose a destination', 'Select a space or container before creating the item.');
@@ -283,7 +479,10 @@ export default function BarcodeScannerScreen() {
       if (existingMatch) {
         setShowItemForm(false);
         setMatchedItem(existingMatch);
+        setEditingMatchedContents(false);
         setQuantityDraft(String(existingMatch.quantity));
+        setItemCountDraft(String(getItemCount(existingMatch.quantity, existingMatch.unitsPerPack)));
+        setUnitsPerPackDraft(existingMatch.unitsPerPack ? String(existingMatch.unitsPerPack) : '');
         setChoosingMoveLocation(false);
         return;
       }
@@ -294,7 +493,9 @@ export default function BarcodeScannerScreen() {
       name,
       selectedDestination.containerId,
       description,
-      quantity
+      quantity,
+      null,
+      unitsPerPack
     );
 
     if (barcodeToSave) {
@@ -317,6 +518,7 @@ export default function BarcodeScannerScreen() {
       name: item.name,
       description: item.description ?? null,
       quantity: item.quantity,
+      unitsPerPack: item.unitsPerPack ?? unitsPerPack ?? null,
       photoUri: item.photoUri ?? null,
       warrantyExpiry: warrantyExpiry ? formatDateOnly(warrantyExpiry) : null,
       spaceId: selectedDestination.spaceId,
@@ -327,6 +529,8 @@ export default function BarcodeScannerScreen() {
       barcodeData: barcodeToSave?.data ?? '',
     });
     setQuantityDraft(String(item.quantity));
+    setItemCountDraft(String(getItemCount(item.quantity, item.unitsPerPack ?? unitsPerPack ?? null)));
+    setUnitsPerPackDraft(item.unitsPerPack ? String(item.unitsPerPack) : '');
     router.push(`/item/${item.id}` as any);
   };
 
@@ -471,8 +675,8 @@ export default function BarcodeScannerScreen() {
             <FontAwesomeIcon icon={faChevronLeft} size={16} color={BARCODE_ORANGE} />
           </TouchableOpacity>
           <View style={styles.titleBlock}>
-            <Text style={[styles.title, { color: colors.text }]}>Barcode Scanner</Text>
-            <Text style={[styles.subtitle, { color: subtleText }]}>Scan and add product-coded items</Text>
+            <Text style={[styles.title, { color: colors.text }]}>Scan Code</Text>
+            <Text style={[styles.subtitle, { color: subtleText }]}>Open QR labels or save product barcodes</Text>
           </View>
         </View>
       </View>
@@ -490,23 +694,34 @@ export default function BarcodeScannerScreen() {
           </Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          <View style={[styles.scanCard, { backgroundColor: cardBg, borderColor }]}>
-            <View style={[styles.scanIcon, { backgroundColor: `${BARCODE_ORANGE}18` }]}>
-              <FontAwesomeIcon icon={faBarcode} size={28} color={BARCODE_ORANGE} />
+        <ScrollView
+          contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 112 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[
+            styles.scanCard,
+            matchedItem && styles.scanCardCompact,
+            { backgroundColor: cardBg, borderColor },
+          ]}>
+            {!matchedItem && (
+              <View style={[styles.scanIcon, { backgroundColor: `${BARCODE_ORANGE}18` }]}>
+                <FontAwesomeIcon icon={faBarcode} size={28} color={BARCODE_ORANGE} />
+              </View>
+            )}
+            <View style={matchedItem ? styles.compactScanText : undefined}>
+              <Text style={[styles.scanTitle, matchedItem && styles.scanTitleCompact, { color: colors.text }]}>
+                {matchedItem ? 'Item found' : scannedBarcode ? 'Barcode captured' : 'Scan a product barcode'}
+              </Text>
+              <Text style={[styles.scanSubtitle, matchedItem && styles.scanSubtitleCompact, { color: subtleText }]}>
+                {matchedItem
+                  ? 'Barcode matched your saved inventory.'
+                  : scannedBarcode
+                  ? `${scannedBarcode.type} - ${scannedBarcode.data}`
+                  : 'Scan a printed Synop QR label to open an item, or scan a product barcode to save and find it later.'}
+              </Text>
             </View>
-            <Text style={[styles.scanTitle, { color: colors.text }]}>
-              {matchedItem ? 'Item found' : scannedBarcode ? 'Barcode captured' : 'Scan a product barcode'}
-            </Text>
-            <Text style={[styles.scanSubtitle, { color: subtleText }]}>
-              {matchedItem
-                ? 'Synop recognized this barcode from your inventory.'
-                : scannedBarcode
-                ? `${scannedBarcode.type} - ${scannedBarcode.data}`
-                : 'First scan saves the item details. Future scans bring those details back instantly.'}
-            </Text>
             <TouchableOpacity
-              style={[styles.scanButton, { backgroundColor: BARCODE_ORANGE }]}
+              style={[styles.scanButton, matchedItem && styles.scanButtonCompact, { backgroundColor: BARCODE_ORANGE }]}
               onPress={() => setShowScanner(true)}
               activeOpacity={0.8}
             >
@@ -522,10 +737,10 @@ export default function BarcodeScannerScreen() {
           )}
 
           {matchedItem ? (
-            <View style={[styles.matchCard, { backgroundColor: cardBg, borderColor }]}>
+            <View style={[styles.matchCard, { backgroundColor: cardBg, borderColor: `${BARCODE_ORANGE}33` }]}>
               <View style={styles.matchHeader}>
-                <View style={[styles.matchIcon, { backgroundColor: `${PRIMARY}18` }]}>
-                  <FontAwesomeIcon icon={faCircleInfo} size={18} color={PRIMARY} />
+                <View style={[styles.matchIcon, { backgroundColor: `${BARCODE_ORANGE}18` }]}>
+                  <FontAwesomeIcon icon={faCircleInfo} size={18} color={BARCODE_ORANGE} />
                 </View>
                 <View style={styles.matchBody}>
                   <Text style={[styles.matchName, { color: colors.text }]} numberOfLines={2}>
@@ -543,24 +758,38 @@ export default function BarcodeScannerScreen() {
                   {matchedItem.description}
                 </Text>
               )}
-              <View style={styles.factGrid}>
-                <View style={[styles.factTile, { backgroundColor: inputBg, borderColor }]}>
-                  <Text style={[styles.factLabel, { color: subtleText }]}>Quantity</Text>
+              <View style={[styles.stockPanel, { backgroundColor: `${BARCODE_ORANGE}0F`, borderColor: `${BARCODE_ORANGE}40` }]}>
+                <View style={styles.stockPanelHeader}>
+                  <View>
+                    <Text style={[styles.stockPanelTitle, { color: BARCODE_ORANGE }]}>Stock controls</Text>
+                    <Text style={[styles.stockPanelSubtitle, { color: subtleText }]}>
+                      {matchedItem.unitsPerPack ? 'Use total contents when selling one unit inside a pack.' : 'Track whole items in stock.'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={[styles.stockControlRow, { borderColor: `${BARCODE_ORANGE}22` }]}>
+                  <View style={styles.stockControlText}>
+                    <Text style={[styles.stockControlLabel, { color: subtleText }]}>Item count</Text>
+                    <Text style={[styles.stockControlHint, { color: subtleText }]}>
+                      Whole items, packs, boxes, or containers
+                    </Text>
+                  </View>
                   <View style={styles.quantityControl}>
                     <TouchableOpacity
-                      style={[styles.quantityButton, { borderColor }]}
-                      onPress={() => handleQuantityChange(-1)}
-                      disabled={updatingQuantity || matchedItem.quantity <= 1}
+                      style={[styles.quantityButton, { borderColor: `${BARCODE_ORANGE}33`, backgroundColor: `${BARCODE_ORANGE}12` }]}
+                      onPress={() => handleItemCountChange(-1)}
+                      disabled={updatingQuantity || matchedItem.quantity <= 0}
                       activeOpacity={0.75}
                     >
-                      <FontAwesomeIcon icon={faMinus} size={12} color={matchedItem.quantity <= 1 ? subtleText : PRIMARY} />
+                      <FontAwesomeIcon icon={faMinus} size={12} color={matchedItem.quantity <= 0 ? subtleText : BARCODE_ORANGE} />
                     </TouchableOpacity>
                     <TextInput
-                      style={[styles.quantityInput, { color: colors.text }]}
-                      value={quantityDraft}
-                      onChangeText={(value) => setQuantityDraft(value.replace(/[^0-9]/g, ''))}
-                      onBlur={handleQuantitySubmit}
-                      onSubmitEditing={handleQuantitySubmit}
+                      style={[styles.quantityInput, styles.quantityInputCompact, { color: colors.text }]}
+                      value={itemCountDraft}
+                      onChangeText={(value) => setItemCountDraft(value.replace(/[^0-9]/g, ''))}
+                      onBlur={handleItemCountSubmit}
+                      onSubmitEditing={handleItemCountSubmit}
                       keyboardType="number-pad"
                       returnKeyType="done"
                       maxLength={4}
@@ -568,17 +797,126 @@ export default function BarcodeScannerScreen() {
                       selectTextOnFocus
                     />
                     <TouchableOpacity
-                      style={[styles.quantityButton, { borderColor }]}
-                      onPress={() => handleQuantityChange(1)}
+                      style={[styles.quantityButton, { borderColor: `${BARCODE_ORANGE}33`, backgroundColor: `${BARCODE_ORANGE}12` }]}
+                      onPress={() => handleItemCountChange(1)}
                       disabled={updatingQuantity}
                       activeOpacity={0.75}
                     >
-                      <FontAwesomeIcon icon={faPlus} size={12} color={PRIMARY} />
+                      <FontAwesomeIcon icon={faPlus} size={12} color={BARCODE_ORANGE} />
                     </TouchableOpacity>
                   </View>
                 </View>
 
-                <View style={[styles.factTile, { backgroundColor: inputBg, borderColor }]}>
+                {matchedItem.unitsPerPack ? (
+                  <View style={[styles.stockControlRow, { borderColor: `${BARCODE_ORANGE}22` }]}>
+                    <View style={styles.stockControlText}>
+                      <Text style={[styles.stockControlLabel, { color: subtleText }]}>Total contents</Text>
+                      <Text style={[styles.stockControlHint, { color: subtleText }]}>Sell or add one content unit</Text>
+                    </View>
+                    <View style={styles.quantityControl}>
+                      <TouchableOpacity
+                        style={[styles.quantityButton, { borderColor: `${BARCODE_ORANGE}33`, backgroundColor: `${BARCODE_ORANGE}12` }]}
+                        onPress={() => handleQuantityChange(-1)}
+                        disabled={updatingQuantity || matchedItem.quantity <= 0}
+                        activeOpacity={0.75}
+                      >
+                        <FontAwesomeIcon icon={faMinus} size={12} color={matchedItem.quantity <= 0 ? subtleText : BARCODE_ORANGE} />
+                      </TouchableOpacity>
+                      <TextInput
+                        style={[styles.quantityInput, styles.quantityInputCompact, { color: colors.text }]}
+                        value={quantityDraft}
+                        onChangeText={(value) => setQuantityDraft(value.replace(/[^0-9]/g, ''))}
+                        onBlur={handleQuantitySubmit}
+                        onSubmitEditing={handleQuantitySubmit}
+                        keyboardType="number-pad"
+                        returnKeyType="done"
+                        maxLength={5}
+                        editable={!updatingQuantity}
+                        selectTextOnFocus
+                      />
+                      <TouchableOpacity
+                        style={[styles.quantityButton, { borderColor: `${BARCODE_ORANGE}33`, backgroundColor: `${BARCODE_ORANGE}12` }]}
+                        onPress={() => handleQuantityChange(1)}
+                        disabled={updatingQuantity}
+                        activeOpacity={0.75}
+                      >
+                        <FontAwesomeIcon icon={faPlus} size={12} color={BARCODE_ORANGE} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : null}
+
+                <View style={styles.contentsSettingRow}>
+                  <View style={styles.stockControlText}>
+                    <Text style={[styles.stockControlLabel, { color: subtleText }]}>Contents per item</Text>
+                    <Text style={[styles.stockControlHint, { color: subtleText }]}>Crucial setup value, edit intentionally</Text>
+                  </View>
+                  {editingMatchedContents ? (
+                    <View style={styles.contentsEditor}>
+                      <View style={styles.quantityControl}>
+                        <TouchableOpacity
+                          style={[styles.quantityButton, { borderColor: `${BARCODE_ORANGE}33`, backgroundColor: `${BARCODE_ORANGE}12` }]}
+                          onPress={() => handleUnitsPerPackChange(-1)}
+                          disabled={updatingUnitsPerPack || !matchedItem.unitsPerPack}
+                          activeOpacity={0.75}
+                        >
+                          <FontAwesomeIcon icon={faMinus} size={12} color={!matchedItem.unitsPerPack ? subtleText : BARCODE_ORANGE} />
+                        </TouchableOpacity>
+                        <TextInput
+                          style={[styles.quantityInput, styles.quantityInputCompact, { color: matchedItem.unitsPerPack ? colors.text : subtleText }]}
+                          value={unitsPerPackDraft}
+                          onChangeText={(value) => setUnitsPerPackDraft(value.replace(/[^0-9]/g, ''))}
+                          onBlur={handleUnitsPerPackSubmit}
+                          onSubmitEditing={handleUnitsPerPackSubmit}
+                          keyboardType="number-pad"
+                          returnKeyType="done"
+                          maxLength={5}
+                          editable={!updatingUnitsPerPack}
+                          placeholder="0"
+                          placeholderTextColor={subtleText}
+                          selectTextOnFocus
+                        />
+                        <TouchableOpacity
+                          style={[styles.quantityButton, { borderColor: `${BARCODE_ORANGE}33`, backgroundColor: `${BARCODE_ORANGE}12` }]}
+                          onPress={() => handleUnitsPerPackChange(1)}
+                          disabled={updatingUnitsPerPack}
+                          activeOpacity={0.75}
+                        >
+                          <FontAwesomeIcon icon={faPlus} size={12} color={BARCODE_ORANGE} />
+                        </TouchableOpacity>
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.inlineEditButton, { borderColor: `${BARCODE_ORANGE}33`, backgroundColor: `${BARCODE_ORANGE}12` }]}
+                        onPress={() => {
+                          handleUnitsPerPackSubmit();
+                          setEditingMatchedContents(false);
+                        }}
+                        activeOpacity={0.75}
+                      >
+                        <Text style={[styles.inlineEditButtonText, { color: BARCODE_ORANGE }]}>Done</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.protectedFactRow}>
+                      <Text style={[styles.protectedFactValue, { color: matchedItem.unitsPerPack ? colors.text : subtleText }]}>
+                        {matchedItem.unitsPerPack ?? 0}
+                      </Text>
+                      <TouchableOpacity
+                        style={[styles.inlineEditButton, { borderColor: `${BARCODE_ORANGE}33`, backgroundColor: `${BARCODE_ORANGE}12` }]}
+                        onPress={() => setEditingMatchedContents(true)}
+                        activeOpacity={0.75}
+                      >
+                        <Text style={[styles.inlineEditButtonText, { color: BARCODE_ORANGE }]}>
+                          {matchedItem.unitsPerPack ? 'Edit' : 'Enable'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              <View style={[styles.metaStrip, { backgroundColor: inputBg, borderColor: `${BARCODE_ORANGE}20` }]}>
+                <View style={styles.metaContent}>
                   <Text style={[styles.factLabel, { color: subtleText }]}>Warranty</Text>
                   {matchedItem.warrantyExpiry ? (
                     <View style={styles.warrantyRow}>
@@ -610,17 +948,17 @@ export default function BarcodeScannerScreen() {
               </View>
               <View style={styles.matchActions}>
                 <TouchableOpacity
-                  style={[styles.secondaryButton, { borderColor }]}
+                  style={[styles.secondaryButton, { borderColor: `${BARCODE_ORANGE}33` }]}
                   onPress={() => setChoosingMoveLocation((current) => !current)}
                   activeOpacity={0.8}
                   disabled={movingLocation}
                 >
-                  <Text style={[styles.secondaryButtonText, { color: PRIMARY }]}>
+                  <Text style={[styles.secondaryButtonText, { color: BARCODE_ORANGE }]}>
                     {choosingMoveLocation ? 'Cancel Move' : 'Move Location'}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.openButton, { backgroundColor: PRIMARY }]}
+                  style={[styles.openButton, { backgroundColor: BARCODE_ORANGE }]}
                   onPress={() => router.push(`/item/${matchedItem.id}` as any)}
                   activeOpacity={0.8}
                 >
@@ -642,6 +980,10 @@ export default function BarcodeScannerScreen() {
         visible={showScanner}
         onClose={() => setShowScanner(false)}
         onScanned={handleScanned}
+        includeQr
+        title="Scan Code"
+        permissionMessage="Synop needs camera access to scan printed QR labels and product barcodes."
+        hint="Place a Synop QR label or product barcode inside the frame"
       />
 
       <ItemFormModal
@@ -689,7 +1031,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center' },
   emptyText: { fontSize: 14, lineHeight: 20, textAlign: 'center' },
-  scroll: { padding: 16, paddingBottom: 32, gap: 18 },
+  scroll: { padding: 16, gap: 14 },
   scanCard: {
     borderRadius: 16,
     borderWidth: 1,
@@ -697,6 +1039,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  scanCardCompact: {
+    borderRadius: 14,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  compactScanText: { flex: 1, minWidth: 0 },
   scanIcon: {
     width: 58,
     height: 58,
@@ -705,7 +1055,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scanTitle: { fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  scanTitleCompact: { fontSize: 15, textAlign: 'left' },
   scanSubtitle: { fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  scanSubtitleCompact: { fontSize: 12, lineHeight: 16, textAlign: 'left', marginTop: 1 },
   scanButton: {
     marginTop: 4,
     minHeight: 44,
@@ -714,6 +1066,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'stretch',
+  },
+  scanButtonCompact: {
+    alignSelf: 'auto',
+    minHeight: 36,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    marginTop: 0,
   },
   scanButtonText: { color: '#ffffff', fontSize: 15, fontWeight: '700' },
   statusRow: {
@@ -748,14 +1107,57 @@ const styles = StyleSheet.create({
   matchName: { fontSize: 17, fontWeight: '700' },
   matchLocation: { fontSize: 13, marginTop: 2 },
   matchDescription: { fontSize: 13, lineHeight: 19 },
-  factGrid: { flexDirection: 'row', gap: 10 },
-  factTile: {
-    flex: 1,
-    minHeight: 76,
+  stockPanel: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    gap: 10,
+  },
+  stockPanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  stockPanelTitle: { fontSize: 15, fontWeight: '800' },
+  stockPanelSubtitle: { fontSize: 12, lineHeight: 17, marginTop: 1 },
+  stockControlRow: {
+    borderTopWidth: 1,
+    paddingTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  stockControlText: { flex: 1, minWidth: 0 },
+  stockControlLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  stockControlHint: { fontSize: 12, lineHeight: 16, marginTop: 2 },
+  contentsSettingRow: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(128,128,128,0.22)',
+    paddingTop: 10,
+    gap: 8,
+  },
+  contentsEditor: { gap: 8 },
+  metaStrip: {
+    minHeight: 54,
     borderRadius: 12,
     borderWidth: 1,
     padding: 10,
-    justifyContent: 'space-between',
+  },
+  metaContent: { gap: 8 },
+  factGrid: { flexDirection: 'row', gap: 10 },
+  factTile: {
+    flex: 1,
+    minHeight: 72,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 10,
+    justifyContent: 'flex-start',
+    gap: 8,
   },
   factLabel: {
     fontSize: 11,
@@ -783,6 +1185,37 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
     paddingVertical: 0,
+  },
+  quantityInputCompact: {
+    flex: 0,
+    width: 52,
+  },
+  protectedFactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  protectedFactValue: {
+    flex: 1,
+    fontSize: 19,
+    fontWeight: '800',
+  },
+  inlineEditButton: {
+    minHeight: 30,
+    borderRadius: 9,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+  },
+  inlineEditButtonText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  packHint: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   warrantyRow: {
     flexDirection: 'row',

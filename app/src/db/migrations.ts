@@ -20,6 +20,7 @@ import { addLendingDueDate } from './migrations/011-add-lending-due-date';
 import { addItemWarranty } from './migrations/012-add-item-warranty';
 import { addGlobalUniqueConstraints } from './migrations/013-add-global-unique-constraints';
 import { addLendingQuantity } from './migrations/014-add-lending-quantity';
+import { addItemUnitsPerPack } from './migrations/015-add-item-units-per-pack';
 
 /**
  * Initialize the database schema
@@ -239,6 +240,13 @@ export async function initializeDatabase() {
       await addItemWarranty(db);
     } catch (err) {
       console.error('⚠ Item warranty migration failed:', err);
+    }
+
+    // Add optional pieces-per-pack metadata to items (Migration 015)
+    try {
+      await addItemUnitsPerPack(db);
+    } catch (err) {
+      console.error('Item units-per-pack migration failed:', err);
     }
 
     // Add lost item tracking columns

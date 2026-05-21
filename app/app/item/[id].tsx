@@ -5,7 +5,7 @@
  * Accessed via /item/[id] dynamic route
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -40,13 +40,26 @@ import { Lending } from '@/src/features/lending/models/Lending';
 import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
 import { OutsideService } from '@/src/features/outside/services/OutsideService';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faBox, faHandshake, faCheck, faTrash, faMapPin, faFolder, faEllipsisVertical, faChevronLeft, faShield, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
+import { faBox, faHandshake, faCheck, faTrash, faMapPin, faFolder, faEllipsisVertical, faChevronLeft, faShield, faTriangleExclamation, faQrcode, faMinus, faPlus } from '@fortawesome/free-solid-svg-icons';
 import DatePickerSheet from '@/src/features/lending/screens/components/DatePickerSheet';
 import { parseDateOnly, startOfLocalDay } from '@/src/utils/dateOnly';
 
 const PRIMARY = '#6b7f99';
 const LENDING = '#9b72cb';
 const WARRANTY = '#e09b3a';
+const PACK_SIZE_PRESETS = [10, 12, 20, 24, 25, 30, 50, 100];
+
+function getItemCount(quantity: number, contentsPerItem?: number | null) {
+  const safeQuantity = Math.max(0, Math.floor(quantity) || 0);
+  const safeContents = contentsPerItem ? Math.max(1, Math.floor(contentsPerItem) || 1) : null;
+  return safeContents ? Math.ceil(safeQuantity / safeContents) : safeQuantity;
+}
+
+function getStoredQuantity(itemCount: number, contentsPerItem?: number | null) {
+  const safeItemCount = Math.max(0, Math.floor(itemCount) || 0);
+  const safeContents = contentsPerItem ? Math.max(1, Math.floor(contentsPerItem) || 1) : null;
+  return safeContents ? safeItemCount * safeContents : safeItemCount;
+}
 
 export default function ItemDetailScreen() {
   const { id: itemId } = useLocalSearchParams<{ id: string }>();
@@ -60,10 +73,14 @@ export default function ItemDetailScreen() {
   const [loading, setLoading] = useState(true);
 
   // Editing state
-  const [editingField, setEditingField] = useState<'name' | 'description' | 'quantity' | null>(null);
+  const [editingField, setEditingField] = useState<'name' | 'description' | 'quantity' | 'totalContents' | 'unitsPerPack' | null>(null);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editQuantity, setEditQuantity] = useState('');
+  const [editTotalContents, setEditTotalContents] = useState('');
+  const [editUnitsPerPack, setEditUnitsPerPack] = useState('');
+  const [savingQuantity, setSavingQuantity] = useState(false);
+  const [savingUnitsPerPack, setSavingUnitsPerPack] = useState(false);
 
   // Lending state
   const [activeLending, setActiveLending] = useState<Lending | null>(null);
@@ -131,7 +148,7 @@ export default function ItemDetailScreen() {
     }
   }
 
-  async function handleSaveField(field: 'name' | 'description' | 'quantity') {
+  async function handleSaveField(field: 'name' | 'description' | 'quantity' | 'totalContents' | 'unitsPerPack') {
     if (!item) return;
     try {
       const updates: any = {};
@@ -141,22 +158,182 @@ export default function ItemDetailScreen() {
       } else if (field === 'description') {
         updates.description = editDescription.trim() || null;
       } else if (field === 'quantity') {
-        updates.quantity = Math.max(1, parseInt(editQuantity) || 1);
+        updates.quantity = getStoredQuantity(parseInt(editQuantity) || 0, item.unitsPerPack);
+      } else if (field === 'totalContents') {
+        updates.quantity = Math.max(0, parseInt(editTotalContents) || 0);
+      } else if (field === 'unitsPerPack') {
+        updates.unitsPerPack = editUnitsPerPack.trim() ? Math.max(1, parseInt(editUnitsPerPack) || 1) : null;
       }
       await ItemService.updateItem(item.id, updates);
+      setItem((current) => current ? { ...current, ...updates } : current);
       setEditingField(null);
-      await loadItem();
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to update');
     }
   }
 
-  function startEdit(field: 'name' | 'description' | 'quantity') {
+  function startEdit(field: 'name' | 'description' | 'quantity' | 'totalContents' | 'unitsPerPack') {
     if (!item) return;
     if (field === 'name') setEditName(item.name);
     else if (field === 'description') setEditDescription(item.description ?? '');
-    else if (field === 'quantity') setEditQuantity(String(item.quantity));
+    else if (field === 'quantity') setEditQuantity(String(getItemCount(item.quantity, item.unitsPerPack)));
+    else if (field === 'totalContents') setEditTotalContents(String(item.quantity));
+    else if (field === 'unitsPerPack') setEditUnitsPerPack(item.unitsPerPack ? String(item.unitsPerPack) : '');
     setEditingField(field);
+  }
+
+  const persistQuantityDraft = useCallback(async (rollbackOnError = true) => {
+    if (!item || savingQuantity) return;
+
+    const nextQuantity = getStoredQuantity(parseInt(editQuantity, 10) || 0, item.unitsPerPack);
+    if (nextQuantity === item.quantity && editQuantity === String(item.quantity)) return;
+
+    setSavingQuantity(true);
+    try {
+      await ItemService.updateItem(item.id, { quantity: nextQuantity });
+      setEditQuantity(String(getItemCount(nextQuantity, item.unitsPerPack)));
+      setItem((current) => current ? { ...current, quantity: nextQuantity } : current);
+    } catch {
+      if (rollbackOnError) setEditQuantity(String(getItemCount(item.quantity, item.unitsPerPack)));
+      Alert.alert('Error', 'Failed to update stock');
+    } finally {
+      setSavingQuantity(false);
+    }
+  }, [editQuantity, item, savingQuantity]);
+
+  const persistTotalContentsDraft = useCallback(async (rollbackOnError = true) => {
+    if (!item || savingQuantity) return;
+
+    const nextQuantity = Math.max(0, Math.floor(parseInt(editTotalContents, 10)) || 0);
+    if (nextQuantity === item.quantity && editTotalContents === String(item.quantity)) return;
+
+    setSavingQuantity(true);
+    try {
+      await ItemService.updateItem(item.id, { quantity: nextQuantity });
+      setEditTotalContents(String(nextQuantity));
+      setItem((current) => current ? { ...current, quantity: nextQuantity } : current);
+    } catch {
+      if (rollbackOnError) setEditTotalContents(String(item.quantity));
+      Alert.alert('Error', 'Failed to update total contents');
+    } finally {
+      setSavingQuantity(false);
+    }
+  }, [editTotalContents, item, savingQuantity]);
+
+  const persistUnitsPerPackDraft = useCallback(async (rollbackOnError = true) => {
+    if (!item || savingUnitsPerPack) return;
+
+    const nextUnitsPerPack = editUnitsPerPack.trim()
+      ? Math.max(1, Math.floor(parseInt(editUnitsPerPack, 10)) || 1)
+      : null;
+    if ((nextUnitsPerPack ?? null) === (item.unitsPerPack ?? null)) return;
+
+    setSavingUnitsPerPack(true);
+    try {
+      const currentItemCount = getItemCount(item.quantity, item.unitsPerPack);
+      const nextQuantity = nextUnitsPerPack ? getStoredQuantity(currentItemCount, nextUnitsPerPack) : currentItemCount;
+      await ItemService.updateItem(item.id, { unitsPerPack: nextUnitsPerPack, quantity: nextQuantity });
+      setEditUnitsPerPack(nextUnitsPerPack ? String(nextUnitsPerPack) : '');
+      setItem((current) => current ? { ...current, unitsPerPack: nextUnitsPerPack, quantity: nextQuantity } : current);
+    } catch {
+      if (rollbackOnError) setEditUnitsPerPack(item.unitsPerPack ? String(item.unitsPerPack) : '');
+      Alert.alert('Error', 'Failed to update contents per item');
+    } finally {
+      setSavingUnitsPerPack(false);
+    }
+  }, [editUnitsPerPack, item, savingUnitsPerPack]);
+
+  useEffect(() => {
+    if (editingField !== 'quantity' || !item || savingQuantity) return;
+    if (editQuantity.trim() === '') return;
+
+    const nextQuantity = Math.max(0, Math.floor(parseInt(editQuantity, 10)) || 0);
+    if (nextQuantity === item.quantity && editQuantity === String(item.quantity)) return;
+
+    const timeout = setTimeout(() => {
+      persistQuantityDraft();
+    }, 650);
+
+    return () => clearTimeout(timeout);
+  }, [editQuantity, editingField, item, persistQuantityDraft, savingQuantity]);
+
+  useEffect(() => {
+    if (editingField !== 'totalContents' || !item || savingQuantity) return;
+    if (editTotalContents.trim() === '') return;
+
+    const nextQuantity = Math.max(0, Math.floor(parseInt(editTotalContents, 10)) || 0);
+    if (nextQuantity === item.quantity && editTotalContents === String(item.quantity)) return;
+
+    const timeout = setTimeout(() => {
+      persistTotalContentsDraft();
+    }, 650);
+
+    return () => clearTimeout(timeout);
+  }, [editTotalContents, editingField, item, persistTotalContentsDraft, savingQuantity]);
+
+  useEffect(() => {
+    if (editingField !== 'unitsPerPack' || !item || savingUnitsPerPack) return;
+
+    const nextUnitsPerPack = editUnitsPerPack.trim()
+      ? Math.max(1, Math.floor(parseInt(editUnitsPerPack, 10)) || 1)
+      : null;
+    if ((nextUnitsPerPack ?? null) === (item.unitsPerPack ?? null)) return;
+
+    const timeout = setTimeout(() => {
+      persistUnitsPerPackDraft();
+    }, 650);
+
+    return () => clearTimeout(timeout);
+  }, [editUnitsPerPack, editingField, item, persistUnitsPerPackDraft, savingUnitsPerPack]);
+
+  async function adjustStock(delta: number) {
+    if (!item) return;
+    const step = item.unitsPerPack ? Math.max(1, item.unitsPerPack) : 1;
+    const nextQuantity = Math.max(0, item.quantity + (delta * step));
+    if (nextQuantity === item.quantity) return;
+    try {
+      await ItemService.updateItem(item.id, { quantity: nextQuantity });
+      setItem((current) => current ? { ...current, quantity: nextQuantity } : current);
+      if (editingField === 'quantity') setEditQuantity(String(getItemCount(nextQuantity, item.unitsPerPack)));
+      if (editingField === 'totalContents') setEditTotalContents(String(nextQuantity));
+    } catch {
+      Alert.alert('Error', 'Failed to update stock');
+    }
+  }
+
+  async function adjustTotalContents(delta: number) {
+    if (!item) return;
+    const nextQuantity = Math.max(0, item.quantity + delta);
+    if (nextQuantity === item.quantity) return;
+    try {
+      await ItemService.updateItem(item.id, { quantity: nextQuantity });
+      setItem((current) => current ? { ...current, quantity: nextQuantity } : current);
+      if (editingField === 'quantity') setEditQuantity(String(getItemCount(nextQuantity, item.unitsPerPack)));
+      if (editingField === 'totalContents') setEditTotalContents(String(nextQuantity));
+    } catch {
+      Alert.alert('Error', 'Failed to update total contents');
+    }
+  }
+
+  async function updateUnitsPerPack(nextValue: number | null) {
+    if (!item) return;
+    try {
+      const itemCount = getItemCount(item.quantity, item.unitsPerPack);
+      const nextQuantity = nextValue ? getStoredQuantity(itemCount, nextValue) : itemCount;
+      await ItemService.updateItem(item.id, { unitsPerPack: nextValue, quantity: nextQuantity });
+      setItem((current) => current ? { ...current, unitsPerPack: nextValue, quantity: nextQuantity } : current);
+      if (editingField === 'unitsPerPack') setEditUnitsPerPack(nextValue ? String(nextValue) : '');
+      if (editingField === 'quantity') setEditQuantity(String(getItemCount(nextQuantity, nextValue)));
+      if (editingField === 'totalContents') setEditTotalContents(String(nextQuantity));
+    } catch {
+      Alert.alert('Error', 'Failed to update contents per item');
+    }
+  }
+
+  function adjustUnitsPerPack(delta: number) {
+    const current = item?.unitsPerPack ?? 0;
+    const nextValue = Math.max(0, current + delta);
+    updateUnitsPerPack(nextValue > 0 ? nextValue : null);
   }
 
   async function handleAddPhoto(source: 'camera' | 'gallery') {
@@ -371,6 +548,18 @@ export default function ItemDetailScreen() {
     return { label: 'Active', color: '#6b9e7a' };
   }
 
+  function openPrintableLabel() {
+    if (!item) return;
+    setShowMenu(false);
+    router.push({
+      pathname: '/tools/label-qr' as any,
+      params: {
+        targetKind: 'item',
+        targetId: item.id,
+      },
+    });
+  }
+
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: isDark ? '#000' : '#f8f9fa', paddingTop: insets.top }]}>
@@ -422,6 +611,9 @@ export default function ItemDetailScreen() {
         { text: 'Mark Found', onPress: handleMarkFound },
       ]
     );
+
+  const noStockGuard = () =>
+    Alert.alert('No stock available', 'Add stock before lending this item.');
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? '#000000' : '#f8f9fa' }]}>
@@ -554,29 +746,171 @@ export default function ItemDetailScreen() {
 
         {/* Quantity */}
         <View style={[styles.fieldCard, { backgroundColor: cardBg, borderColor }]}>
-          <Text style={[styles.fieldLabel, { color: subtleText }]}>Quantity</Text>
-          {editingField === 'quantity' ? (
-            <View style={styles.editRow}>
-              <TextInput
-                style={[styles.editInput, { color: colors.text, backgroundColor: inputBg, borderColor, width: 80 }]}
-                value={editQuantity}
-                onChangeText={(t) => setEditQuantity(t.replace(/[^0-9]/g, ''))}
-                autoFocus
-                keyboardType="number-pad"
-                maxLength={4}
-              />
-              <TouchableOpacity style={[styles.saveBtn, { backgroundColor: PRIMARY }]} onPress={() => handleSaveField('quantity')}>
-                <Text style={styles.saveBtnText}>Save</Text>
+          <Text style={[styles.fieldLabel, { color: subtleText }]}>Item count</Text>
+          <View style={styles.stepperRow}>
+            <TouchableOpacity
+              style={[styles.stepperButton, { borderColor, opacity: item.quantity <= 0 ? 0.45 : 1 }]}
+              onPress={() => adjustStock(-1)}
+              disabled={item.quantity <= 0}
+            >
+              <FontAwesomeIcon icon={faMinus} size={13} color={item.quantity <= 0 ? subtleText : PRIMARY} />
+            </TouchableOpacity>
+            {editingField === 'quantity' ? (
+              <View style={[styles.stepperValueWrap, { backgroundColor: inputBg, borderColor }]}>
+                <TextInput
+                    style={[styles.stepperInput, { color: colors.text }]}
+                    value={editQuantity}
+                    onChangeText={(t) => setEditQuantity(t.replace(/[^0-9]/g, ''))}
+                    onBlur={() => persistQuantityDraft()}
+                    onSubmitEditing={() => persistQuantityDraft()}
+                    autoFocus
+                    keyboardType="number-pad"
+                    returnKeyType="done"
+                    maxLength={4}
+                    editable={!savingQuantity}
+                  />
+              </View>
+            ) : (
+              <TouchableOpacity onPress={() => startEdit('quantity')} style={[styles.stepperValueWrap, { backgroundColor: inputBg, borderColor }]}>
+                <Text style={[styles.stepperValue, { color: colors.text }]}>{getItemCount(item.quantity, item.unitsPerPack)}</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setEditingField(null)}>
-                <Text style={[styles.cancelText, { color: subtleText }]}>Cancel</Text>
+            )}
+            <TouchableOpacity
+              style={[styles.stepperButton, { borderColor }]}
+              onPress={() => adjustStock(1)}
+            >
+              <FontAwesomeIcon icon={faPlus} size={13} color={PRIMARY} />
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.stockHint, { color: subtleText }]}>
+            {item.unitsPerPack ? `Each step changes ${item.unitsPerPack} total contents.` : 'Count whole items you have in stock.'}
+          </Text>
+        </View>
+
+        {item.unitsPerPack ? (
+          <View style={[styles.fieldCard, { backgroundColor: cardBg, borderColor }]}>
+            <Text style={[styles.fieldLabel, { color: subtleText }]}>Total contents</Text>
+            <View style={styles.stepperRow}>
+              <TouchableOpacity
+                style={[styles.stepperButton, { borderColor, opacity: item.quantity <= 0 ? 0.45 : 1 }]}
+                onPress={() => adjustTotalContents(-1)}
+                disabled={item.quantity <= 0}
+              >
+                <FontAwesomeIcon icon={faMinus} size={13} color={item.quantity <= 0 ? subtleText : PRIMARY} />
+              </TouchableOpacity>
+              {editingField === 'totalContents' ? (
+                <View style={[styles.stepperValueWrap, { backgroundColor: inputBg, borderColor }]}>
+                  <TextInput
+                    style={[styles.stepperInput, { color: colors.text }]}
+                    value={editTotalContents}
+                    onChangeText={(t) => setEditTotalContents(t.replace(/[^0-9]/g, ''))}
+                    onBlur={() => persistTotalContentsDraft()}
+                    onSubmitEditing={() => persistTotalContentsDraft()}
+                    autoFocus
+                    keyboardType="number-pad"
+                    returnKeyType="done"
+                    maxLength={5}
+                    editable={!savingQuantity}
+                  />
+                </View>
+              ) : (
+                <TouchableOpacity onPress={() => startEdit('totalContents')} style={[styles.stepperValueWrap, { backgroundColor: inputBg, borderColor }]}>
+                  <Text style={[styles.stepperValue, { color: colors.text }]}>{item.quantity}</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[styles.stepperButton, { borderColor }]}
+                onPress={() => adjustTotalContents(1)}
+              >
+                <FontAwesomeIcon icon={faPlus} size={13} color={PRIMARY} />
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.stockHint, { color: subtleText }]}>Use this when one content unit is sold or used.</Text>
+          </View>
+        ) : null}
+
+        {/* Pack size */}
+        <View style={[styles.fieldCard, { backgroundColor: cardBg, borderColor }]}>
+          <Text style={[styles.fieldLabel, { color: subtleText }]}>Contents per item</Text>
+          {editingField === 'unitsPerPack' ? (
+            <>
+              <View style={styles.stepperRow}>
+                <TouchableOpacity
+                  style={[styles.stepperButton, { borderColor, opacity: !item.unitsPerPack ? 0.45 : 1 }]}
+                  onPress={() => adjustUnitsPerPack(-1)}
+                  disabled={!item.unitsPerPack}
+                >
+                  <FontAwesomeIcon icon={faMinus} size={13} color={!item.unitsPerPack ? subtleText : PRIMARY} />
+                </TouchableOpacity>
+                <View style={[styles.stepperValueWrap, { backgroundColor: inputBg, borderColor }]}>
+                  <TextInput
+                    style={[styles.stepperInput, { color: colors.text }]}
+                    value={editUnitsPerPack}
+                    onChangeText={(t) => setEditUnitsPerPack(t.replace(/[^0-9]/g, ''))}
+                    onBlur={() => persistUnitsPerPackDraft()}
+                    onSubmitEditing={() => persistUnitsPerPackDraft()}
+                    autoFocus
+                    keyboardType="number-pad"
+                    returnKeyType="done"
+                    maxLength={5}
+                    editable={!savingUnitsPerPack}
+                    placeholder="0"
+                    placeholderTextColor={subtleText}
+                  />
+                </View>
+                <TouchableOpacity
+                  style={[styles.stepperButton, { borderColor }]}
+                  onPress={() => adjustUnitsPerPack(1)}
+                >
+                  <FontAwesomeIcon icon={faPlus} size={13} color={PRIMARY} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.presetRow}>
+                {PACK_SIZE_PRESETS.map((preset) => {
+                  const active = item.unitsPerPack === preset;
+                  return (
+                    <TouchableOpacity
+                      key={preset}
+                      style={[styles.presetChip, { backgroundColor: active ? PRIMARY : inputBg, borderColor }]}
+                      onPress={() => updateUnitsPerPack(preset)}
+                    >
+                      <Text style={[styles.presetChipText, { color: active ? '#ffffff' : colors.text }]}>{preset}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <View style={styles.editActionsRow}>
+                <TouchableOpacity
+                  style={[styles.secondaryMiniBtn, { borderColor }]}
+                  onPress={() => setEditingField(null)}
+                >
+                  <Text style={[styles.secondaryMiniBtnText, { color: subtleText }]}>Done</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : item.unitsPerPack ? (
+            <View style={styles.protectedValueRow}>
+              <View style={[styles.protectedValueBox, { backgroundColor: inputBg, borderColor }]}>
+                <Text style={[styles.stepperValue, { color: colors.text }]}>{item.unitsPerPack}</Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.secondaryMiniBtn, { borderColor }]}
+                onPress={() => startEdit('unitsPerPack')}
+              >
+                <Text style={[styles.secondaryMiniBtnText, { color: PRIMARY }]}>Edit</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity onPress={() => startEdit('quantity')}>
-              <Text style={[styles.fieldValue, { color: colors.text }]}>{item.quantity}</Text>
+            <TouchableOpacity
+              style={[styles.enableContentsBtn, { backgroundColor: inputBg, borderColor }]}
+              onPress={() => startEdit('unitsPerPack')}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.enableContentsText, { color: colors.text }]}>Enable contents tracking</Text>
+              <Text style={[styles.stockHint, { color: subtleText }]}>For packs, tubs, boxes, or containers with units inside.</Text>
             </TouchableOpacity>
           )}
+          <Text style={[styles.stockHint, { color: subtleText }]}>Set this to how many sellable contents are inside one item.</Text>
         </View>
 
         {/* Location */}
@@ -668,12 +1002,19 @@ export default function ItemDetailScreen() {
             ) : (
               <TouchableOpacity
                 style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]}
-              onPress={() => { setShowMenu(false); if (isLost) { lostGuard(); } else if (isOutside) { outsideGuard(); } else { setBorrowerName(''); setLendQuantity('1'); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); setShowLendModal(true); } }}
+              onPress={() => { setShowMenu(false); if (isLost) { lostGuard(); } else if (isOutside) { outsideGuard(); } else if (item.quantity <= 0) { noStockGuard(); } else { setBorrowerName(''); setLendQuantity('1'); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); setShowLendModal(true); } }}
               >
                 <FontAwesomeIcon icon={faHandshake} size={18} color={isLost ? '#d32f2f' : isOutside ? '#e67e22' : PRIMARY} />
                 <Text style={[styles.menuItemText, { color: isLost ? '#d32f2f' : isOutside ? '#e67e22' : colors.text }]}>Lend item</Text>
               </TouchableOpacity>
             )}
+            <TouchableOpacity
+              style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]}
+              onPress={openPrintableLabel}
+            >
+              <FontAwesomeIcon icon={faQrcode} size={18} color={PRIMARY} />
+              <Text style={[styles.menuItemText, { color: colors.text }]}>Print item label</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem} onPress={() => { setShowMenu(false); handleDelete(); }}>
               <FontAwesomeIcon icon={faTrash} size={18} color="#e53e3e" />
               <Text style={[styles.menuItemText, { color: '#e53e3e' }]}>Delete item</Text>
@@ -860,6 +1201,22 @@ const styles = StyleSheet.create({
   },
   fieldLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.3, marginBottom: 4 },
   fieldValue: { fontSize: 16, fontWeight: '500' },
+  stockHint: { fontSize: 12, lineHeight: 17, marginTop: 3 },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
+  stepperButton: { width: 38, height: 38, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  stepperValueWrap: { flex: 1, height: 38, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  stepperValue: { fontSize: 18, fontWeight: '800' },
+  stepperInput: { width: '100%', height: 38, textAlign: 'center', fontSize: 18, fontWeight: '800', paddingVertical: 0 },
+  presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  presetChip: { minWidth: 44, minHeight: 32, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+  presetChipText: { fontSize: 13, fontWeight: '800' },
+  protectedValueRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
+  protectedValueBox: { flex: 1, minHeight: 38, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  secondaryMiniBtn: { minHeight: 38, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
+  secondaryMiniBtnText: { fontSize: 14, fontWeight: '800' },
+  editActionsRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10 },
+  enableContentsBtn: { borderRadius: 10, borderWidth: 1.5, padding: 12, marginTop: 4 },
+  enableContentsText: { fontSize: 15, fontWeight: '800' },
 
   editRow: { gap: 8 },
   editInput: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16 },

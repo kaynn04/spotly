@@ -29,13 +29,27 @@ const BARCODE_TYPES: BarcodeType[] = [
   'itf14',
 ];
 
+const CODE_TYPES: BarcodeType[] = ['qr', ...BARCODE_TYPES];
+
 interface BarcodeScannerModalProps {
   visible: boolean;
   onClose: () => void;
   onScanned: (result: { type: string; data: string }) => void;
+  includeQr?: boolean;
+  title?: string;
+  permissionMessage?: string;
+  hint?: string;
 }
 
-export default function BarcodeScannerModal({ visible, onClose, onScanned }: BarcodeScannerModalProps) {
+export default function BarcodeScannerModal({
+  visible,
+  onClose,
+  onScanned,
+  includeQr = false,
+  title = 'Scan Barcode',
+  permissionMessage = 'Synop needs camera access to scan product barcodes for item details.',
+  hint = 'Align the product barcode inside the frame',
+}: BarcodeScannerModalProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const [permission, requestPermission] = useCameraPermissions();
@@ -71,7 +85,7 @@ export default function BarcodeScannerModal({ visible, onClose, onScanned }: Bar
         <View style={[styles.header, { backgroundColor: surfaceBg }]}>
           <View style={styles.headerTitleWrap}>
             <FontAwesomeIcon icon={faBarcode} size={18} color={BARCODE_ORANGE} />
-            <Text style={[styles.headerTitle, { color: textColor }]}>Scan Barcode</Text>
+            <Text style={[styles.headerTitle, { color: textColor }]}>{title}</Text>
           </View>
           <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
             <FontAwesomeIcon icon={faTimes} size={17} color={PRIMARY} />
@@ -87,7 +101,7 @@ export default function BarcodeScannerModal({ visible, onClose, onScanned }: Bar
             <FontAwesomeIcon icon={faBarcode} size={48} color={BARCODE_ORANGE} />
             <Text style={[styles.permissionTitle, { color: textColor }]}>Camera access needed</Text>
             <Text style={[styles.permissionText, { color: mutedText }]}>
-              Synop needs camera access to scan product barcodes for item details.
+              {permissionMessage}
             </Text>
             <TouchableOpacity style={styles.permissionButton} onPress={requestPermission} activeOpacity={0.8}>
               <Text style={styles.permissionButtonText}>Allow Camera</Text>
@@ -98,12 +112,12 @@ export default function BarcodeScannerModal({ visible, onClose, onScanned }: Bar
             <CameraView
               style={styles.camera}
               facing="back"
-              barcodeScannerSettings={{ barcodeTypes: BARCODE_TYPES }}
+              barcodeScannerSettings={{ barcodeTypes: includeQr ? CODE_TYPES : BARCODE_TYPES }}
               onBarcodeScanned={scanned ? undefined : handleScan}
             >
               <View style={styles.cameraOverlay}>
-                <View style={styles.scanFrame} />
-                <Text style={styles.scanHint}>Align the product barcode inside the frame</Text>
+                <View style={includeQr ? styles.scanFrameSquare : styles.scanFrame} />
+                <Text style={styles.scanHint}>{hint}</Text>
               </View>
             </CameraView>
           </View>
@@ -163,6 +177,14 @@ const styles = StyleSheet.create({
     width: 280,
     height: 130,
     borderRadius: 18,
+    borderWidth: 3,
+    borderColor: '#ffffff',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  scanFrameSquare: {
+    width: 240,
+    height: 240,
+    borderRadius: 24,
     borderWidth: 3,
     borderColor: '#ffffff',
     backgroundColor: 'rgba(255,255,255,0.05)',
