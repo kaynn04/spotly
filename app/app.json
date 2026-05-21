@@ -2,7 +2,7 @@
   "expo": {
     "name": "Synop",
     "slug": "synop",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "synop",
@@ -13,7 +13,7 @@
       "supportsTablet": true,
       "backgroundColor": "#f8f9fa",
       "bundleIdentifier": "com.kaynn.synop",
-      "buildNumber": "2"
+      "buildNumber": "3"
     },
     "android": {
       "permissions": [
@@ -35,7 +35,7 @@
       "predictiveBackGestureEnabled": false,
       "allowBackup": false,
       "package": "com.kaynn.synop",
-      "versionCode": 2
+      "versionCode": 3
     },
     "web": {
       "output": "static",
