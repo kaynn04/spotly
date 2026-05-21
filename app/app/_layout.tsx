@@ -111,6 +111,7 @@ export default function RootLayout() {
             <Stack.Screen name="item/[id]" />
             <Stack.Screen name="lending/[id]" />
             <Stack.Screen name="lending/history" />
+            <Stack.Screen name="outside/index" />
             <Stack.Screen name="outside/[id]" />
             <Stack.Screen name="outside/history" />
             <Stack.Screen name="tools/barcode-scanner" />
