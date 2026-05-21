@@ -34,7 +34,6 @@ import {
 } from '../services/LabelQrService';
 import QrScannerModal from '../components/QrScannerModal';
 
-const PRIMARY = '#6b7f99';
 const QR_PURPLE = '#9b7fd4';
 
 const FILTERS: { key: LabelTargetKind | 'all'; label: string }[] = [
@@ -287,12 +286,12 @@ export default function LabelQrGeneratorScreen() {
           </View>
         </View>
         <TouchableOpacity
-          style={[styles.scanButton, { backgroundColor: cardBg, borderColor }]}
+          style={[styles.scanButton, { backgroundColor: `${QR_PURPLE}14`, borderColor: `${QR_PURPLE}45` }]}
           onPress={() => setShowScanner(true)}
           activeOpacity={0.7}
           accessibilityLabel="Scan code"
         >
-          <FontAwesomeIcon icon={faCamera} size={16} color={PRIMARY} />
+          <FontAwesomeIcon icon={faCamera} size={16} color={QR_PURPLE} />
         </TouchableOpacity>
       </View>
 
@@ -311,7 +310,7 @@ export default function LabelQrGeneratorScreen() {
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {!selectedTarget && (
-            <View style={[styles.pickCard, { backgroundColor: cardBg, borderColor }]}>
+            <View style={[styles.pickCard, { backgroundColor: `${QR_PURPLE}0F`, borderColor: `${QR_PURPLE}35` }]}>
               <FontAwesomeIcon icon={faQrcode} size={28} color={QR_PURPLE} />
               <Text style={[styles.pickTitle, { color: colors.text }]}>Choose what to label</Text>
               <Text style={[styles.pickText, { color: subtleText }]}>
@@ -321,7 +320,7 @@ export default function LabelQrGeneratorScreen() {
           )}
 
           {selectedTarget && (
-            <View style={[styles.previewCard, { backgroundColor: cardBg, borderColor }]}>
+            <View style={[styles.previewCard, { backgroundColor: `${QR_PURPLE}0F`, borderColor: `${QR_PURPLE}40` }]}>
               <View ref={printableLabelRef} collapsable={false} style={styles.printableLabel}>
                 <View style={styles.previewHeader}>
                   <View style={styles.previewTitleWrap}>
@@ -363,18 +362,18 @@ export default function LabelQrGeneratorScreen() {
               )}
 
               <TouchableOpacity
-                style={[styles.exportButton, { borderColor: PRIMARY }]}
+                style={[styles.exportButton, { borderColor: `${QR_PURPLE}75`, backgroundColor: `${QR_PURPLE}12` }]}
                 onPress={exportPrintableLabel}
                 activeOpacity={0.8}
                 disabled={exporting}
               >
-                <Text style={[styles.exportButtonText, { color: PRIMARY }]}>
+                <Text style={[styles.exportButtonText, { color: QR_PURPLE }]}>
                   {exporting ? 'Preparing label...' : 'Download printable label'}
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.openButton, { backgroundColor: PRIMARY }]}
+                style={[styles.openButton, { backgroundColor: QR_PURPLE }]}
                 onPress={openSelected}
                 activeOpacity={0.8}
               >
@@ -563,6 +562,8 @@ const styles = StyleSheet.create({
   printableLabel: {
     backgroundColor: '#ffffff',
     borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#dacdf6',
     padding: 16,
     gap: 16,
   },
@@ -589,6 +590,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     padding: 16,
     borderRadius: 14,
+    backgroundColor: '#f6f1ff',
   },
   codeBlock: {
     borderRadius: 12,
@@ -603,7 +605,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     alignItems: 'center',
-    backgroundColor: '#eef0f3',
+    backgroundColor: '#f1ebfb',
   },
   printCodeText: { color: '#11181c', fontSize: 13, fontWeight: '700', letterSpacing: 0.4 },
   liveCountText: {
