@@ -39,6 +39,7 @@ import { SpaceRepository } from '@/src/repositories/SpaceRepository';
 import { PhotoService } from '@/src/services/PhotoService';
 import { ItemRepository } from '@/src/repositories/ItemRepository';
 import { ContainerRepository } from '@/src/repositories/ContainerRepository';
+import { RecentItemService, type RecentOpenedItem } from '@/src/services/RecentItemService';
 import SpaceFormModal from './components/SpaceFormModal';
 import WalkthroughOverlay from '@/src/features/walkthrough/components/WalkthroughOverlay';
 import { SPACES_WALKTHROUGH_STEPS, type SpotlightRect } from '@/src/features/walkthrough/models/WalkthroughStep';
@@ -94,6 +95,7 @@ export default function SpacesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [editingSpace, setEditingSpace] = useState<SpaceWithCount | null>(null);
+  const [recentItems, setRecentItems] = useState<RecentOpenedItem[]>([]);
   const formVisibleRef = useRef(false);
   const spacesSearchRef = useRef<View>(null);
   const firstSpaceCardRef = useRef<View>(null);
@@ -213,6 +215,7 @@ export default function SpacesPage() {
   useFocusEffect(
     useCallback(() => {
       loadSpaces();
+      loadRecentItems();
     }, [])
   );
 
@@ -257,6 +260,16 @@ export default function SpacesPage() {
       console.error('[SpacesPage] Error loading spaces:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadRecentItems = async () => {
+    try {
+      const items = await RecentItemService.getRecentOpened();
+      setRecentItems(items.slice(0, 6));
+    } catch (err) {
+      console.error('[SpacesPage] Error loading recent items:', err);
+      setRecentItems([]);
     }
   };
 
@@ -543,6 +556,32 @@ export default function SpacesPage() {
     router.push({ pathname: '/space/[id]' as any, params: { id: result.spaceId } });
   };
 
+  const openRecentItem = (item: RecentOpenedItem) => {
+    router.push({ pathname: '/item/[id]' as any, params: { id: item.id } });
+  };
+
+  const renderRecentTrail = (item: RecentOpenedItem) => (
+    <TouchableOpacity
+      key={item.id}
+      style={[styles.recentTrailCard, { backgroundColor: cardBg, borderColor }]}
+      onPress={() => openRecentItem(item)}
+      activeOpacity={0.75}
+    >
+      <View style={[styles.recentTrailIcon, { backgroundColor: `${PRIMARY}14` }]}>
+        <FontAwesomeIcon icon={faFileAlt} size={14} color={PRIMARY} />
+      </View>
+      <View style={styles.recentTrailBody}>
+        <Text style={[styles.recentTrailName, { color: colors.text }]} numberOfLines={1}>
+          {item.name}
+        </Text>
+        <Text style={[styles.recentTrailPath, { color: subtleText }]} numberOfLines={1}>
+          {item.containerName ? `${item.spaceName} > ${item.containerName} > ${item.name}` : `${item.spaceName} > ${item.name}`}
+        </Text>
+      </View>
+      <FontAwesomeIcon icon={faChevronRight} size={13} color={subtleText} />
+    </TouchableOpacity>
+  );
+
   type GridSearchRow =
     | { kind: 'fullwidth'; item: SectionedSearchItem }
     | { kind: 'pair'; left: SectionedSearchItem; right: SectionedSearchItem | null };
@@ -731,6 +770,21 @@ export default function SpacesPage() {
             </TouchableOpacity>
           )}
         </View>
+
+        {!isSearching && recentItems.length > 0 && !selectMode ? (
+          <View style={styles.recentTrailSection}>
+            <View style={styles.recentTrailHeader}>
+              <Text style={[styles.sectionLabel, { color: subtleText }]}>RECENT PATHS</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recentTrailList}
+            >
+              {recentItems.map(renderRecentTrail)}
+            </ScrollView>
+          </View>
+        ) : null}
 
         {/* Search result summary OR spaces section label */}
         {isSearching ? (
@@ -1121,6 +1175,30 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
   sectionLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 0 },
   sectionHeader: { fontSize: 12, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', paddingTop: 12, paddingBottom: 6 },
+  recentTrailSection: { marginBottom: 12 },
+  recentTrailHeader: { marginBottom: 8 },
+  recentTrailList: { gap: 8, paddingRight: 16 },
+  recentTrailCard: {
+    width: 232,
+    minHeight: 64,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  recentTrailIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  recentTrailBody: { flex: 1, minWidth: 0 },
+  recentTrailName: { fontSize: 14, fontWeight: '800' },
+  recentTrailPath: { fontSize: 11, marginTop: 2 },
 
   // Search results
   resultCard: {

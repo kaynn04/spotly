@@ -39,6 +39,7 @@ import PhotoViewModal from '@/components/PhotoViewModal';
 import { Lending } from '@/src/features/lending/models/Lending';
 import LendingFormModal from '@/src/features/lending/screens/components/LendingFormModal';
 import { OutsideService } from '@/src/features/outside/services/OutsideService';
+import { RecentItemService } from '@/src/services/RecentItemService';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faBox, faHandshake, faCheck, faTrash, faMapPin, faFolder, faEllipsisVertical, faChevronLeft, faShield, faTriangleExclamation, faQrcode, faMinus, faPlus } from '@fortawesome/free-solid-svg-icons';
 import DatePickerSheet from '@/src/features/lending/screens/components/DatePickerSheet';
@@ -137,6 +138,11 @@ export default function ItemDetailScreen() {
         outsideService.getActiveSessionItemIds(),
       ]);
       setItem(result);
+      if (result?.id) {
+        RecentItemService.recordOpened(result.id).catch((error) => {
+          console.warn('[ItemDetailScreen] failed to record recent item:', error);
+        });
+      }
       const lending = lendings.find((l) => l.item_id === itemId);
       setActiveLending(lending ?? null);
       setActiveOutsideSession(outsideIds.has(itemId!));
