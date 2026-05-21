@@ -27,10 +27,11 @@ export class SpaceService {
    * - Requires non-empty name after trimming
    * - Enforces maximum length of 100 characters
    */
-  static async createSpace(name: string): Promise<Space> {
+  static async createSpace(name: string, description?: string | null): Promise<Space> {
     try {
       // Trim input
       const trimmedName = name.trim();
+      const trimmedDescription = description?.trim() || null;
 
       // Validate: must not be empty after trimming
       if (trimmedName.length === 0) {
@@ -61,7 +62,7 @@ export class SpaceService {
       }
 
       // Create space in database via repository
-      const space = await SpaceRepository.createSpace(trimmedName);
+      const space = await SpaceRepository.createSpace(trimmedName, trimmedDescription);
 
       return space;
     } catch (error) {

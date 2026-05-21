@@ -10,6 +10,7 @@
 import { getDatabase } from '../../../db/client';
 import { OutsideSessionItem, OutsideSessionItemWithContext, OutsideSessionItemError, OutsideSessionItemErrorCode } from '../models/OutsideSessionItem';
 import { generateUUID } from '../../../utils/uuid';
+import { OutsideSessionRepository } from './OutsideSessionRepository';
 
 export class OutsideSessionItemRepository {
   private static ensureColumnsPromise: Promise<void> | null = null;
@@ -27,6 +28,8 @@ export class OutsideSessionItemRepository {
 
   private async ensureSessionItemColumnsOnce(): Promise<void> {
     const db = getDatabase();
+    await OutsideSessionRepository.ensureTables();
+
     const safeAddColumn = async (name: string, definition: string) => {
       const columns = await db.getAllAsync<any>("PRAGMA table_info(outside_session_items);");
       if (columns.some((col: any) => col.name === name)) return;

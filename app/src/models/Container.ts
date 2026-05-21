@@ -14,6 +14,7 @@
 export interface Container {
   id: string;                    // UUID, unique identifier
   name: string;                  // User-provided container name (1-50 chars)
+  description?: string | null;   // Optional description/notes
   spaceId: string;               // Foreign key reference to space
   createdAt: string;             // ISO 8601 timestamp, immutable
   updatedAt?: string | null;     // ISO 8601 timestamp, last modification
@@ -28,6 +29,7 @@ export interface Container {
 export interface ContainerRow {
   id: string;
   name: string;
+  description?: string | null;
   space_id: string;
   created_at: string;
   updated_at?: string | null;

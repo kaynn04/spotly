@@ -69,6 +69,7 @@ export default function ItemDetailScreen() {
   const [activeLending, setActiveLending] = useState<Lending | null>(null);
   const [showLendModal, setShowLendModal] = useState(false);
   const [borrowerName, setBorrowerName] = useState('');
+  const [lendQuantity, setLendQuantity] = useState('1');
   const [lendNote, setLendNote] = useState('');
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const [lendLoading, setLendLoading] = useState(false);
@@ -237,11 +238,13 @@ export default function ItemDetailScreen() {
   // Lend
   async function handleLendSubmit() {
     if (!borrowerName.trim() || !item) return;
+    const quantity = Math.max(1, Math.floor(Number(lendQuantity) || 1));
     setLendLoading(true);
     try {
       const lending = await lendingService.createLending({
         item_id: item.id,
         borrower_name: borrowerName.trim(),
+        quantity,
         note: lendNote.trim() || undefined,
         due_date: dueDate ?? undefined,
       });
@@ -255,6 +258,7 @@ export default function ItemDetailScreen() {
       }
       setShowLendModal(false);
       setBorrowerName('');
+      setLendQuantity('1');
       setLendNote('');
       setDueDate(null);
       setLendBeforePhotoUris([]);
@@ -664,7 +668,7 @@ export default function ItemDetailScreen() {
             ) : (
               <TouchableOpacity
                 style={[styles.menuItem, { borderBottomColor: borderColor, borderBottomWidth: 1 }]}
-              onPress={() => { setShowMenu(false); if (isLost) { lostGuard(); } else if (isOutside) { outsideGuard(); } else { setBorrowerName(''); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); setShowLendModal(true); } }}
+              onPress={() => { setShowMenu(false); if (isLost) { lostGuard(); } else if (isOutside) { outsideGuard(); } else { setBorrowerName(''); setLendQuantity('1'); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); setShowLendModal(true); } }}
               >
                 <FontAwesomeIcon icon={faHandshake} size={18} color={isLost ? '#d32f2f' : isOutside ? '#e67e22' : PRIMARY} />
                 <Text style={[styles.menuItemText, { color: isLost ? '#d32f2f' : isOutside ? '#e67e22' : colors.text }]}>Lend item</Text>
@@ -686,12 +690,14 @@ export default function ItemDetailScreen() {
         item={item}
         borrowerName={borrowerName}
         onBorrowerNameChange={setBorrowerName}
+        quantity={lendQuantity}
+        onQuantityChange={setLendQuantity}
         note={lendNote}
         onNoteChange={setLendNote}
         dueDate={dueDate}
         onDueDateChange={setDueDate}
         onSubmit={handleLendSubmit}
-        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); }}
+        onCancel={() => { setShowLendModal(false); setBorrowerName(''); setLendQuantity('1'); setLendNote(''); setDueDate(null); setLendBeforePhotoUris([]); }}
         loading={lendLoading}
         beforePhotoUris={lendBeforePhotoUris}
         onBeforePhotosChange={setLendBeforePhotoUris}

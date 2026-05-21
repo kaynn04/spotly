@@ -263,19 +263,32 @@ export default function SpacesPage() {
   const handleSearch = useCallback((text: string) => {
     setSearchText(text);
     const trimmed = text.trim();
-    if (!trimmed) { setSearchResults([]); return; }
-
-    // Debounce: cancel previous pending search
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    searchTimerRef.current = setTimeout(() => performSearch(trimmed), 300);
+    if (!trimmed) {
+      searchRequestRef.current += 1;
+      setSearchLoading(false);
+      setSearchResults([]);
+      return;
+    }
+
+    setSearchLoading(true);
+    const requestId = searchRequestRef.current + 1;
+    searchRequestRef.current = requestId;
+    searchTimerRef.current = setTimeout(() => performSearch(trimmed, requestId), 180);
     // performSearch is intentionally captured for the debounce callback.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRequestRef = useRef(0);
 
-  const performSearch = useCallback(async (trimmed: string) => {
-    setSearchLoading(true);
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, []);
+
+  const performSearch = useCallback(async (trimmed: string, requestId: number) => {
     try {
       const itemRepo = new ItemRepository();
       const [allItems, allSpaces] = await Promise.all([
@@ -336,12 +349,14 @@ export default function SpacesPage() {
         sections.push({ kind: 'section', title: 'Items' });
         itemMatches.forEach((i) => sections.push({ kind: 'result', data: i }));
       }
+      if (requestId !== searchRequestRef.current) return;
       setSearchResults(sections);
     } catch (err) {
+      if (requestId !== searchRequestRef.current) return;
       console.error('[SpacesPage] Search error:', err);
       setSearchResults([]);
     } finally {
-      setSearchLoading(false);
+      if (requestId === searchRequestRef.current) setSearchLoading(false);
     }
   }, []);
 
@@ -395,9 +410,9 @@ export default function SpacesPage() {
     );
   };
 
-  const handleCreateSpace = async (name: string, photoUri?: string | null) => {
+  const handleCreateSpace = async (name: string, description?: string | null, photoUri?: string | null) => {
     const shouldShowSpacesGuide = spaces.length === 0 && !(await WalkthroughService.isSpacesDone());
-    const space = await SpaceService.createSpace(name);
+    const space = await SpaceService.createSpace(name, description);
     if (photoUri && space) {
       const savedUri = await PhotoService.savePhoto(photoUri, `space_${space.id}`);
       await SpaceRepository.updatePhotoUri(space.id, savedUri);
@@ -410,10 +425,10 @@ export default function SpacesPage() {
     }
   };
 
-  const handleEditSpace = async (name: string, photoUri?: string | null) => {
+  const handleEditSpace = async (name: string, description?: string | null, photoUri?: string | null) => {
     if (!editingSpace) return;
     const id = editingSpace.id;
-    await SpaceRepository.updateName(id, name);
+    await SpaceRepository.updateDetails(id, { name, description: description ?? null });
     if (photoUri && photoUri !== editingSpace.photoUri) {
       const savedUri = await PhotoService.savePhoto(photoUri, `space_${id}`);
       await SpaceRepository.updatePhotoUri(id, savedUri);
@@ -700,7 +715,14 @@ export default function SpacesPage() {
           />
           {isSearching && (
             <TouchableOpacity 
-              onPress={() => { setSearchText(''); setSearchResults([]); searchInputRef.current?.focus(); }} 
+              onPress={() => {
+                if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+                searchRequestRef.current += 1;
+                setSearchText('');
+                setSearchLoading(false);
+                setSearchResults([]);
+                searchInputRef.current?.focus();
+              }} 
               style={styles.clearBtn}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               activeOpacity={0.6}
@@ -880,6 +902,7 @@ export default function SpacesPage() {
         onSubmit={handleEditSpace}
         editMode
         initialName={editingSpace?.name}
+        initialDescription={editingSpace?.description}
         initialPhotoUri={editingSpace?.photoUri}
       />
 

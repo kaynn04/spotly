@@ -35,6 +35,7 @@ import {
   faShieldAlt,
   faX,
   faMicrophone,
+  faQrcode,
 } from '@fortawesome/free-solid-svg-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -58,6 +59,7 @@ import { WALKTHROUGH_STEPS, type SpotlightRect } from '@/src/features/walkthroug
 import { useWalkthroughContext } from '@/src/features/walkthrough/context/WalkthroughContext';
 import WalkthroughOverlay from '@/src/features/walkthrough/components/WalkthroughOverlay';
 import VoiceModal from '@/src/features/voice/screens/components/VoiceModal';
+import QrScannerModal from '@/src/features/tools/components/QrScannerModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PRIMARY = '#6b7f99';
@@ -143,6 +145,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardData | null>(null);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
+  const [showQrScanner, setShowQrScanner] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [dismissedGuidanceCards, setDismissedGuidanceCards] = useState<Set<string>>(new Set());
@@ -154,6 +157,7 @@ export default function HomePage() {
   // Walkthrough
   const { tabBarRef, measureScreenRef } = useWalkthroughContext();
   const dashboardRef = useRef<View>(null);
+  const scannerRef = useRef<View>(null);
   const voiceInputRef = useRef<View>(null);
   const appearanceToggleHomeRef = useRef<View>(null);
   const settingsRef = useRef<View>(null);
@@ -213,6 +217,13 @@ export default function HomePage() {
       if (step.targetRef === 'voice-input-header') {
         return await new Promise<SpotlightRect>((resolve, reject) => {
           voiceInputRef.current?.measure((_, __, width, height, pageX, pageY) => {
+            resolve({ x: pageX, y: pageY, width, height });
+          }) ?? reject(new Error('no ref'));
+        });
+      }
+      if (step.targetRef === 'dashboard-scanner') {
+        return await new Promise<SpotlightRect>((resolve, reject) => {
+          scannerRef.current?.measure((_, __, width, height, pageX, pageY) => {
             resolve({ x: pageX, y: pageY, width, height });
           }) ?? reject(new Error('no ref'));
         });
@@ -399,6 +410,14 @@ export default function HomePage() {
             </View>
           </View>
           <View style={styles.headerRight}>
+            <TouchableOpacity
+              ref={scannerRef}
+              onPress={() => setShowQrScanner(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={[styles.themeToggle, { backgroundColor: isDark ? '#2c2c2e' : '#e8eaed' }]}
+            >
+              <FontAwesomeIcon icon={faQrcode} size={15} color={PRIMARY} />
+            </TouchableOpacity>
             <TouchableOpacity
               ref={voiceInputRef}
               onPress={() => setShowVoiceModal(true)}
@@ -1080,8 +1099,14 @@ export default function HomePage() {
         step={WALKTHROUGH_STEPS[walkthroughIndex] ?? null}
         spotlightRect={spotlightRect}
         currentIndex={walkthroughIndex}
+        totalSteps={WALKTHROUGH_STEPS.length}
         onNext={handleWalkthroughNext}
         onSkip={handleWalkthroughSkip}
+      />
+
+      <QrScannerModal
+        visible={showQrScanner}
+        onClose={() => setShowQrScanner(false)}
       />
 
       <VoiceModal

@@ -32,9 +32,10 @@ const PRIMARY = '#6b7f99';
 interface ContainerFormModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (name: string, photoUri?: string | null) => Promise<void>;
+  onSubmit: (name: string, description?: string | null, photoUri?: string | null) => Promise<void>;
   editMode?: boolean;
   initialName?: string;
+  initialDescription?: string | null;
   initialPhotoUri?: string | null;
 }
 
@@ -44,6 +45,7 @@ export default function ContainerFormModal({
   onSubmit,
   editMode,
   initialName,
+  initialDescription,
   initialPhotoUri,
 }: ContainerFormModalProps) {
   const colorScheme = useColorScheme();
@@ -52,6 +54,7 @@ export default function ContainerFormModal({
   const isDark = colorScheme === 'dark';
 
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -60,9 +63,10 @@ export default function ContainerFormModal({
   useEffect(() => {
     if (!visible) return;
     setName(editMode ? (initialName ?? '') : '');
+    setDescription(editMode ? (initialDescription ?? '') : '');
     setPhotoUri(editMode ? (initialPhotoUri ?? null) : null);
     setError(null);
-  }, [visible, editMode, initialName, initialPhotoUri]);
+  }, [visible, editMode, initialDescription, initialName, initialPhotoUri]);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const inputBg = isDark ? '#2c2c2e' : '#f8f9fa';
@@ -75,6 +79,7 @@ export default function ContainerFormModal({
   const handleCancel = () => {
     Keyboard.dismiss();
     setName('');
+    setDescription('');
     setError(null);
     setPhotoUri(null);
     onClose();
@@ -85,9 +90,10 @@ export default function ContainerFormModal({
     setLoading(true);
     setError(null);
     try {
-      await onSubmit(name.trim(), photoUri);
+      await onSubmit(name.trim(), description.trim() || null, photoUri);
       if (!editMode) {
         setName('');
+        setDescription('');
         setPhotoUri(null);
       }
       onClose();
@@ -155,6 +161,23 @@ export default function ContainerFormModal({
                     )}
                     <Text style={[styles.charCount, { color: subtleText }]}>{name.length}/50</Text>
                   </View>
+
+                  <Text style={[styles.fieldLabel, { color: subtleText }]}>Description (optional)</Text>
+                  <View style={[styles.inputWrapper, styles.descriptionWrapper, { backgroundColor: inputBg, borderColor }]}>
+                    <TextInput
+                      style={[styles.input, styles.descriptionInput, { color: textColor }]}
+                      placeholder="Add notes about this container"
+                      placeholderTextColor={subtleText}
+                      value={description}
+                      onChangeText={setDescription}
+                      maxLength={500}
+                      editable={!loading}
+                      multiline
+                      numberOfLines={3}
+                      textAlignVertical="top"
+                    />
+                  </View>
+                  <Text style={[styles.descriptionCount, { color: subtleText }]}>{description.length}/500</Text>
 
                   {/* Photo */}
                   <Text style={[styles.fieldLabel, { color: subtleText }]}>Photo (optional)</Text>
@@ -234,6 +257,9 @@ const styles = StyleSheet.create({
   sheetSubtitle: { fontSize: 14, marginBottom: 20 },
   inputWrapper: { borderRadius: 12, borderWidth: 1.5, paddingHorizontal: 14, paddingVertical: 2 },
   input: { fontSize: 16, paddingVertical: 12 },
+  descriptionWrapper: { paddingVertical: 8, marginBottom: 4 },
+  descriptionInput: { minHeight: 72, paddingTop: 2 },
+  descriptionCount: { fontSize: 11, textAlign: 'right', marginBottom: 16 },
   inputMeta: {
     flexDirection: 'row',
     justifyContent: 'space-between',

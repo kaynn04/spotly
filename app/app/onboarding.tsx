@@ -23,11 +23,12 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
+  BackHandler,
   useWindowDimensions,
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
@@ -127,6 +128,7 @@ export default function OnboardingScreen() {
 
   const listRef = useRef<FlatList<Slide>>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
+  const currentIndexRef = useRef(0);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [name, setName] = useState('');
   const [nameError, setNameError] = useState<string | null>(null);
@@ -145,13 +147,36 @@ export default function OnboardingScreen() {
   const isLastSlide = currentIndex === SLIDES.length - 1;
 
   useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        const current = currentIndexRef.current;
+        if (current <= 0) {
+          listRef.current?.scrollToIndex({ index: 0, animated: false });
+          setCurrentIndex(0);
+          return true;
+        }
+
+        const previous = current - 1;
+        listRef.current?.scrollToIndex({ index: previous, animated: true });
+        setCurrentIndex(previous);
+        return true;
+      });
+      return () => subscription.remove();
+    }, [])
+  );
+
+  useEffect(() => {
     if (!layoutSize.width) return;
 
-    scrollX.setValue(currentIndex * pageWidth);
+    scrollX.setValue(currentIndexRef.current * pageWidth);
     requestAnimationFrame(() => {
-      listRef.current?.scrollToIndex({ index: currentIndex, animated: false });
+      listRef.current?.scrollToIndex({ index: currentIndexRef.current, animated: false });
     });
-  }, [currentIndex, layoutSize.width, pageWidth, scrollX]);
+  }, [layoutSize.width, pageWidth, scrollX]);
 
   function goNext() {
     if (isLastSlide) {
@@ -245,7 +270,6 @@ export default function OnboardingScreen() {
     >
       {/* Slides */}
       <Animated.FlatList
-        key={`onboarding-${pageWidth}`}
         ref={listRef}
         data={SLIDES}
         keyExtractor={(s) => s.key}

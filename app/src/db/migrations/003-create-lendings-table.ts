@@ -49,6 +49,7 @@ export async function createLendingsTable(db: any): Promise<void> {
         id TEXT PRIMARY KEY,
         item_id TEXT NOT NULL,
         borrower_name TEXT NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 1,
         note TEXT,
         lent_at TEXT NOT NULL,
         returned_at TEXT,

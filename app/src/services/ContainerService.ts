@@ -28,10 +28,11 @@ export class ContainerService {
    * - Requires non-empty name after trimming
    * - Enforces maximum length of 50 characters
    */
-  static async createContainer(name: string, spaceId: string): Promise<Container> {
+  static async createContainer(name: string, spaceId: string, description?: string | null): Promise<Container> {
     try {
       // Trim input
       const trimmedName = name.trim();
+      const trimmedDescription = description?.trim() || null;
 
       // Validate: must not be empty after trimming
       if (trimmedName.length === 0) {
@@ -62,7 +63,7 @@ export class ContainerService {
 
       // Create container in database via repository
       // Database enforces global UNIQUE constraint on container names
-      const container = await ContainerRepository.createContainer(trimmedName, spaceId);
+      const container = await ContainerRepository.createContainer(trimmedName, spaceId, trimmedDescription);
 
       return container;
     } catch (error) {
@@ -129,7 +130,9 @@ export class ContainerService {
    * @param updates - Object containing fields to update
    * @throws ServiceError if validation fails or duplicate name found
    */
-  static async updateContainer(id: string, updates: { name?: string; photoUri?: string | null }): Promise<void> {
+  static async updateContainer(id: string, updates: { name?: string; description?: string | null; photoUri?: string | null }): Promise<void> {
+    const detailUpdates: { name?: string; description?: string | null } = {};
+
     if (updates.name !== undefined) {
       const trimmed = updates.name.trim();
       if (trimmed.length === 0) {
@@ -147,7 +150,15 @@ export class ContainerService {
         throw error;
       }
 
-      await ContainerRepository.updateName(id, trimmed);
+      detailUpdates.name = trimmed;
+    }
+
+    if (updates.description !== undefined) {
+      detailUpdates.description = updates.description?.trim() || null;
+    }
+
+    if (detailUpdates.name !== undefined || updates.description !== undefined) {
+      await ContainerRepository.updateDetails(id, detailUpdates);
     }
 
     if (updates.photoUri !== undefined) {

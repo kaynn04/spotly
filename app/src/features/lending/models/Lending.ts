@@ -42,6 +42,7 @@ export interface Lending {
   id: string; // UUID
   item_id: string; // UUID (foreign key)
   borrower_name: string; // Required
+  quantity: number; // Number of units lent
   note?: string; // Optional
   lent_at: Date;
   due_date: Date | null; // Optional return-by date
@@ -66,6 +67,7 @@ export interface Lending {
 export interface LendingCreateInput {
   item_id: string;
   borrower_name: string;
+  quantity?: number;
   note?: string;
   due_date?: Date | null; // Optional due date
 }

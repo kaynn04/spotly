@@ -28,8 +28,30 @@ import { generateUUID } from '../../../utils/uuid';
  * Error handling: Throws native SQLite errors; Service layer translates to domain errors
  */
 export class LendingRepository {
+  private static ensureQuantityColumnPromise: Promise<void> | null = null;
+
   private get db() {
     return getDatabase();
+  }
+
+  private async ensureQuantityColumn(): Promise<void> {
+    if (!LendingRepository.ensureQuantityColumnPromise) {
+      LendingRepository.ensureQuantityColumnPromise = (async () => {
+        const cols = await this.db.getAllAsync<any>('PRAGMA table_info(lendings);');
+        if (cols.some((col: any) => col.name === 'quantity')) return;
+
+        try {
+          await this.db.execAsync(`ALTER TABLE lendings ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1;`);
+        } catch (error: any) {
+          const message = String(error?.message ?? error).toLowerCase();
+          if (!message.includes('duplicate column')) throw error;
+        }
+      })().finally(() => {
+        LendingRepository.ensureQuantityColumnPromise = null;
+      });
+    }
+
+    await LendingRepository.ensureQuantityColumnPromise;
   }
 
   /**
@@ -46,6 +68,7 @@ export class LendingRepository {
    * @throws SQLite error if query fails
    */
   async getByStatus(status: LendingStatus): Promise<Lending[]> {
+    await this.ensureQuantityColumn();
     const results = await this.db.getAllAsync(
       `SELECT * FROM lendings WHERE status = ? ORDER BY lent_at DESC`,
       [status]
@@ -54,6 +77,7 @@ export class LendingRepository {
   }
 
   async getActiveLendingsWithItemNames(): Promise<(Lending & { item_name: string })[]> {
+    await this.ensureQuantityColumn();
     const results = await this.db.getAllAsync(
       `SELECT l.*, COALESCE(i.name, 'Unknown Item') as item_name
        FROM lendings l
@@ -80,6 +104,7 @@ export class LendingRepository {
    * @throws SQLite error if query fails
    */
   async getAll(): Promise<Lending[]> {
+    await this.ensureQuantityColumn();
     const results = await this.db.getAllAsync(
       `SELECT * FROM lendings ORDER BY lent_at DESC`
     );
@@ -99,6 +124,7 @@ export class LendingRepository {
    * @throws SQLite error if query fails
    */
   async getById(id: string): Promise<Lending | null> {
+    await this.ensureQuantityColumn();
     const result = await this.db.getFirstAsync(
       `SELECT * FROM lendings WHERE id = ?`,
       [id]
@@ -121,6 +147,7 @@ export class LendingRepository {
    * @throws SQLite error if query fails
    */
   async getByItemId(itemId: string): Promise<Lending[]> {
+    await this.ensureQuantityColumn();
     const results = await this.db.getAllAsync(
       `SELECT * FROM lendings WHERE item_id = ? ORDER BY lent_at DESC`,
       [itemId]
@@ -132,6 +159,7 @@ export class LendingRepository {
    * Get the current ACTIVE lending for a single item, or null.
    */
   async getActiveLendingForItem(itemId: string): Promise<Lending | null> {
+    await this.ensureQuantityColumn();
     const result = await this.db.getFirstAsync(
       `SELECT * FROM lendings WHERE item_id = ? AND status = ? LIMIT 1`,
       [itemId, LendingStatus.ACTIVE]
@@ -153,6 +181,7 @@ export class LendingRepository {
    * @throws SQLite error if query fails
    */
   async hasActiveLending(itemId: string): Promise<boolean> {
+    await this.ensureQuantityColumn();
     console.log('[LendingRepository.hasActiveLending] Checking for item:', itemId);
     const result = await this.db.getFirstAsync(
       `SELECT 1 FROM lendings WHERE item_id = ? AND status = ?`,
@@ -184,8 +213,10 @@ export class LendingRepository {
    * @throws SQLite error (likely unique constraint violation if item already lent)
    */
   async create(input: LendingCreateInput): Promise<Lending> {
+    await this.ensureQuantityColumn();
     const id = generateUUID();
     const now = new Date().toISOString();
+    const quantity = Math.max(1, Math.floor(input.quantity ?? 1));
 
     console.log('[LendingRepository.create] Starting with:', {
       id,
@@ -198,12 +229,13 @@ export class LendingRepository {
       console.log('[LendingRepository.create] Executing INSERT...');
       await this.db.runAsync(
         `INSERT INTO lendings (
-          id, item_id, borrower_name, note, lent_at, due_date, returned_at, status, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          id, item_id, borrower_name, quantity, note, lent_at, due_date, returned_at, status, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           input.item_id,
           input.borrower_name,
+          quantity,
           input.note || null,
           now,
           input.due_date ? input.due_date.toISOString() : null,
@@ -252,6 +284,7 @@ export class LendingRepository {
    * @throws SQLite error if query fails or lending not found
    */
   async markAsReturned(id: string): Promise<Lending> {
+    await this.ensureQuantityColumn();
     const now = new Date().toISOString();
 
     await this.db.runAsync(
@@ -271,6 +304,7 @@ export class LendingRepository {
     id: string,
     updates: { borrower_name: string; note?: string | null; due_date?: Date | null }
   ): Promise<Lending> {
+    await this.ensureQuantityColumn();
     const now = new Date().toISOString();
     await this.db.runAsync(
       `UPDATE lendings
@@ -294,10 +328,12 @@ export class LendingRepository {
   }
 
   async delete(id: string): Promise<void> {
+    await this.ensureQuantityColumn();
     await this.db.runAsync(`DELETE FROM lendings WHERE id = ?`, [id]);
   }
 
   async setReminderId(id: string, reminderId: string | null): Promise<void> {
+    await this.ensureQuantityColumn();
     await this.db.runAsync(
       `UPDATE lendings SET reminder_id = ?, updated_at = ? WHERE id = ?`,
       [reminderId, new Date().toISOString(), id]
@@ -318,6 +354,7 @@ export class LendingRepository {
       id: row.id,
       item_id: row.item_id,
       borrower_name: row.borrower_name,
+      quantity: Math.max(1, Number(row.quantity ?? 1)),
       note: row.note || undefined,
       lent_at: new Date(row.lent_at),
       due_date: row.due_date ? new Date(row.due_date) : null,

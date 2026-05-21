@@ -30,6 +30,7 @@ import LendingPhotoSection from './components/LendingPhotoSection';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faCamera, faChevronLeft, faTimes } from '@fortawesome/free-solid-svg-icons';
 import PhotoPickerSheet from '@/components/PhotoPickerSheet';
+import PhotoViewModal from '@/components/PhotoViewModal';
 import { PhotoService } from '@/src/services/PhotoService';
 
 const PRIMARY = '#6b7f99';
@@ -61,6 +62,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
   const [afterPhotos, setAfterPhotos] = useState<LendingPhoto[]>([]);
   const [returnPhotoUris, setReturnPhotoUris] = useState<string[]>([]);
   const [showReturnPhotoPicker, setShowReturnPhotoPicker] = useState(false);
+  const [showItemPhotoViewer, setShowItemPhotoViewer] = useState(false);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
@@ -217,7 +219,14 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
           {/* Item Card */}
           <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
             {item?.photoUri && (
-              <Image source={{ uri: item.photoUri }} style={styles.itemPhoto} />
+              <TouchableOpacity
+                activeOpacity={0.86}
+                onPress={() => setShowItemPhotoViewer(true)}
+                accessibilityRole="imagebutton"
+                accessibilityLabel={`View ${item.name ?? 'item'} photo full screen`}
+              >
+                <Image source={{ uri: item.photoUri }} style={styles.itemPhoto} />
+              </TouchableOpacity>
             )}
             <Text style={[styles.sectionLabel, { color: subtleText }]}>ITEM</Text>
             {item ? (
@@ -244,6 +253,11 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
           <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
             <Text style={[styles.sectionLabel, { color: subtleText }]}>BORROWER</Text>
             <Text style={[styles.sectionValue, { color: colors.text }]}>{lending.borrower_name}</Text>
+
+            <View style={[styles.divider, { backgroundColor: borderColor }]} />
+
+            <Text style={[styles.sectionLabel, { color: subtleText }]}>QUANTITY</Text>
+            <Text style={[styles.sectionValue, { color: colors.text }]}>{lending.quantity}</Text>
 
             <View style={[styles.divider, { backgroundColor: borderColor }]} />
 
@@ -343,7 +357,7 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
             <View style={[styles.dialogHandle, { backgroundColor: isDark ? '#48484a' : '#d1d5db' }]} />
             <Text style={[styles.dialogTitle, { color: colors.text }]}>Mark as Returned?</Text>
             <Text style={[styles.dialogMessage, { color: subtleText }]}>
-              Confirm that {lending.borrower_name} has returned the item.
+              Confirm that {lending.borrower_name} has returned {lending.quantity} unit{lending.quantity === 1 ? '' : 's'}.
             </Text>
             <Text style={[styles.dialogPhotoLabel, { color: subtleText }]}>After Photo (optional)</Text>
             <View style={styles.returnPhotoGrid}>
@@ -403,6 +417,12 @@ export default function LendingDetailScreen({ lendingId }: LendingDetailScreenPr
           const uri = await PhotoService.pickFromGallery();
           if (uri) setReturnPhotoUris((prev) => [...prev, uri].slice(0, MAX_PHOTOS_PER_PHASE));
         }}
+      />
+      <PhotoViewModal
+        visible={showItemPhotoViewer}
+        uri={item?.photoUri ?? null}
+        title={item?.name ?? 'Item photo'}
+        onClose={() => setShowItemPhotoViewer(false)}
       />
     </SafeAreaView>
   );

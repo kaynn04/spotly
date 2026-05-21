@@ -19,6 +19,7 @@ import { createLendingPhotosTable } from './migrations/010-create-lending-photos
 import { addLendingDueDate } from './migrations/011-add-lending-due-date';
 import { addItemWarranty } from './migrations/012-add-item-warranty';
 import { addGlobalUniqueConstraints } from './migrations/013-add-global-unique-constraints';
+import { addLendingQuantity } from './migrations/014-add-lending-quantity';
 
 /**
  * Initialize the database schema
@@ -37,6 +38,7 @@ export async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS spaces (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        description TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at TEXT NOT NULL DEFAULT (datetime('now')),
         CHECK (length(trim(name)) > 0 AND length(name) <= 100)
@@ -60,6 +62,7 @@ export async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS containers (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        description TEXT,
         space_id TEXT NOT NULL,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         FOREIGN KEY (space_id) REFERENCES spaces(id) ON DELETE CASCADE,
@@ -72,6 +75,22 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_containers_space_id 
       ON containers(space_id);
     `);
+
+    // Add optional description columns to spaces and containers
+    try {
+      const spaceCols = await db.getAllAsync<any>("PRAGMA table_info(spaces);");
+      if (!spaceCols.some((col: any) => col.name === 'description')) {
+        await db.execAsync(`ALTER TABLE spaces ADD COLUMN description TEXT;`);
+        console.log('✓ Added description column to spaces');
+      }
+      const containerCols = await db.getAllAsync<any>("PRAGMA table_info(containers);");
+      if (!containerCols.some((col: any) => col.name === 'description')) {
+        await db.execAsync(`ALTER TABLE containers ADD COLUMN description TEXT;`);
+        console.log('✓ Added description column to containers');
+      }
+    } catch (err) {
+      console.error('Space/container description columns migration failed:', err);
+    }
 
     // Ensure container names are unique within a space
     await db.execAsync(`
@@ -208,6 +227,13 @@ export async function initializeDatabase() {
       console.error('⚠ Lending due_date migration failed:', err);
     }
 
+    // Add quantity column to lendings (Migration 014)
+    try {
+      await addLendingQuantity(db);
+    } catch (err) {
+      console.error('Lending quantity migration failed:', err);
+    }
+
     // Add warranty_expiry + warranty_reminder_id columns to items (Migration 012)
     try {
       await addItemWarranty(db);
@@ -234,6 +260,26 @@ export async function initializeDatabase() {
       }
     } catch (err) {
       console.error('Lost item columns migration failed:', err);
+    }
+
+    // Add barcode lookup columns for scanner-assisted item recall
+    try {
+      const itemCols = await db.getAllAsync<any>("PRAGMA table_info(items);");
+      if (!itemCols.some((col: any) => col.name === 'barcode_type')) {
+        await db.execAsync(`ALTER TABLE items ADD COLUMN barcode_type TEXT;`);
+        console.log('✓ Added barcode_type column to items');
+      }
+      const refreshedItemCols = await db.getAllAsync<any>("PRAGMA table_info(items);");
+      if (!refreshedItemCols.some((col: any) => col.name === 'barcode_data')) {
+        await db.execAsync(`ALTER TABLE items ADD COLUMN barcode_data TEXT;`);
+        console.log('✓ Added barcode_data column to items');
+      }
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_items_barcode_data
+        ON items(barcode_data);
+      `);
+    } catch (err) {
+      console.error('Barcode columns migration failed:', err);
     }
 
     // Add global unique constraints for items and containers (Migration 013)

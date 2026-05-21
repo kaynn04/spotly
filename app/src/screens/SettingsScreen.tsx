@@ -111,32 +111,93 @@ const STARTER_TEMPLATES: StarterTemplate[] = [
       { name: 'Shed', containers: ['Garden Tools', 'Safety Gear'] },
     ],
   },
+  {
+    id: 'family',
+    title: 'Family Home',
+    description: 'Separate shared household storage, kids items, medicine, and school supplies.',
+    spaces: [
+      { name: 'Entryway', containers: ['Keys Tray', 'Shoe Rack', 'Go Bag'] },
+      { name: 'Kids Room', containers: ['School Supplies', 'Toys Bin', 'Clothes Drawer'] },
+      { name: 'Medicine Cabinet', containers: ['First Aid', 'Daily Medicine', 'Thermometers'] },
+      { name: 'Laundry Area', containers: ['Cleaning Supplies', 'Spare Linens'] },
+    ],
+  },
+  {
+    id: 'electronics',
+    title: 'Electronics & Gadgets',
+    description: 'Track devices, cables, accessories, warranties, and manuals.',
+    spaces: [
+      { name: 'Tech Shelf', containers: ['Phones & Tablets', 'Adapters', 'Manuals'] },
+      { name: 'Computer Desk', containers: ['Peripherals', 'Storage Drives', 'Cables'] },
+      { name: 'Camera Kit', containers: ['Batteries', 'Memory Cards', 'Lenses'] },
+    ],
+  },
+  {
+    id: 'kitchen',
+    title: 'Kitchen & Pantry',
+    description: 'Structure pantry goods, cookware, appliances, and party supplies.',
+    spaces: [
+      { name: 'Pantry', containers: ['Canned Goods', 'Baking Supplies', 'Snacks'] },
+      { name: 'Kitchen Cabinets', containers: ['Cookware', 'Food Containers', 'Small Appliances'] },
+      { name: 'Dining Storage', containers: ['Serveware', 'Party Supplies'] },
+    ],
+  },
+  {
+    id: 'hobby',
+    title: 'Hobbies & Crafts',
+    description: 'Group creative supplies, sports gear, collectibles, and project materials.',
+    spaces: [
+      { name: 'Craft Station', containers: ['Paints', 'Paper', 'Tools'] },
+      { name: 'Sports Gear', containers: ['Outdoor Gear', 'Protective Gear', 'Accessories'] },
+      { name: 'Collections', containers: ['Display Items', 'Storage Boxes'] },
+    ],
+  },
+  {
+    id: 'emergency',
+    title: 'Emergency Preparedness',
+    description: 'Create a quick structure for safety kits, documents, and backup supplies.',
+    spaces: [
+      { name: 'Emergency Kit', containers: ['First Aid', 'Flashlights', 'Batteries'] },
+      { name: 'Important Documents', containers: ['IDs', 'Insurance', 'Medical Records'] },
+      { name: 'Backup Supplies', containers: ['Water', 'Food', 'Power Bank'] },
+    ],
+  },
+  {
+    id: 'moving',
+    title: 'Moving Boxes',
+    description: 'Prepare spaces and box groups for packing, moving, or storage units.',
+    spaces: [
+      { name: 'Packed Boxes', containers: ['Kitchen Box', 'Bedroom Box', 'Bathroom Box'] },
+      { name: 'Fragile Items', containers: ['Glassware', 'Electronics', 'Decor'] },
+      { name: 'Storage Unit', containers: ['Seasonal Box', 'Archive Box', 'Tools Box'] },
+    ],
+  },
 ];
 
 const GUIDE_TOPICS = [
   {
-    title: 'Spaces, containers, and items',
-    body: 'Use spaces for locations, containers for boxes or drawers, and items for the things you want to track.',
+    title: 'Start with places',
+    body: 'Create a space first, like Bedroom, Garage, Office, or Travel Bag. Add containers only when they help, like Drawer, Toolbox, or Documents.',
   },
   {
-    title: 'Lending',
-    body: 'Track who borrowed an item, add due dates, and keep before/after photos when condition matters.',
+    title: 'Add items with useful details',
+    body: 'Name the item, set quantity, add a photo if helpful, and use description for notes like size, color, serial number, or where it fits.',
   },
   {
-    title: 'Outside sessions',
-    body: 'Build a temporary checklist before leaving, then confirm what came back when you are going home.',
+    title: 'Use the scanner to skip searching',
+    body: 'Generate QR labels for spaces, containers, or items. Product barcodes can remember item details after the first scan.',
   },
   {
-    title: 'Lost items',
-    body: 'Mark an item lost from an outside session or item details, then clear the note when it is found.',
+    title: 'Track borrowed quantity',
+    body: 'When lending, choose how many units leave your inventory. When they come back, Synop adds the quantity back automatically.',
   },
   {
-    title: 'Import and export',
-    body: 'Export a JSON backup, then import it later by merging or replacing your current data.',
+    title: 'Use outside sessions for trips',
+    body: 'Before leaving, choose the items you are bringing. When you return, check them off, mark missing items, or move items to a new location.',
   },
   {
-    title: 'Offline first',
-    body: 'Synop keeps your inventory on your device, so core organizing tools work even without Wi-Fi or mobile data.',
+    title: 'Back up when you make progress',
+    body: 'Export a backup after big organizing sessions. Import later by merging with current data or replacing it when you need a clean restore.',
   },
 ];
 
@@ -343,7 +404,13 @@ export default function SettingsScreen() {
       setShowTemplates(false);
       Alert.alert(
         'Template Added',
-        `Added ${createdSpaces} space${createdSpaces === 1 ? '' : 's'} and ${createdContainers} container${createdContainers === 1 ? '' : 's'}.`
+        `Added ${createdSpaces} space${createdSpaces === 1 ? '' : 's'} and ${createdContainers} container${createdContainers === 1 ? '' : 's'}.`,
+        [
+          {
+            text: 'View Dashboard',
+            onPress: () => router.replace('/(tabs)' as any),
+          },
+        ]
       );
     } catch (err: any) {
       console.error('Template error:', err);
@@ -509,7 +576,7 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
           {renderRow(faInfoCircle, PRIMARY, 'Version', () => {}, {
             rightElement: (
-              <Text style={[styles.versionText, { color: subtleText }]}>1.0.0</Text>
+              <Text style={[styles.versionText, { color: subtleText }]}>1.0.1</Text>
             ),
           })}
         </View>
