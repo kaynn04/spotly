@@ -5,7 +5,7 @@
  * Sections: Profile, Appearance, Data, About
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,7 @@ import {
   faTrash,
   faInfoCircle,
   faChevronRight,
+  faChevronDown,
   faRotateRight,
   faBookOpen,
   faLayerGroup,
@@ -51,8 +52,18 @@ import { ContainerService } from '@/src/services/ContainerService';
 const PRIMARY = '#6b7f99';
 const DANGER = '#d32f2f';
 
+const TEMPLATE_CATEGORIES = [
+  { id: 'business', title: 'Business Inventory', description: 'Small shops, sellers, supplies, and stock rooms.' },
+  { id: 'home', title: 'Home & Daily Life', description: 'Rooms, documents, pantry, and shared household storage.' },
+  { id: 'hobby', title: 'Hobbies & Collections', description: 'Creative supplies, gear, collectibles, and projects.' },
+  { id: 'moving', title: 'Travel, Moving & Safety', description: 'Trips, moving boxes, emergency kits, and seasonal storage.' },
+] as const;
+
+type TemplateCategory = typeof TEMPLATE_CATEGORIES[number]['id'];
+
 interface StarterTemplate {
   id: string;
+  category: TemplateCategory;
   title: string;
   description: string;
   spaces: {
@@ -64,6 +75,7 @@ interface StarterTemplate {
 const STARTER_TEMPLATES: StarterTemplate[] = [
   {
     id: 'home',
+    category: 'home',
     title: 'Home Inventory',
     description: 'A balanced setup for rooms, documents, tools, and everyday storage.',
     spaces: [
@@ -75,6 +87,7 @@ const STARTER_TEMPLATES: StarterTemplate[] = [
   },
   {
     id: 'apartment',
+    category: 'home',
     title: 'Dorm / Apartment',
     description: 'Simple spaces for compact living and shared storage.',
     spaces: [
@@ -85,6 +98,7 @@ const STARTER_TEMPLATES: StarterTemplate[] = [
   },
   {
     id: 'office',
+    category: 'business',
     title: 'Office Storage',
     description: 'Track office supplies, equipment, and documents.',
     spaces: [
@@ -95,6 +109,7 @@ const STARTER_TEMPLATES: StarterTemplate[] = [
   },
   {
     id: 'travel',
+    category: 'moving',
     title: 'Travel Essentials',
     description: 'Prepare common travel groups for bags, documents, and gadgets.',
     spaces: [
@@ -104,6 +119,7 @@ const STARTER_TEMPLATES: StarterTemplate[] = [
   },
   {
     id: 'tools',
+    category: 'hobby',
     title: 'Tools & Equipment',
     description: 'Organize tools, spare parts, manuals, and safety gear.',
     spaces: [
@@ -113,6 +129,7 @@ const STARTER_TEMPLATES: StarterTemplate[] = [
   },
   {
     id: 'family',
+    category: 'home',
     title: 'Family Home',
     description: 'Separate shared household storage, kids items, medicine, and school supplies.',
     spaces: [
@@ -124,6 +141,7 @@ const STARTER_TEMPLATES: StarterTemplate[] = [
   },
   {
     id: 'electronics',
+    category: 'hobby',
     title: 'Electronics & Gadgets',
     description: 'Track devices, cables, accessories, warranties, and manuals.',
     spaces: [
@@ -134,6 +152,7 @@ const STARTER_TEMPLATES: StarterTemplate[] = [
   },
   {
     id: 'kitchen',
+    category: 'home',
     title: 'Kitchen & Pantry',
     description: 'Structure pantry goods, cookware, appliances, and party supplies.',
     spaces: [
@@ -144,6 +163,7 @@ const STARTER_TEMPLATES: StarterTemplate[] = [
   },
   {
     id: 'hobby',
+    category: 'hobby',
     title: 'Hobbies & Crafts',
     description: 'Group creative supplies, sports gear, collectibles, and project materials.',
     spaces: [
@@ -154,6 +174,7 @@ const STARTER_TEMPLATES: StarterTemplate[] = [
   },
   {
     id: 'emergency',
+    category: 'moving',
     title: 'Emergency Preparedness',
     description: 'Create a quick structure for safety kits, documents, and backup supplies.',
     spaces: [
@@ -164,12 +185,112 @@ const STARTER_TEMPLATES: StarterTemplate[] = [
   },
   {
     id: 'moving',
+    category: 'moving',
     title: 'Moving Boxes',
     description: 'Prepare spaces and box groups for packing, moving, or storage units.',
     spaces: [
       { name: 'Packed Boxes', containers: ['Kitchen Box', 'Bedroom Box', 'Bathroom Box'] },
       { name: 'Fragile Items', containers: ['Glassware', 'Electronics', 'Decor'] },
       { name: 'Storage Unit', containers: ['Seasonal Box', 'Archive Box', 'Tools Box'] },
+    ],
+  },
+  {
+    id: 'sari-sari-store',
+    category: 'business',
+    title: 'Sari-sari Store',
+    description: 'Set up common shelves and stock groups for a small neighborhood store.',
+    spaces: [
+      { name: 'Front Shelf', containers: ['Snacks', 'Noodles', 'Canned Goods'] },
+      { name: 'Counter', containers: ['Candy Jars', 'Sachets', 'Small Items'] },
+      { name: 'Back Stock', containers: ['Drinks', 'Extra Packs', 'Cleaning Goods'] },
+    ],
+  },
+  {
+    id: 'online-seller',
+    category: 'business',
+    title: 'Online Seller',
+    description: 'Organize products, packing supplies, returns, and ready-to-ship orders.',
+    spaces: [
+      { name: 'Product Stock', containers: ['New Items', 'Best Sellers', 'Low Stock'] },
+      { name: 'Packing Station', containers: ['Pouches', 'Boxes', 'Labels'] },
+      { name: 'Orders', containers: ['To Pack', 'To Ship', 'Returns'] },
+    ],
+  },
+  {
+    id: 'food-stall',
+    category: 'business',
+    title: 'Food Stall / Kitchen Stock',
+    description: 'Track ingredients, disposables, drinks, and prep supplies.',
+    spaces: [
+      { name: 'Ingredients', containers: ['Dry Goods', 'Sauces', 'Condiments'] },
+      { name: 'Drinks', containers: ['Bottled Drinks', 'Powder Mixes', 'Ice Supplies'] },
+      { name: 'Disposables', containers: ['Cups', 'Plates', 'Takeout Bags'] },
+    ],
+  },
+  {
+    id: 'salon',
+    category: 'business',
+    title: 'Salon / Beauty Supplies',
+    description: 'Keep products, tools, towels, and service supplies easy to check.',
+    spaces: [
+      { name: 'Products', containers: ['Hair Care', 'Skin Care', 'Nail Supplies'] },
+      { name: 'Tools', containers: ['Clippers', 'Brushes', 'Heat Tools'] },
+      { name: 'Laundry', containers: ['Clean Towels', 'Used Towels', 'Capes'] },
+    ],
+  },
+  {
+    id: 'repair-shop',
+    category: 'business',
+    title: 'Repair Shop Parts',
+    description: 'Separate tools, spare parts, customer items, and work in progress.',
+    spaces: [
+      { name: 'Workbench', containers: ['Hand Tools', 'Testers', 'Current Repairs'] },
+      { name: 'Parts Storage', containers: ['Cables', 'Screws', 'Replacement Parts'] },
+      { name: 'Customer Items', containers: ['For Diagnosis', 'For Pickup', 'Waiting Parts'] },
+    ],
+  },
+  {
+    id: 'school-supplies-store',
+    category: 'business',
+    title: 'School Supplies Store',
+    description: 'Prepare shelves for paper goods, writing tools, art supplies, and stock extras.',
+    spaces: [
+      { name: 'Main Display', containers: ['Pens', 'Notebooks', 'Paper'] },
+      { name: 'Art Supplies', containers: ['Crayons', 'Paint', 'Craft Materials'] },
+      { name: 'Back Stock', containers: ['Bulk Paper', 'Extra Pens', 'Seasonal Items'] },
+    ],
+  },
+  {
+    id: 'collectibles',
+    category: 'hobby',
+    title: 'Collectibles',
+    description: 'Track display pieces, boxed items, accessories, and condition notes.',
+    spaces: [
+      { name: 'Display Shelf', containers: ['Featured Items', 'Figures', 'Decor'] },
+      { name: 'Storage Boxes', containers: ['Sealed Items', 'Accessories', 'Protective Cases'] },
+      { name: 'Documents', containers: ['Receipts', 'Certificates', 'Checklists'] },
+    ],
+  },
+  {
+    id: 'books-media',
+    category: 'hobby',
+    title: 'Books & Media',
+    description: 'Organize books, games, albums, and loaned media.',
+    spaces: [
+      { name: 'Bookshelf', containers: ['Fiction', 'Reference', 'Comics'] },
+      { name: 'Media Cabinet', containers: ['Games', 'Movies', 'Music'] },
+      { name: 'Borrowed Out', containers: ['Books Lent', 'Games Lent'] },
+    ],
+  },
+  {
+    id: 'plants-garden',
+    category: 'hobby',
+    title: 'Plants & Garden',
+    description: 'Keep seeds, pots, soil, tools, and plant care supplies organized.',
+    spaces: [
+      { name: 'Garden Shelf', containers: ['Seeds', 'Fertilizer', 'Plant Labels'] },
+      { name: 'Potting Area', containers: ['Pots', 'Soil Mixes', 'Tools'] },
+      { name: 'Outdoor Storage', containers: ['Watering Gear', 'Pest Control'] },
     ],
   },
 ];
@@ -219,6 +340,9 @@ export default function SettingsScreen() {
   const [showGuide, setShowGuide] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [templateLoadingId, setTemplateLoadingId] = useState<string | null>(null);
+  const [expandedTemplateGroups, setExpandedTemplateGroups] = useState<Set<TemplateCategory>>(
+    () => new Set()
+  );
 
   const handleRestartWalkthrough = async () => {
     await WalkthroughService.reset();
@@ -229,6 +353,22 @@ export default function SettingsScreen() {
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
   const subtleText = isDark ? '#8e8e93' : '#a0aec0';
   const inputBg = isDark ? '#2c2c2e' : '#f8f9fa';
+
+  const templatesByCategory = useMemo(() => {
+    return TEMPLATE_CATEGORIES.map((category) => ({
+      ...category,
+      templates: STARTER_TEMPLATES.filter((template) => template.category === category.id),
+    }));
+  }, []);
+
+  const toggleTemplateGroup = (category: TemplateCategory) => {
+    setExpandedTemplateGroups((current) => {
+      const next = new Set(current);
+      if (next.has(category)) next.delete(category);
+      else next.add(category);
+      return next;
+    });
+  };
 
   const buildAvailableName = (baseName: string, existingNames: Set<string>) => {
     let candidate = baseName;
@@ -384,6 +524,7 @@ export default function SettingsScreen() {
         SpaceService.getAllSpaces(),
         ContainerService.getAllContainers(),
       ]);
+      const shouldShowSpacesGuide = !(await WalkthroughService.isSpacesDone());
       const spaceNames = new Set(existingSpaces.map((space) => space.name.toLowerCase()));
       const containerNames = new Set(existingContainers.map((container) => container.name.toLowerCase()));
       let createdSpaces = 0;
@@ -407,8 +548,14 @@ export default function SettingsScreen() {
         `Added ${createdSpaces} space${createdSpaces === 1 ? '' : 's'} and ${createdContainers} container${createdContainers === 1 ? '' : 's'}.`,
         [
           {
-            text: 'View Dashboard',
-            onPress: () => router.replace('/(tabs)' as any),
+            text: 'View Spaces',
+            onPress: () => {
+              router.replace(
+                shouldShowSpacesGuide
+                  ? ({ pathname: '/(tabs)/spaces' as any, params: { showGuide: '1' } } as any)
+                  : ('/(tabs)/spaces' as any)
+              );
+            },
           },
         ]
       );
@@ -616,32 +763,54 @@ export default function SettingsScreen() {
               Add ready-made spaces and containers without replacing your current data.
             </Text>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetScroll}>
-              {STARTER_TEMPLATES.map((template) => {
-                const spaceCount = template.spaces.length;
-                const containerCount = template.spaces.reduce((sum, space) => sum + space.containers.length, 0);
-                const isLoading = templateLoadingId === template.id;
+              {templatesByCategory.map((group) => {
+                const isExpanded = expandedTemplateGroups.has(group.id);
                 return (
-                  <View key={template.id} style={[styles.templateCard, { borderColor, backgroundColor: inputBg }]}>
-                    <View style={styles.templateHeader}>
+                  <View key={group.id} style={styles.templateGroup}>
+                    <TouchableOpacity
+                      style={[styles.templateGroupHeader, { borderColor, backgroundColor: inputBg }]}
+                      onPress={() => toggleTemplateGroup(group.id)}
+                      activeOpacity={0.75}
+                    >
                       <View style={styles.templateCopy}>
-                        <Text style={[styles.templateTitle, { color: colors.text }]}>{template.title}</Text>
-                        <Text style={[styles.templateDescription, { color: subtleText }]}>{template.description}</Text>
+                        <Text style={[styles.templateGroupTitle, { color: colors.text }]}>{group.title}</Text>
+                        <Text style={[styles.templateGroupDescription, { color: subtleText }]}>{group.description}</Text>
                       </View>
-                      <TouchableOpacity
-                        style={[styles.templateButton, { backgroundColor: PRIMARY, opacity: templateLoadingId && !isLoading ? 0.5 : 1 }]}
-                        onPress={() => handleApplyTemplate(template)}
-                        disabled={templateLoadingId !== null}
-                      >
-                        {isLoading ? (
-                          <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                          <Text style={styles.templateButtonText}>Add</Text>
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                    <Text style={[styles.templateMeta, { color: subtleText }]}>
-                      {spaceCount} space{spaceCount === 1 ? '' : 's'} · {containerCount} container{containerCount === 1 ? '' : 's'}
-                    </Text>
+                      <View style={styles.templateGroupRight}>
+                        <Text style={[styles.templateGroupCount, { color: subtleText }]}>{group.templates.length}</Text>
+                        <FontAwesomeIcon icon={isExpanded ? faChevronDown : faChevronRight} size={13} color={PRIMARY} />
+                      </View>
+                    </TouchableOpacity>
+
+                    {isExpanded && group.templates.map((template) => {
+                      const spaceCount = template.spaces.length;
+                      const containerCount = template.spaces.reduce((sum, space) => sum + space.containers.length, 0);
+                      const isLoading = templateLoadingId === template.id;
+                      return (
+                        <View key={template.id} style={[styles.templateCard, { borderColor, backgroundColor: cardBg }]}>
+                          <View style={styles.templateHeader}>
+                            <View style={styles.templateCopy}>
+                              <Text style={[styles.templateTitle, { color: colors.text }]}>{template.title}</Text>
+                              <Text style={[styles.templateDescription, { color: subtleText }]}>{template.description}</Text>
+                            </View>
+                            <TouchableOpacity
+                              style={[styles.templateButton, { backgroundColor: PRIMARY, opacity: templateLoadingId && !isLoading ? 0.5 : 1 }]}
+                              onPress={() => handleApplyTemplate(template)}
+                              disabled={templateLoadingId !== null}
+                            >
+                              {isLoading ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                              ) : (
+                                <Text style={styles.templateButtonText}>Add</Text>
+                              )}
+                            </TouchableOpacity>
+                          </View>
+                          <Text style={[styles.templateMeta, { color: subtleText }]}>
+                            {spaceCount} space{spaceCount === 1 ? '' : 's'} - {containerCount} container{containerCount === 1 ? '' : 's'}
+                          </Text>
+                        </View>
+                      );
+                    })}
                   </View>
                 );
               })}
@@ -787,11 +956,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+  templateGroup: {
+    marginBottom: 10,
+  },
+  templateGroupHeader: {
+    minHeight: 64,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 8,
+  },
+  templateGroupTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 3,
+  },
+  templateGroupDescription: {
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  templateGroupRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  templateGroupCount: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
   templateCard: {
     borderWidth: 1,
     borderRadius: 12,
     padding: 14,
-    marginBottom: 10,
+    marginBottom: 8,
+    marginLeft: 10,
   },
   templateHeader: {
     flexDirection: 'row',

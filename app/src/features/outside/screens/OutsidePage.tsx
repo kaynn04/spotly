@@ -38,7 +38,7 @@ interface SessionCardState {
   returnCheckedCount: number;
 }
 
-const PRIMARY = '#6b7f99';
+const PRIMARY = '#4f8f7b';
 
 function formatRelativeDate(date: Date): string {
   const now = new Date();

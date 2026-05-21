@@ -619,9 +619,15 @@ export default function ContainerDetailScreen() {
           ) : (
             <>
               {space && (
-                <Text style={[styles.breadcrumb, { color: subtleText }]} numberOfLines={1}>
-                  {space.name}
-                </Text>
+                <TouchableOpacity
+                  onPress={() => router.dismissTo({ pathname: '/space/[id]' as any, params: { id: space.id } })}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
+                >
+                  <Text style={[styles.breadcrumb, { color: PRIMARY }]} numberOfLines={1}>
+                    {space.name}
+                  </Text>
+                </TouchableOpacity>
               )}
               <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
                 {container?.name ?? 'Container'}

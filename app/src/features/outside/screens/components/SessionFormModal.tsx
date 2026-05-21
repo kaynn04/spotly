@@ -32,7 +32,7 @@ interface SessionFormModalProps {
   onClose: () => void;
 }
 
-const PRIMARY = '#6b7f99';
+const PRIMARY = '#4f8f7b';
 
 export default function SessionFormModal({ visible, onClose }: SessionFormModalProps) {
   const router = useRouter();

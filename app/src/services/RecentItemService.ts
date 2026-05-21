@@ -10,6 +10,7 @@ export interface RecentOpenedItem {
   name: string;
   spaceName: string;
   containerName: string | null;
+  photoUri: string | null;
 }
 
 async function readIds(): Promise<string[]> {
@@ -32,6 +33,7 @@ function toRecentItem(item: Item): RecentOpenedItem {
     name: item.name,
     spaceName: item.space?.name ?? 'Unknown space',
     containerName: item.container?.name ?? null,
+    photoUri: item.photoUri ?? null,
   };
 }
 

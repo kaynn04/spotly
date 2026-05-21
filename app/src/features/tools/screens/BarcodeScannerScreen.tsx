@@ -61,6 +61,12 @@ function getStoredQuantity(itemCount: number, contentsPerItem?: number | null) {
   return safeContents ? safeItemCount * safeContents : safeItemCount;
 }
 
+function parseNonNegativeDraft(value: string, fallback: number) {
+  if (!value.trim()) return fallback;
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : fallback;
+}
+
 function routeForLabelTarget(target: LabelTarget) {
   if (target.kind === 'space') return `/space/${target.id}`;
   if (target.kind === 'container') return `/container/${target.id}`;
@@ -195,7 +201,10 @@ export default function BarcodeScannerScreen() {
     if (!matchedItem || updatingQuantity) return;
 
     const nextItemCount = Math.max(0, Math.floor(itemCount) || 0);
-    const nextQuantity = getStoredQuantity(nextItemCount, matchedItem.unitsPerPack);
+    const currentItemCount = getItemCount(matchedItem.quantity, matchedItem.unitsPerPack);
+    const nextQuantity = matchedItem.unitsPerPack
+      ? Math.max(0, matchedItem.quantity + (nextItemCount - currentItemCount) * matchedItem.unitsPerPack)
+      : nextItemCount;
     setItemCountDraft(String(nextItemCount));
     setQuantityDraft(String(nextQuantity));
     if (nextQuantity === matchedItem.quantity) return;
@@ -253,14 +262,14 @@ export default function BarcodeScannerScreen() {
   const handleQuantityChange = (delta: number) => {
     if (!matchedItem || updatingQuantity) return;
 
-    const currentQuantity = Math.max(0, parseInt(quantityDraft, 10) || matchedItem.quantity);
+    const currentQuantity = parseNonNegativeDraft(quantityDraft, matchedItem.quantity);
     persistMatchedQuantity(currentQuantity + delta);
   };
 
   const handleItemCountChange = (delta: number) => {
     if (!matchedItem || updatingQuantity) return;
 
-    const currentItemCount = Math.max(0, parseInt(itemCountDraft, 10) || getItemCount(matchedItem.quantity, matchedItem.unitsPerPack));
+    const currentItemCount = parseNonNegativeDraft(itemCountDraft, getItemCount(matchedItem.quantity, matchedItem.unitsPerPack));
     persistMatchedItemCount(currentItemCount + delta);
   };
 
@@ -770,7 +779,7 @@ export default function BarcodeScannerScreen() {
 
                 <View style={[styles.stockControlRow, { borderColor: `${BARCODE_ORANGE}22` }]}>
                   <View style={styles.stockControlText}>
-                    <Text style={[styles.stockControlLabel, { color: subtleText }]}>Item count</Text>
+                    <Text style={[styles.stockControlLabel, { color: BARCODE_ORANGE }]}>Item count</Text>
                     <Text style={[styles.stockControlHint, { color: subtleText }]}>
                       Whole items, packs, boxes, or containers
                     </Text>
@@ -810,7 +819,7 @@ export default function BarcodeScannerScreen() {
                 {matchedItem.unitsPerPack ? (
                   <View style={[styles.stockControlRow, { borderColor: `${BARCODE_ORANGE}22` }]}>
                     <View style={styles.stockControlText}>
-                      <Text style={[styles.stockControlLabel, { color: subtleText }]}>Total contents</Text>
+                      <Text style={[styles.stockControlLabel, { color: BARCODE_ORANGE }]}>Total contents</Text>
                       <Text style={[styles.stockControlHint, { color: subtleText }]}>Sell or add one content unit</Text>
                     </View>
                     <View style={styles.quantityControl}>
@@ -848,7 +857,7 @@ export default function BarcodeScannerScreen() {
 
                 <View style={styles.contentsSettingRow}>
                   <View style={styles.stockControlText}>
-                    <Text style={[styles.stockControlLabel, { color: subtleText }]}>Contents per item</Text>
+                    <Text style={[styles.stockControlLabel, { color: BARCODE_ORANGE }]}>Contents per item</Text>
                     <Text style={[styles.stockControlHint, { color: subtleText }]}>Crucial setup value, edit intentionally</Text>
                   </View>
                   {editingMatchedContents ? (
@@ -917,7 +926,7 @@ export default function BarcodeScannerScreen() {
 
               <View style={[styles.metaStrip, { backgroundColor: inputBg, borderColor: `${BARCODE_ORANGE}20` }]}>
                 <View style={styles.metaContent}>
-                  <Text style={[styles.factLabel, { color: subtleText }]}>Warranty</Text>
+                  <Text style={[styles.factLabel, { color: BARCODE_ORANGE }]}>Warranty</Text>
                   {matchedItem.warrantyExpiry ? (
                     <View style={styles.warrantyRow}>
                       <FontAwesomeIcon

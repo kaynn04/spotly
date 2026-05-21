@@ -75,7 +75,7 @@ export default function SpacesPage() {
   const { width: screenWidth } = useWindowDimensions();
   const GRID_ITEM_WIDTH = (screenWidth - GRID_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
   const router = useRouter();
-  const { openCreate } = useLocalSearchParams<{ openCreate?: string }>();
+  const { openCreate, showGuide } = useLocalSearchParams<{ openCreate?: string; showGuide?: string }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
@@ -104,6 +104,7 @@ export default function SpacesPage() {
   const [spacesWalkthroughVisible, setSpacesWalkthroughVisible] = useState(false);
   const [spacesWalkthroughIndex, setSpacesWalkthroughIndex] = useState(0);
   const [spacesSpotlightRect, setSpacesSpotlightRect] = useState<SpotlightRect | null>(null);
+  const guideRequestHandledRef = useRef(false);
 
   const openCreateSpaceForm = useCallback(() => {
     setEditingSpace(null);
@@ -167,7 +168,7 @@ export default function SpacesPage() {
   const borderColor = isDark ? '#2c2c2e' : '#e2e6ea';
   const subtleText = isDark ? '#8e8e93' : '#a0aec0';
 
-  const measureSpacesStep = async (index: number): Promise<SpotlightRect | null> => {
+  const measureSpacesStep = useCallback(async (index: number): Promise<SpotlightRect | null> => {
     const step = SPACES_WALKTHROUGH_STEPS[index];
     if (!step) return null;
     const refMap: Record<string, React.RefObject<View | null>> = {
@@ -184,15 +185,30 @@ export default function SpacesPage() {
         resolve({ x: pageX, y: pageY, width, height });
       }) ?? reject(new Error('walkthrough ref not found'));
     }).catch(() => null);
-  };
+  }, []);
 
-  const startSpacesWalkthrough = async () => {
+  const startSpacesWalkthrough = useCallback(async () => {
     DeviceEventEmitter.emit('synop:hide-tab-bar');
     const rect = await measureSpacesStep(0);
     setSpacesSpotlightRect(rect);
     setSpacesWalkthroughIndex(0);
     setSpacesWalkthroughVisible(true);
-  };
+  }, [measureSpacesStep]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (showGuide !== '1' || guideRequestHandledRef.current) return;
+      guideRequestHandledRef.current = true;
+
+      const timer = setTimeout(async () => {
+        router.setParams({ showGuide: '' } as any);
+        if (await WalkthroughService.isSpacesDone()) return;
+        startSpacesWalkthrough();
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }, [router, showGuide, startSpacesWalkthrough])
+  );
 
   const finishSpacesWalkthrough = async () => {
     await WalkthroughService.markSpacesDone();
@@ -567,9 +583,13 @@ export default function SpacesPage() {
       onPress={() => openRecentItem(item)}
       activeOpacity={0.75}
     >
-      <View style={[styles.recentTrailIcon, { backgroundColor: `${PRIMARY}14` }]}>
-        <FontAwesomeIcon icon={faFileAlt} size={14} color={PRIMARY} />
-      </View>
+      {item.photoUri ? (
+        <Image source={{ uri: item.photoUri }} style={styles.recentTrailThumb} />
+      ) : (
+        <View style={[styles.recentTrailIcon, { backgroundColor: `${PRIMARY}14` }]}>
+          <FontAwesomeIcon icon={faFileAlt} size={14} color={PRIMARY} />
+        </View>
+      )}
       <View style={styles.recentTrailBody}>
         <Text style={[styles.recentTrailName, { color: colors.text }]} numberOfLines={1}>
           {item.name}
@@ -1196,6 +1216,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
   },
+  recentTrailThumb: { width: 34, height: 34, borderRadius: 9, flexShrink: 0 },
   recentTrailBody: { flex: 1, minWidth: 0 },
   recentTrailName: { fontSize: 14, fontWeight: '800' },
   recentTrailPath: { fontSize: 11, marginTop: 2 },

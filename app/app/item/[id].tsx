@@ -922,7 +922,33 @@ export default function ItemDetailScreen() {
         {/* Location */}
         <View style={[styles.fieldCard, { backgroundColor: cardBg, borderColor }]}>
           <Text style={[styles.fieldLabel, { color: subtleText }]}>Location</Text>
-          <Text style={[styles.fieldValue, { color: colors.text }]}>{locationText}</Text>
+          <View style={styles.locationTrail}>
+            {item.space ? (
+              <TouchableOpacity
+                style={[styles.locationPill, { backgroundColor: inputBg, borderColor }]}
+                onPress={() => router.dismissTo({ pathname: '/space/[id]' as any, params: { id: item.spaceId } })}
+                activeOpacity={0.75}
+              >
+                <FontAwesomeIcon icon={faMapPin} size={11} color={PRIMARY} />
+                <Text style={[styles.locationPillText, { color: PRIMARY }]} numberOfLines={1}>{item.space.name}</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={[styles.fieldValue, { color: colors.text }]}>{locationText}</Text>
+            )}
+            {item.container ? (
+              <>
+                <Text style={[styles.locationSeparator, { color: subtleText }]}>/</Text>
+                <TouchableOpacity
+                  style={[styles.locationPill, { backgroundColor: inputBg, borderColor }]}
+                  onPress={() => router.dismissTo({ pathname: '/container/[id]' as any, params: { id: item.containerId } })}
+                  activeOpacity={0.75}
+                >
+                  <FontAwesomeIcon icon={faFolder} size={11} color={PRIMARY} />
+                  <Text style={[styles.locationPillText, { color: PRIMARY }]} numberOfLines={1}>{item.container.name}</Text>
+                </TouchableOpacity>
+              </>
+            ) : null}
+          </View>
         </View>
 
         {/* Created */}
@@ -1207,6 +1233,10 @@ const styles = StyleSheet.create({
   },
   fieldLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 0.3, marginBottom: 4 },
   fieldValue: { fontSize: 16, fontWeight: '500' },
+  locationTrail: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 7, marginTop: 4 },
+  locationPill: { minHeight: 30, maxWidth: '100%', borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  locationPillText: { fontSize: 13, fontWeight: '800', flexShrink: 1 },
+  locationSeparator: { fontSize: 13, fontWeight: '800' },
   stockHint: { fontSize: 12, lineHeight: 17, marginTop: 3 },
   stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
   stepperButton: { width: 38, height: 38, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
