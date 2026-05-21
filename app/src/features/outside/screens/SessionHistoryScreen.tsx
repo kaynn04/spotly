@@ -25,7 +25,7 @@ import { OutsideSessionItemWithContext } from '../models/OutsideSessionItem';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faChevronLeft } from '@fortawesome/free-solid-svg-icons';
 
-const PRIMARY = '#6b7f99';
+const PRIMARY = '#4f8f7b';
 
 export default function SessionHistoryScreen() {
   const router = useRouter();

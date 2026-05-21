@@ -37,7 +37,8 @@ export class ItemService {
     containerId?: string | null,
     description?: string | null,
     quantity?: number,
-    photoUri?: string | null
+    photoUri?: string | null,
+    unitsPerPack?: number | null
   ): Promise<Item> {
     try {
       // Trim input
@@ -63,7 +64,10 @@ export class ItemService {
 
       // Create item in database via repository
       // Database enforces global UNIQUE constraint on item names
-      const item = await ItemRepository.createItem(trimmedName, spaceId, containerId, description, quantity, photoUri);
+      const safeQuantity = Math.max(0, Math.floor(quantity ?? 1));
+      const safeUnitsPerPack = unitsPerPack == null ? null : Math.max(1, Math.floor(unitsPerPack));
+
+      const item = await ItemRepository.createItem(trimmedName, spaceId, containerId, description, safeQuantity, photoUri, safeUnitsPerPack);
 
       return item;
     } catch (error) {
@@ -247,7 +251,7 @@ export class ItemService {
   /**
    * Update item fields (name, description, quantity)
    */
-  static async updateItem(itemId: string, updates: { name?: string; description?: string | null; quantity?: number }): Promise<void> {
+  static async updateItem(itemId: string, updates: { name?: string; description?: string | null; quantity?: number; unitsPerPack?: number | null }): Promise<void> {
     if (updates.name !== undefined) {
       const trimmed = updates.name.trim();
       if (trimmed.length === 0) {
@@ -267,6 +271,15 @@ export class ItemService {
 
       updates.name = trimmed;
     }
+
+    if (updates.quantity !== undefined) {
+      updates.quantity = Math.max(0, Math.floor(updates.quantity) || 0);
+    }
+
+    if (updates.unitsPerPack !== undefined && updates.unitsPerPack !== null) {
+      updates.unitsPerPack = Math.max(1, Math.floor(updates.unitsPerPack) || 1);
+    }
+
     return ItemRepository.updateItem(itemId, updates);
   }
 

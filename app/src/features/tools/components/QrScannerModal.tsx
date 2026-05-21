@@ -11,13 +11,14 @@ import {
 import { CameraView, useCameraPermissions, type BarcodeScanningResult, type BarcodeType } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faBarcode, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faBarcode, faBolt, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { LabelQrService, type LabelTarget } from '../services/LabelQrService';
 
 const PRIMARY = '#6b7f99';
+const QR_PURPLE = '#7b61c9';
 const BARCODE_TYPES: BarcodeType[] = [
   'qr',
   'ean13',
@@ -49,11 +50,13 @@ export default function QrScannerModal({ visible, onClose }: QrScannerModalProps
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [resolving, setResolving] = useState(false);
+  const [torchEnabled, setTorchEnabled] = useState(false);
 
   useEffect(() => {
     if (!visible) {
       setScanned(false);
       setResolving(false);
+      setTorchEnabled(false);
       return;
     }
     if (!permission?.granted) {
@@ -149,10 +152,19 @@ export default function QrScannerModal({ visible, onClose }: QrScannerModalProps
             <CameraView
               style={styles.camera}
               facing="back"
+              enableTorch={torchEnabled}
               barcodeScannerSettings={{ barcodeTypes: BARCODE_TYPES }}
               onBarcodeScanned={scanned ? undefined : handleScan}
             >
               <View style={styles.cameraOverlay}>
+                <TouchableOpacity
+                  style={[styles.torchButton, torchEnabled && styles.torchButtonActive]}
+                  onPress={() => setTorchEnabled((enabled) => !enabled)}
+                  activeOpacity={0.75}
+                  accessibilityLabel={torchEnabled ? 'Turn flashlight off' : 'Turn flashlight on'}
+                >
+                  <FontAwesomeIcon icon={faBolt} size={16} color="#ffffff" />
+                </TouchableOpacity>
                 <View style={styles.scanFrame} />
                 <Text style={styles.scanHint}>Place a Synop QR label or product barcode inside the frame</Text>
                 {resolving && (
@@ -215,6 +227,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
     backgroundColor: 'rgba(0,0,0,0.18)',
+  },
+  torchButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.48)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
+  torchButtonActive: {
+    backgroundColor: QR_PURPLE,
+    borderColor: 'rgba(255,255,255,0.7)',
   },
   scanFrame: {
     width: 240,

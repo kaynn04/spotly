@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult, type BarcodeType } from 'expo-camera';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faBarcode, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faBarcode, faBolt, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -29,21 +29,37 @@ const BARCODE_TYPES: BarcodeType[] = [
   'itf14',
 ];
 
+const CODE_TYPES: BarcodeType[] = ['qr', ...BARCODE_TYPES];
+
 interface BarcodeScannerModalProps {
   visible: boolean;
   onClose: () => void;
   onScanned: (result: { type: string; data: string }) => void;
+  includeQr?: boolean;
+  title?: string;
+  permissionMessage?: string;
+  hint?: string;
 }
 
-export default function BarcodeScannerModal({ visible, onClose, onScanned }: BarcodeScannerModalProps) {
+export default function BarcodeScannerModal({
+  visible,
+  onClose,
+  onScanned,
+  includeQr = false,
+  title = 'Scan Barcode',
+  permissionMessage = 'Synop needs camera access to scan product barcodes for item details.',
+  hint = 'Align the product barcode inside the frame',
+}: BarcodeScannerModalProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
+  const [torchEnabled, setTorchEnabled] = useState(false);
 
   useEffect(() => {
     if (!visible) {
       setScanned(false);
+      setTorchEnabled(false);
       return;
     }
     if (!permission?.granted) {
@@ -71,7 +87,7 @@ export default function BarcodeScannerModal({ visible, onClose, onScanned }: Bar
         <View style={[styles.header, { backgroundColor: surfaceBg }]}>
           <View style={styles.headerTitleWrap}>
             <FontAwesomeIcon icon={faBarcode} size={18} color={BARCODE_ORANGE} />
-            <Text style={[styles.headerTitle, { color: textColor }]}>Scan Barcode</Text>
+            <Text style={[styles.headerTitle, { color: textColor }]}>{title}</Text>
           </View>
           <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
             <FontAwesomeIcon icon={faTimes} size={17} color={PRIMARY} />
@@ -87,7 +103,7 @@ export default function BarcodeScannerModal({ visible, onClose, onScanned }: Bar
             <FontAwesomeIcon icon={faBarcode} size={48} color={BARCODE_ORANGE} />
             <Text style={[styles.permissionTitle, { color: textColor }]}>Camera access needed</Text>
             <Text style={[styles.permissionText, { color: mutedText }]}>
-              Synop needs camera access to scan product barcodes for item details.
+              {permissionMessage}
             </Text>
             <TouchableOpacity style={styles.permissionButton} onPress={requestPermission} activeOpacity={0.8}>
               <Text style={styles.permissionButtonText}>Allow Camera</Text>
@@ -98,12 +114,21 @@ export default function BarcodeScannerModal({ visible, onClose, onScanned }: Bar
             <CameraView
               style={styles.camera}
               facing="back"
-              barcodeScannerSettings={{ barcodeTypes: BARCODE_TYPES }}
+              enableTorch={torchEnabled}
+              barcodeScannerSettings={{ barcodeTypes: includeQr ? CODE_TYPES : BARCODE_TYPES }}
               onBarcodeScanned={scanned ? undefined : handleScan}
             >
               <View style={styles.cameraOverlay}>
-                <View style={styles.scanFrame} />
-                <Text style={styles.scanHint}>Align the product barcode inside the frame</Text>
+                <TouchableOpacity
+                  style={[styles.torchButton, torchEnabled && styles.torchButtonActive]}
+                  onPress={() => setTorchEnabled((enabled) => !enabled)}
+                  activeOpacity={0.75}
+                  accessibilityLabel={torchEnabled ? 'Turn flashlight off' : 'Turn flashlight on'}
+                >
+                  <FontAwesomeIcon icon={faBolt} size={16} color="#ffffff" />
+                </TouchableOpacity>
+                <View style={includeQr ? styles.scanFrameSquare : styles.scanFrame} />
+                <Text style={styles.scanHint}>{hint}</Text>
               </View>
             </CameraView>
           </View>
@@ -159,10 +184,35 @@ const styles = StyleSheet.create({
     padding: 24,
     backgroundColor: 'rgba(0,0,0,0.18)',
   },
+  torchButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.48)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
+  torchButtonActive: {
+    backgroundColor: BARCODE_ORANGE,
+    borderColor: 'rgba(255,255,255,0.7)',
+  },
   scanFrame: {
     width: 280,
     height: 130,
     borderRadius: 18,
+    borderWidth: 3,
+    borderColor: '#ffffff',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  scanFrameSquare: {
+    width: 240,
+    height: 240,
+    borderRadius: 24,
     borderWidth: 3,
     borderColor: '#ffffff',
     backgroundColor: 'rgba(255,255,255,0.05)',

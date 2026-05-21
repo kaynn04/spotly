@@ -30,8 +30,6 @@ import { Colors } from '@/constants/theme';
 import { useScrollHide } from '@/hooks/use-scroll-hide';
 import { useTabBarPadding } from '@/hooks/use-tab-bar-padding';
 
-const PRIMARY = '#6b7f99';
-
 interface Tool {
   id: string;
   title: string;
@@ -48,14 +46,14 @@ const TOOLS: Tool[] = [
     title: 'Outside Sessions',
     description: "Track items you've taken out of the house with a checklist.",
     icon: faSuitcase,
-    iconColor: PRIMARY,
+    iconColor: '#4f8f7b',
     route: '/outside',
     available: true,
   },
   {
     id: 'qrcode',
-    title: 'QR scanner',
-    description: 'Create printable QR labels and scan QR or product barcodes.',
+    title: 'QR Labels',
+    description: 'Create printable item labels and scan QR or product barcodes.',
     icon: faQrcode,
     iconColor: '#9b7fd4',
     route: '/tools/label-qr',

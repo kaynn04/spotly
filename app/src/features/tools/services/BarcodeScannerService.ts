@@ -20,6 +20,7 @@ export interface BarcodeMatch {
   name: string;
   description: string | null;
   quantity: number;
+  unitsPerPack: number | null;
   photoUri: string | null;
   warrantyExpiry: string | null;
   spaceId: string;
@@ -126,6 +127,7 @@ export class BarcodeScannerService {
           i.name,
           i.description,
           i.quantity,
+          i.units_per_pack,
           i.photo_uri,
           i.warranty_expiry,
           i.space_id,
@@ -152,7 +154,8 @@ export class BarcodeScannerService {
       id: String(row.id),
       name: row.name,
       description: row.description ?? null,
-      quantity: row.quantity ?? 1,
+      quantity: row.quantity ?? 0,
+      unitsPerPack: row.units_per_pack ?? null,
       photoUri: row.photo_uri ?? null,
       warrantyExpiry: row.warranty_expiry ?? null,
       spaceId: String(row.space_id),

@@ -31,7 +31,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faChevronLeft, faBox, faHandshake, faCheck, faTrash, faMapPin, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faFilter, faList, faGrip, faPen, faRightLeft, faEllipsisVertical } from '@fortawesome/free-solid-svg-icons';
+import { faMagnifyingGlass, faTimes, faChevronRight, faFolder, faChevronLeft, faBox, faHandshake, faCheck, faTrash, faMapPin, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faFilter, faList, faGrip, faPen, faRightLeft, faEllipsisVertical, faQrcode } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -433,6 +433,18 @@ export default function SpaceDetailScreen() {
     ]);
   }
 
+  function openSpacePrintableLabel() {
+    if (!space) return;
+    setShowSpaceMenu(false);
+    router.push({
+      pathname: '/tools/label-qr' as any,
+      params: {
+        targetKind: 'space',
+        targetId: space.id,
+      },
+    });
+  }
+
   // --- Select mode ---
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -601,9 +613,9 @@ export default function SpaceDetailScreen() {
     setShowLendModal(true);
   };
 
-  const handleEditItemSubmit = async (name: string, description?: string, quantity?: number, photoUri?: string | null) => {
+  const handleEditItemSubmit = async (name: string, description?: string, quantity?: number, photoUri?: string | null, warrantyExpiry?: Date | null, barcode?: ScannedBarcode | null, unitsPerPack?: number | null) => {
     if (!editingItem) return;
-    await ItemService.updateItem(editingItem.id, { name, description: description ?? null, quantity: quantity ?? 1 });
+    await ItemService.updateItem(editingItem.id, { name, description: description ?? null, quantity: quantity ?? 0, unitsPerPack: unitsPerPack ?? null });
     if (photoUri && photoUri !== editingItem.photoUri) {
       const savedUri = await PhotoService.savePhoto(photoUri, editingItem.id);
       await ItemRepository.updatePhotoUri(editingItem.id, savedUri);
@@ -648,9 +660,9 @@ export default function SpaceDetailScreen() {
     await loadSpace();
   };
 
-  async function handleAddItem(name: string, description?: string, quantity?: number, photoUri?: string | null, warrantyExpiry?: Date | null, barcode?: ScannedBarcode | null) {
+  async function handleAddItem(name: string, description?: string, quantity?: number, photoUri?: string | null, warrantyExpiry?: Date | null, barcode?: ScannedBarcode | null, unitsPerPack?: number | null) {
     // Create item first to get the ID, then save photo if provided
-    const item = await ItemService.createItem(id!, name, null, description, quantity);
+    const item = await ItemService.createItem(id!, name, null, description, quantity, null, unitsPerPack);
     if (barcode) {
       await BarcodeScannerService.linkItemToBarcode(item.id, barcode);
     }
@@ -1420,6 +1432,14 @@ export default function SpaceDetailScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.menuOption}
+                  onPress={openSpacePrintableLabel}
+                  activeOpacity={0.7}
+                >
+                  <FontAwesomeIcon icon={faQrcode} size={14} color={PRIMARY} />
+                  <Text style={[styles.menuOptionText, { color: colors.text }]}>Print label</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.menuOption}
                   onPress={() => { setShowSpaceMenu(false); handleDeleteSpace(); }}
                   activeOpacity={0.7}
                 >
@@ -1536,6 +1556,7 @@ export default function SpaceDetailScreen() {
         initialName={editingItem?.name}
         initialDescription={editingItem?.description ?? undefined}
         initialQuantity={editingItem?.quantity}
+        initialUnitsPerPack={editingItem?.unitsPerPack}
         initialPhotoUri={editingItem?.photoUri}
       />
       <ContainerFormModal

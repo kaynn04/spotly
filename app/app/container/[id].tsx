@@ -30,7 +30,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faChevronLeft, faMapPin, faBox, faHandshake, faCheck, faTrash, faFolder, faRightLeft, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faFilter, faList, faGrip, faPen, faTimes, faEllipsisVertical, faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
+import { faChevronLeft, faMapPin, faBox, faHandshake, faCheck, faTrash, faFolder, faRightLeft, faArrowDownAZ, faArrowDownZA, faCalendarPlus, faCalendar, faFilter, faList, faGrip, faPen, faTimes, faEllipsisVertical, faMagnifyingGlass, faQrcode } from '@fortawesome/free-solid-svg-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -418,9 +418,9 @@ export default function ContainerDetailScreen() {
     setShowLendModal(true);
   };
 
-  const handleEditItemSubmit = async (name: string, description?: string, quantity?: number, photoUri?: string | null) => {
+  const handleEditItemSubmit = async (name: string, description?: string, quantity?: number, photoUri?: string | null, warrantyExpiry?: Date | null, barcode?: ScannedBarcode | null, unitsPerPack?: number | null) => {
     if (!editingItem) return;
-    await ItemService.updateItem(editingItem.id, { name, description: description ?? null, quantity: quantity ?? 1 });
+    await ItemService.updateItem(editingItem.id, { name, description: description ?? null, quantity: quantity ?? 0, unitsPerPack: unitsPerPack ?? null });
     if (photoUri && photoUri !== editingItem.photoUri) {
       const savedUri = await PhotoService.savePhoto(photoUri, editingItem.id);
       await ItemRepository.updatePhotoUri(editingItem.id, savedUri);
@@ -494,6 +494,18 @@ export default function ContainerDetailScreen() {
     );
   }
 
+  function openContainerPrintableLabel() {
+    if (!container) return;
+    setShowContainerMenu(false);
+    router.push({
+      pathname: '/tools/label-qr' as any,
+      params: {
+        targetKind: 'container',
+        targetId: container.id,
+      },
+    });
+  }
+
   function confirmDeleteItem(itemId: string, itemName: string) {
     Alert.alert('Delete Item', `Delete "${itemName}"? This cannot be undone.`, [
       { text: 'Cancel', style: 'cancel' },
@@ -549,9 +561,9 @@ export default function ContainerDetailScreen() {
     }
   }
 
-  async function handleAddItem(name: string, description?: string, quantity?: number, photoUri?: string | null, warrantyExpiry?: Date | null, barcode?: ScannedBarcode | null) {
+  async function handleAddItem(name: string, description?: string, quantity?: number, photoUri?: string | null, warrantyExpiry?: Date | null, barcode?: ScannedBarcode | null, unitsPerPack?: number | null) {
     if (!space || !containerId) return;
-    const item = await ItemService.createItem(space.id, name, containerId, description, quantity);
+    const item = await ItemService.createItem(space.id, name, containerId, description, quantity, null, unitsPerPack);
     if (barcode) {
       await BarcodeScannerService.linkItemToBarcode(item.id, barcode);
     }
@@ -607,9 +619,15 @@ export default function ContainerDetailScreen() {
           ) : (
             <>
               {space && (
-                <Text style={[styles.breadcrumb, { color: subtleText }]} numberOfLines={1}>
-                  {space.name}
-                </Text>
+                <TouchableOpacity
+                  onPress={() => router.dismissTo({ pathname: '/space/[id]' as any, params: { id: space.id } })}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
+                >
+                  <Text style={[styles.breadcrumb, { color: PRIMARY }]} numberOfLines={1}>
+                    {space.name}
+                  </Text>
+                </TouchableOpacity>
               )}
               <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
                 {container?.name ?? 'Container'}
@@ -1027,6 +1045,10 @@ export default function ContainerDetailScreen() {
                   <FontAwesomeIcon icon={faRightLeft} size={14} color={PRIMARY} />
                   <Text style={[styles.menuOptionText, { color: colors.text }]}>Move</Text>
                 </TouchableOpacity>
+                <TouchableOpacity style={[styles.menuOption]} onPress={openContainerPrintableLabel} activeOpacity={0.7}>
+                  <FontAwesomeIcon icon={faQrcode} size={14} color={PRIMARY} />
+                  <Text style={[styles.menuOptionText, { color: colors.text }]}>Print label</Text>
+                </TouchableOpacity>
                 <TouchableOpacity style={[styles.menuOption]} onPress={() => { setShowContainerMenu(false); confirmDeleteContainer(); }} activeOpacity={0.7}>
                   <FontAwesomeIcon icon={faTrash} size={14} color="#d32f2f" />
                   <Text style={[styles.menuOptionText, { color: '#d32f2f' }]}>Delete</Text>
@@ -1230,6 +1252,7 @@ export default function ContainerDetailScreen() {
         initialName={editingItem?.name}
         initialDescription={editingItem?.description ?? undefined}
         initialQuantity={editingItem?.quantity}
+        initialUnitsPerPack={editingItem?.unitsPerPack}
         initialPhotoUri={editingItem?.photoUri}
       />
       <ContainerFormModal

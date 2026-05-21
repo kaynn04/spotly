@@ -24,7 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faShield, faCalendarAlt, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faShield, faCalendarAlt, faTimes, faChevronRight, faLayerGroup } from '@fortawesome/free-solid-svg-icons';
 import PhotoPickerSheet from '@/components/PhotoPickerSheet';
 import DatePickerSheet from '@/src/features/lending/screens/components/DatePickerSheet';
 import { PhotoService } from '@/src/services/PhotoService';
@@ -33,11 +33,24 @@ import BarcodeScannerModal from '@/src/features/tools/components/BarcodeScannerM
 import type { ScannedBarcode } from '@/src/features/tools/services/BarcodeScannerService';
 
 const PRIMARY = '#6b7f99';
+const PACK_SIZE_PRESETS = [10, 12, 20, 24, 25, 30, 50, 100];
+
+function getItemCount(quantity: number, contentsPerItem?: number | null) {
+  const safeQuantity = Math.max(0, Math.floor(quantity) || 0);
+  const safeContents = contentsPerItem ? Math.max(1, Math.floor(contentsPerItem) || 1) : null;
+  return safeContents ? Math.ceil(safeQuantity / safeContents) : safeQuantity;
+}
+
+function getStoredQuantity(itemCount: number, contentsPerItem?: number | null) {
+  const safeItemCount = Math.max(0, Math.floor(itemCount) || 0);
+  const safeContents = contentsPerItem ? Math.max(1, Math.floor(contentsPerItem) || 1) : null;
+  return safeContents ? safeItemCount * safeContents : safeItemCount;
+}
 
 interface ItemFormModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (name: string, description?: string, quantity?: number, photoUri?: string | null, warrantyExpiry?: Date | null, barcode?: ScannedBarcode | null) => Promise<void>;
+  onSubmit: (name: string, description?: string, quantity?: number, photoUri?: string | null, warrantyExpiry?: Date | null, barcode?: ScannedBarcode | null, unitsPerPack?: number | null) => Promise<void>;
   contextLabel?: string;
   editMode?: boolean;
   initialName?: string;
@@ -45,9 +58,10 @@ interface ItemFormModalProps {
   initialQuantity?: number;
   initialPhotoUri?: string | null;
   initialBarcode?: ScannedBarcode | null;
+  initialUnitsPerPack?: number | null;
 }
 
-export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel, editMode, initialName, initialDescription, initialQuantity, initialPhotoUri, initialBarcode }: ItemFormModalProps) {
+export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel, editMode, initialName, initialDescription, initialQuantity, initialPhotoUri, initialBarcode, initialUnitsPerPack }: ItemFormModalProps) {
   const colorScheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();
@@ -56,6 +70,8 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [quantity, setQuantity] = useState('1');
+  const [unitsPerPack, setUnitsPerPack] = useState('');
+  const [showContentsTracking, setShowContentsTracking] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -70,12 +86,14 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
     if (visible) {
       setName(initialName ?? '');
       setDescription(initialDescription ?? '');
-      setQuantity(String(initialQuantity ?? 1));
+      setQuantity(String(getItemCount(initialQuantity ?? 1, initialUnitsPerPack)));
+      setUnitsPerPack(initialUnitsPerPack ? String(initialUnitsPerPack) : '');
+      setShowContentsTracking(!!initialUnitsPerPack);
       setPhotoUri(initialPhotoUri ?? null);
       setScannedBarcode(initialBarcode ?? null);
       if (!editMode) setWarrantyDate(null);
     }
-  }, [editMode, initialBarcode, initialDescription, initialName, initialPhotoUri, initialQuantity, visible]);
+  }, [editMode, initialBarcode, initialDescription, initialName, initialPhotoUri, initialQuantity, initialUnitsPerPack, visible]);
 
   const cardBg = isDark ? '#1c1c1e' : '#ffffff';
   const inputBg = isDark ? '#2c2c2e' : '#f8f9fa';
@@ -90,6 +108,8 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
     setName('');
     setDescription('');
     setQuantity('1');
+    setUnitsPerPack('');
+    setShowContentsTracking(false);
     setError(null);
     setPhotoUri(null);
     setWarrantyDate(null);
@@ -102,11 +122,20 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
     setLoading(true);
     setError(null);
     try {
-      const qty = Math.max(1, parseInt(quantity) || 1);
-      await onSubmit(name.trim(), description.trim() || undefined, qty, photoUri, warrantyDate, scannedBarcode);
+      const itemCount = Math.max(0, parseInt(quantity) || 0);
+      const packSize = unitsPerPack.trim() ? Math.max(1, parseInt(unitsPerPack) || 1) : null;
+      const initialItemCount = getItemCount(initialQuantity ?? 0, initialUnitsPerPack);
+      const countUnchanged = editMode && itemCount === initialItemCount;
+      const contentsUnchanged = editMode && (packSize ?? null) === (initialUnitsPerPack ?? null);
+      const qty = countUnchanged && contentsUnchanged
+        ? Math.max(0, initialQuantity ?? 0)
+        : getStoredQuantity(itemCount, packSize);
+      await onSubmit(name.trim(), description.trim() || undefined, qty, photoUri, warrantyDate, scannedBarcode, packSize);
       setName('');
       setDescription('');
       setQuantity('1');
+      setUnitsPerPack('');
+      setShowContentsTracking(false);
       setPhotoUri(null);
       setWarrantyDate(null);
       setScannedBarcode(null);
@@ -215,11 +244,11 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
                   )}
 
                   {/* Quantity */}
-                  <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 14 }]}>Quantity</Text>
+                  <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 14 }]}>Item count</Text>
                   <View style={styles.quantityRow}>
                     <TouchableOpacity
                       style={[styles.quantityBtn, { backgroundColor: inputBg, borderColor }]}
-                      onPress={() => setQuantity(String(Math.max(1, (parseInt(quantity) || 1) - 1)))}
+                      onPress={() => setQuantity(String(Math.max(0, (parseInt(quantity) || 0) - 1)))}
                     >
                       <Text style={[styles.quantityBtnText, { color: textColor }]}>−</Text>
                     </TouchableOpacity>
@@ -235,11 +264,78 @@ export default function ItemFormModal({ visible, onClose, onSubmit, contextLabel
                     </View>
                     <TouchableOpacity
                       style={[styles.quantityBtn, { backgroundColor: inputBg, borderColor }]}
-                      onPress={() => setQuantity(String((parseInt(quantity) || 1) + 1))}
+                      onPress={() => setQuantity(String((parseInt(quantity) || 0) + 1))}
                     >
                       <Text style={[styles.quantityBtnText, { color: textColor }]}>+</Text>
                     </TouchableOpacity>
                   </View>
+
+                  {showContentsTracking ? (
+                    <>
+                      <View style={styles.labelRow}>
+                        <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 14, marginBottom: 0 }]}>Contents per item</Text>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setUnitsPerPack('');
+                            setShowContentsTracking(false);
+                          }}
+                          disabled={loading}
+                          hitSlop={8}
+                        >
+                          <Text style={[styles.inlineActionText, { color: subtleText }]}>Disable</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <View style={[styles.inputWrapper, { backgroundColor: inputBg, borderColor, marginTop: 6 }]}>
+                        <TextInput
+                          style={[styles.input, { color: textColor }]}
+                          placeholder="e.g., 100 sticks in 1 tub"
+                          placeholderTextColor={subtleText}
+                          value={unitsPerPack}
+                          onChangeText={(t) => setUnitsPerPack(t.replace(/[^0-9]/g, ''))}
+                          keyboardType="number-pad"
+                          maxLength={5}
+                          editable={!loading}
+                        />
+                      </View>
+                      <View style={styles.presetRow}>
+                        {PACK_SIZE_PRESETS.map((preset) => {
+                          const active = unitsPerPack === String(preset);
+                          return (
+                            <TouchableOpacity
+                              key={preset}
+                              style={[styles.presetChip, { backgroundColor: active ? PRIMARY : inputBg, borderColor }]}
+                              onPress={() => setUnitsPerPack(String(preset))}
+                              activeOpacity={0.75}
+                            >
+                              <Text style={[styles.presetChipText, { color: active ? '#ffffff' : textColor }]}>{preset}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                      <Text style={[styles.helperText, { color: subtleText }]}>
+                        When set, Synop tracks the total contents from item count x contents per item.
+                      </Text>
+                    </>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.optionalFeatureBtn, { backgroundColor: `${PRIMARY}12`, borderColor: PRIMARY }]}
+                      onPress={() => setShowContentsTracking(true)}
+                      activeOpacity={0.8}
+                      disabled={loading}
+                    >
+                      <View style={[styles.optionalFeatureIcon, { backgroundColor: `${PRIMARY}20` }]}>
+                        <FontAwesomeIcon icon={faLayerGroup} size={15} color={PRIMARY} />
+                      </View>
+                      <View style={styles.optionalFeatureBody}>
+                        <Text style={[styles.optionalFeatureEyebrow, { color: PRIMARY }]}>Optional setup</Text>
+                        <Text style={[styles.optionalFeatureText, { color: textColor }]}>Tap to enable contents tracking</Text>
+                        <Text style={[styles.optionalFeatureHint, { color: subtleText }]}>For packs, tubs, boxes, or containers with units inside.</Text>
+                      </View>
+                      <View style={[styles.optionalFeatureArrow, { backgroundColor: PRIMARY }]}>
+                        <FontAwesomeIcon icon={faChevronRight} size={12} color="#ffffff" />
+                      </View>
+                    </TouchableOpacity>
+                  )}
 
                   {/* Photo */}
                   <Text style={[styles.fieldLabel, { color: subtleText, marginTop: 14 }]}>Photo (optional)</Text>
@@ -387,12 +483,25 @@ const styles = StyleSheet.create({
   },
   errorText: { fontSize: 12, color: '#d32f2f', flex: 1 },
   hint: { fontSize: 12, flex: 1 },
+  helperText: { fontSize: 12, lineHeight: 17, marginTop: 6 },
+  labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  inlineActionText: { fontSize: 12, fontWeight: '800' },
+  optionalFeatureBtn: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1.5, padding: 14, marginTop: 14, gap: 12 },
+  optionalFeatureIcon: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  optionalFeatureBody: { flex: 1, minWidth: 0, gap: 2 },
+  optionalFeatureEyebrow: { fontSize: 11, fontWeight: '900', textTransform: 'uppercase' },
+  optionalFeatureText: { fontSize: 15, fontWeight: '800' },
+  optionalFeatureHint: { fontSize: 12, lineHeight: 17 },
+  optionalFeatureArrow: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   charCount: { fontSize: 11 },
   quantityRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   quantityBtn: { width: 40, height: 40, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   quantityBtnText: { fontSize: 20, fontWeight: '600' },
   quantityInputWrap: { width: 60, height: 40, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   quantityInput: { fontSize: 16, fontWeight: '600', textAlign: 'center', width: '100%', paddingVertical: 0 },
+  presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  presetChip: { minWidth: 44, minHeight: 32, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+  presetChipText: { fontSize: 13, fontWeight: '800' },
   buttonRow: { flexDirection: 'row', gap: 10 },
   cancelBtn: { flex: 1, borderWidth: 1.5, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   cancelBtnText: { fontSize: 15, fontWeight: '600' },

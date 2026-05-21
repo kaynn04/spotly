@@ -41,7 +41,7 @@ import LendingFormModal from '@/src/features/lending/screens/components/LendingF
 import ItemPickerModal from './components/ItemPickerModal';
 import { useKeyboardHeight } from '@/hooks/use-keyboard-height';
 
-const PRIMARY = '#6b7f99';
+const PRIMARY = '#4f8f7b';
 const LENDING = '#9b72cb';
 type OutsidePhase = 'leaving' | 'returning';
 

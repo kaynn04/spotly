@@ -23,21 +23,38 @@ function isUniqueConstraintError(error: unknown): boolean {
  */
 export class ItemRepository {
   private static ensureLostColumnsPromise: Promise<void> | null = null;
+  private static ensureStockUnitColumnsPromise: Promise<void> | null = null;
+
+  private static async safeAddItemColumn(name: string, definition: string): Promise<void> {
+    const db = getDatabase();
+    const columns = await db.getAllAsync<any>('PRAGMA table_info(items);');
+    if (columns.some((col: any) => col.name === name)) return;
+
+    try {
+      await db.execAsync(`ALTER TABLE items ADD COLUMN ${definition};`);
+    } catch (error: any) {
+      const message = String(error?.message ?? error).toLowerCase();
+      if (!message.includes('duplicate column')) throw error;
+    }
+  }
+
+  private static async ensureStockUnitColumns(): Promise<void> {
+    if (!ItemRepository.ensureStockUnitColumnsPromise) {
+      ItemRepository.ensureStockUnitColumnsPromise = (async () => {
+        await ItemRepository.safeAddItemColumn('units_per_pack', 'units_per_pack INTEGER');
+      })().finally(() => {
+        ItemRepository.ensureStockUnitColumnsPromise = null;
+      });
+    }
+
+    await ItemRepository.ensureStockUnitColumnsPromise;
+  }
 
   private static async ensureLostColumns(): Promise<void> {
     if (!ItemRepository.ensureLostColumnsPromise) {
       ItemRepository.ensureLostColumnsPromise = (async () => {
-        const db = getDatabase();
         const safeAddColumn = async (name: string, definition: string) => {
-          const columns = await db.getAllAsync<any>('PRAGMA table_info(items);');
-          if (columns.some((col: any) => col.name === name)) return;
-
-          try {
-            await db.execAsync(`ALTER TABLE items ADD COLUMN ${definition};`);
-          } catch (error: any) {
-            const message = String(error?.message ?? error).toLowerCase();
-            if (!message.includes('duplicate column')) throw error;
-          }
+          await ItemRepository.safeAddItemColumn(name, definition);
         };
 
         await safeAddColumn('lost_at', 'lost_at TEXT');
@@ -78,6 +95,7 @@ export class ItemRepository {
     try {
       const db = getDatabase();
       await ItemRepository.ensureLostColumns();
+      await ItemRepository.ensureStockUnitColumns();
       const rows = await db.getAllAsync<any>(
         `SELECT i.id, i.name, i.space_id, i.container_id, i.lost_at,
                 s.name as space_name,
@@ -122,10 +140,12 @@ export class ItemRepository {
     containerId?: string | null,
     description?: string | null,
     quantity?: number,
-    photoUri?: string | null
+    photoUri?: string | null,
+    unitsPerPack?: number | null
   ): Promise<Item> {
     try {
       const db = getDatabase();
+      await ItemRepository.ensureStockUnitColumns();
 
       // Generate UUID and current ISO 8601 timestamp
       const id = generateUUID();
@@ -134,8 +154,8 @@ export class ItemRepository {
 
       // Execute parameterized INSERT query (handle optional containerId)
       await db.runAsync(
-        'INSERT INTO items (id, name, space_id, container_id, description, quantity, photo_uri, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [id, name, spaceId, containerId ?? null, description ?? null, qty, photoUri ?? null, now, now]
+        'INSERT INTO items (id, name, space_id, container_id, description, quantity, photo_uri, units_per_pack, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, name, spaceId, containerId ?? null, description ?? null, qty, photoUri ?? null, unitsPerPack ?? null, now, now]
       );
 
       // Return the created Item object
@@ -144,6 +164,7 @@ export class ItemRepository {
         name,
         description: description ?? null,
         quantity: qty,
+        unitsPerPack: unitsPerPack ?? null,
         spaceId,
         containerId,
         photoUri: photoUri ?? null,
@@ -189,6 +210,7 @@ export class ItemRepository {
     try {
       const db = getDatabase();
       await ItemRepository.ensureLostColumns();
+      await ItemRepository.ensureStockUnitColumns();
 
       const result = await db.getAllAsync(
         'SELECT * FROM items WHERE space_id = ? ORDER BY created_at DESC',
@@ -200,6 +222,7 @@ export class ItemRepository {
         name: row.name,
         description: row.description ?? null,
         quantity: row.quantity ?? 1,
+        unitsPerPack: row.units_per_pack ?? null,
         spaceId: row.space_id,
         containerId: row.container_id,
         createdAt: row.created_at,
@@ -235,6 +258,7 @@ export class ItemRepository {
     try {
       const db = getDatabase();
       await ItemRepository.ensureLostColumns();
+      await ItemRepository.ensureStockUnitColumns();
 
       const result = await db.getAllAsync(
         'SELECT * FROM items WHERE container_id = ? ORDER BY created_at DESC',
@@ -246,6 +270,7 @@ export class ItemRepository {
         name: row.name,
         description: row.description ?? null,
         quantity: row.quantity ?? 1,
+        unitsPerPack: row.units_per_pack ?? null,
         spaceId: row.space_id,
         createdAt: row.created_at,
         containerId: row.container_id,
@@ -515,6 +540,7 @@ export class ItemRepository {
     try {
       const db = getDatabase();
       await ItemRepository.ensureLostColumns();
+      await ItemRepository.ensureStockUnitColumns();
       const result = await db.getAllAsync(`
         SELECT 
           i.id,
@@ -527,6 +553,7 @@ export class ItemRepository {
           i.photo_uri,
           i.warranty_expiry,
           i.warranty_reminder_id,
+          i.units_per_pack,
           i.lost_at,
           i.lost_outside_session_id,
           i.lost_note,
@@ -543,6 +570,7 @@ export class ItemRepository {
         name: row.name,
         description: row.description ?? null,
         quantity: row.quantity ?? 1,
+        unitsPerPack: row.units_per_pack ?? null,
         spaceId: row.space_id,
         containerId: row.container_id,
         createdAt: row.created_at,
@@ -576,6 +604,7 @@ export class ItemRepository {
     try {
       const db = getDatabase();
       await ItemRepository.ensureLostColumns();
+      await ItemRepository.ensureStockUnitColumns();
       const result = await db.getFirstAsync<any>(`
         SELECT 
           i.id,
@@ -588,6 +617,7 @@ export class ItemRepository {
           i.photo_uri,
           i.warranty_expiry,
           i.warranty_reminder_id,
+          i.units_per_pack,
           i.lost_at,
           i.lost_outside_session_id,
           i.lost_note,
@@ -609,6 +639,7 @@ export class ItemRepository {
         name: result.name,
         description: result.description ?? null,
         quantity: result.quantity ?? 1,
+        unitsPerPack: result.units_per_pack ?? null,
         spaceId: result.space_id,
         containerId: result.container_id,
         createdAt: result.created_at,
@@ -640,15 +671,17 @@ export class ItemRepository {
   /**
    * Update item fields (name, description, quantity)
    */
-  static async updateItem(id: string, updates: { name?: string; description?: string | null; quantity?: number }): Promise<void> {
+  static async updateItem(id: string, updates: { name?: string; description?: string | null; quantity?: number; unitsPerPack?: number | null }): Promise<void> {
     try {
       const db = getDatabase();
+      await ItemRepository.ensureStockUnitColumns();
       const fields: string[] = [];
       const values: any[] = [];
 
       if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name); }
       if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description); }
       if (updates.quantity !== undefined) { fields.push('quantity = ?'); values.push(updates.quantity); }
+      if (updates.unitsPerPack !== undefined) { fields.push('units_per_pack = ?'); values.push(updates.unitsPerPack); }
 
       if (fields.length === 0) return;
       fields.push('updated_at = ?');
